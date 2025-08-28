@@ -16,7 +16,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
 
   const { open, ready } = usePlaidLink({
     token: linkToken,
-    env: 'sandbox',
+    env: process.env.NEXT_PUBLIC_PLAID_ENV as 'sandbox' | 'development' | 'production' || 'production',
     // Additional configurations for sandbox
     product: ['liabilities', 'transactions'],
     onSuccess: async (public_token, metadata) => {
