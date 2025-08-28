@@ -180,7 +180,11 @@ class PlaidServiceImpl implements PlaidService {
         const creditLimit = balanceAccount?.balances?.limit ?? account.balances.limit;
 
         // Debug logging for credit limits
-        console.log('Plaid account data for', account.name, {
+        console.log('=== FULL PLAID RESPONSE DEBUG for', account.name, '===');
+        console.log('Liabilities Account:', JSON.stringify(account, null, 2));
+        console.log('Balance Account:', JSON.stringify(balanceAccount, null, 2));
+        console.log('Liability Data:', JSON.stringify(liability, null, 2));
+        console.log('Final Analysis:', {
           accountId: account.account_id,
           liabilitiesLimit: account.balances.limit,
           balancesLimit: balanceAccount?.balances?.limit,
@@ -190,6 +194,7 @@ class PlaidServiceImpl implements PlaidService {
           isFinite: isFinite(creditLimit),
           isNaN: isNaN(creditLimit)
         });
+        console.log('=== END DEBUG ===');
 
         const cardData = {
           name: account.name,
