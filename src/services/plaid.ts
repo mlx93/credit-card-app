@@ -108,9 +108,27 @@ class PlaidServiceImpl implements PlaidService {
         end_date: endDate.toISOString().split('T')[0],
       };
 
-      console.log('Calling Plaid transactionsGet...');
+      console.log('Calling Plaid transactionsGet with request:', JSON.stringify(request, null, 2));
       const response = await plaidClient.transactionsGet(request);
       console.log('Plaid transactionsGet response:', response.data.transactions.length, 'transactions');
+      console.log('Total transactions available:', response.data.total_transactions);
+      console.log('Response includes all data:', response.data.transactions.length >= response.data.total_transactions);
+      
+      if (response.data.transactions.length < response.data.total_transactions) {
+        console.warn(`⚠️  PAGINATION ISSUE: Only got ${response.data.transactions.length} of ${response.data.total_transactions} total transactions`);
+        console.warn('This explains why you only see 3 months of data - we need to implement pagination!');
+      }
+      
+      if (response.data.transactions.length > 0) {
+        const dates = response.data.transactions.map(t => t.date).sort();
+        console.log('Actual transaction date range returned by Plaid:', dates[0], 'to', dates[dates.length - 1]);
+        console.log('Expected vs actual months of data:', {
+          requested: Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24 * 30)),
+          actualOldest: dates[0],
+          actualNewest: dates[dates.length - 1],
+          actualMonthsSpan: Math.round((new Date(dates[dates.length - 1]).getTime() - new Date(dates[0]).getTime()) / (1000 * 60 * 60 * 24 * 30))
+        });
+      }
       console.log('Sample transactions:', response.data.transactions.slice(0, 3).map(t => ({
         id: t.transaction_id,
         account_id: t.account_id,
@@ -395,7 +413,13 @@ class PlaidServiceImpl implements PlaidService {
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - 15); // Extended to 15 months to ensure coverage
 
-      console.log(`Fetching transactions from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+      console.log(`=== TRANSACTION DATE RANGE DEBUG ===`);
+      console.log(`Current date: ${new Date().toISOString()}`);
+      console.log(`Calculated start date: ${startDate.toISOString()}`);  
+      console.log(`Calculated end date: ${endDate.toISOString()}`);
+      console.log(`Requesting range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+      console.log(`Expected months back: ${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))}`);
+      console.log(`=== END DATE RANGE DEBUG ===`);
 
       const transactions = await this.getTransactions(
         accessToken,
