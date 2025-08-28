@@ -10,6 +10,8 @@ interface BillingCycle {
   totalSpend: number;
   transactionCount: number;
   dueDate?: Date;
+  statementBalance?: number;
+  minimumPayment?: number;
   isCurrentCycle?: boolean;
 }
 
@@ -85,10 +87,13 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     return Math.abs(cardName.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % cardColors.length;
   };
 
-  const BillingCycleItem = ({ cycle, isHistorical = false }: { cycle: BillingCycle, isHistorical?: boolean }) => {
+  const BillingCycleItem = ({ cycle, card, isHistorical = false }: { cycle: BillingCycle, card?: CreditCardInfo, isHistorical?: boolean }) => {
     const daysUntilDue = cycle.dueDate ? getDaysUntil(cycle.dueDate) : null;
     const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
     const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
+    
+    // Hide due date info if total spend and statement balance are both $0
+    const shouldShowDueDate = cycle.dueDate && (cycle.totalSpend > 0 || (cycle.statementBalance && cycle.statementBalance > 0));
 
     return (
       <div className={`p-4 rounded-lg border ${isHistorical ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-300'} ${isHistorical ? 'opacity-75' : ''}`}>
@@ -99,16 +104,27 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
               <p className="font-medium text-gray-900">
                 {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
               </p>
-              <p className="text-sm text-gray-600">{cycle.transactionCount} transactions</p>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>{cycle.transactionCount} transactions</span>
+                {card && <span>•••• {card.mask}</span>}
+              </div>
             </div>
           </div>
           <div className="text-right">
-            <p className="font-semibold text-lg text-gray-900">{formatCurrency(cycle.totalSpend)}</p>
-            {cycle.dueDate && (
+            {cycle.statementBalance && cycle.statementBalance !== cycle.totalSpend ? (
+              <div>
+                <p className="font-semibold text-lg text-blue-600">{formatCurrency(cycle.statementBalance)}</p>
+                <p className="text-xs text-blue-500">Statement Balance</p>
+                <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+              </div>
+            ) : (
+              <p className="font-semibold text-lg text-gray-900">{formatCurrency(cycle.totalSpend)}</p>
+            )}
+            {shouldShowDueDate && (
               <p className={`text-sm ${
                 isOverdue ? 'text-red-600' : isDueSoon ? 'text-yellow-600' : 'text-green-600'
               }`}>
-                Due: {formatDate(cycle.dueDate)}
+                Due: {formatDate(cycle.dueDate!)}
                 {daysUntilDue !== null && (
                   <span className="block">
                     ({Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'remaining'})
@@ -119,7 +135,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
           </div>
         </div>
         
-        {cycle.dueDate && (
+        {shouldShowDueDate && (
           <div className="flex justify-end">
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
               isOverdue 
@@ -145,10 +161,14 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
 
       {Object.entries(cyclesByCard).map(([cardName, cardCycles]) => {
         const colorIndex = getCardColorIndex(cardName);
-        const currentAndRecent = cardCycles.slice(0, 2); // Current + most recent previous
-        const historical = cardCycles.slice(2); // All others
-        const isExpanded = expandedCards.has(cardName);
         const card = cards.find(c => c.name === cardName);
+        const isExpanded = expandedCards.has(cardName);
+        
+        // Separate cycles: those with statement balance (prior/closed) and current/recent ones
+        const closedCycles = cardCycles.filter(c => c.statementBalance && c.statementBalance > 0);
+        const currentCycles = cardCycles.filter(c => !c.statementBalance || c.statementBalance <= 0);
+        const allRecentCycles = [...closedCycles.slice(0, 1), ...currentCycles.slice(0, 1)]; // Show 1 closed + 1 current
+        const historical = cardCycles.slice(2); // All others beyond the first 2
 
         return (
           <div key={cardName} className={`rounded-lg border-2 ${cardColors[colorIndex]} ${cardBorderColors[colorIndex]} border-l-4`}>
@@ -173,11 +193,22 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
               </div>
 
               <div className="space-y-3">
-                {/* Current and recent cycles (always shown) */}
-                {currentAndRecent.map((cycle, index) => (
+                {/* Show closed cycle with statement balance first */}
+                {closedCycles.slice(0, 1).map(cycle => (
                   <BillingCycleItem 
                     key={cycle.id} 
                     cycle={cycle}
+                    card={card}
+                    isHistorical={false}
+                  />
+                ))}
+                
+                {/* Show current cycle */}
+                {currentCycles.slice(0, 1).map(cycle => (
+                  <BillingCycleItem 
+                    key={cycle.id} 
+                    cycle={cycle}
+                    card={card}
                     isHistorical={false}
                   />
                 ))}
@@ -194,6 +225,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                         <BillingCycleItem 
                           key={cycle.id} 
                           cycle={cycle}
+                          card={card}
                           isHistorical={true}
                         />
                       ))}

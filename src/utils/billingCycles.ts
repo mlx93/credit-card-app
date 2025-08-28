@@ -91,11 +91,27 @@ async function createOrUpdateCycle(
   dueDate: Date | null,
   hasStatementBalance: boolean
 ): Promise<void> {
+  // For current cycles, cap the transaction search at today to get accurate spend calculation
+  const today = new Date();
+  const effectiveEndDate = cycleEnd > today ? today : cycleEnd;
+  
   const cycleTransactions = creditCard.transactions.filter((t: any) => 
-    t.date >= cycleStart && t.date <= cycleEnd
+    t.date >= cycleStart && t.date <= effectiveEndDate
   );
 
   const totalSpend = cycleTransactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+
+  // Debug logging for current cycles
+  if (cycleEnd > today) {
+    console.log('Current cycle calculation for', creditCard.name, {
+      cycleStart: cycleStart.toISOString(),
+      cycleEnd: cycleEnd.toISOString(),
+      effectiveEndDate: effectiveEndDate.toISOString(),
+      transactionCount: cycleTransactions.length,
+      totalSpend,
+      hasStatementBalance
+    });
+  }
 
   let existingCycle = await prisma.billingCycle.findFirst({
     where: {
