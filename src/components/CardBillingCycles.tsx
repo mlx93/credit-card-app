@@ -244,13 +244,17 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
         {shouldShowDueDate && (
           <div className="flex justify-end">
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-              isOverdue && paymentStatus !== 'paid'
-                ? 'bg-red-100 text-red-800' 
-                : isDueSoon && paymentStatus !== 'paid'
-                  ? 'bg-yellow-100 text-yellow-800' 
-                  : 'bg-green-100 text-green-800'
+              paymentStatus === 'paid'
+                ? 'bg-green-100 text-green-800'
+                : paymentStatus === 'outstanding'
+                  ? 'bg-orange-100 text-orange-800'
+                  : isOverdue
+                    ? 'bg-red-100 text-red-800'
+                    : isDueSoon
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : 'bg-green-100 text-green-800'
             }`}>
-              {isOverdue && paymentStatus !== 'paid' ? 'Overdue' : isDueSoon && paymentStatus !== 'paid' ? 'Due Soon' : paymentStatus === 'paid' ? 'Paid' : 'On Track'}
+              {paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'outstanding' ? 'Outstanding' : isOverdue ? 'Overdue' : isDueSoon ? 'Due Soon' : 'On Track'}
             </span>
           </div>
         )}
