@@ -86,12 +86,14 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
             </p>
             <p className="text-xs text-gray-500">Includes new charges</p>
           </div>
-          <div>
-            <p className="text-sm text-gray-600">Minimum Payment</p>
-            <p className="font-semibold text-lg text-gray-900">
-              {card.minimumPaymentAmount ? formatCurrency(card.minimumPaymentAmount) : 'N/A'}
-            </p>
-          </div>
+          {card.minimumPaymentAmount && card.minimumPaymentAmount > 0 && (
+            <div>
+              <p className="text-sm text-gray-600">Minimum Payment</p>
+              <p className="font-semibold text-lg text-gray-900">
+                {formatCurrency(card.minimumPaymentAmount)}
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -101,12 +103,14 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
               {formatCurrency(Math.abs(card.balanceCurrent))}
             </p>
           </div>
-          <div>
-            <p className="text-sm text-gray-600">Minimum Payment</p>
-            <p className="font-semibold text-lg text-gray-900">
-              {card.minimumPaymentAmount ? formatCurrency(card.minimumPaymentAmount) : 'N/A'}
-            </p>
-          </div>
+          {card.minimumPaymentAmount && card.minimumPaymentAmount > 0 && (
+            <div>
+              <p className="text-sm text-gray-600">Minimum Payment</p>
+              <p className="font-semibold text-lg text-gray-900">
+                {formatCurrency(card.minimumPaymentAmount)}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
