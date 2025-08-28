@@ -93,43 +93,69 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
     const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
     
-    // Analyze payment status for cycles with statement balances
+    // Smart payment status analysis
     let paymentStatus: 'paid' | 'outstanding' | 'current' = 'current';
     let paymentAnalysis = '';
     
     if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles.length > 0) {
       const currentBalance = Math.abs(card.balanceCurrent || 0);
       
-      // Find current cycle (no statement balance yet)
-      const currentCycle = allCycles.find(c => !c.statementBalance || c.statementBalance === 0);
-      const currentCycleSpending = currentCycle?.totalSpend || 0;
+      // Step 1: Find open cycle (no statement) and most recent closed cycle with future due date
+      const openCycle = allCycles.find(c => !c.statementBalance || c.statementBalance === 0);
+      const openCycleSpend = openCycle?.totalSpend || 0;
       
-      // Calculate historical balance (current balance minus current cycle spending)
-      const historicalBalance = Math.max(0, currentBalance - currentCycleSpending);
+      const closedCyclesWithFutureDue = allCycles.filter(c => 
+        c.statementBalance && c.statementBalance > 0 && c.dueDate && new Date(c.dueDate) > new Date()
+      ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
       
-      // Sum all historical statement balances that should still be outstanding
-      const historicalStatements = allCycles.filter(c => 
-        c.statementBalance && c.statementBalance > 0 && 
-        new Date(c.endDate) <= new Date() // Only past cycles
-      );
-      const totalHistoricalStatements = historicalStatements.reduce((sum, c) => sum + (c.statementBalance || 0), 0);
+      const mostRecentClosedBalance = closedCyclesWithFutureDue[0]?.statementBalance || 0;
       
-      if (isHistorical && cycle.statementBalance > 0) {
-        // For this specific historical cycle
-        if (historicalBalance < totalHistoricalStatements) {
-          // Some historical statements were paid off
-          if (historicalBalance >= cycle.statementBalance) {
-            paymentStatus = 'outstanding';
-            paymentAnalysis = `Still outstanding (part of $${historicalBalance.toFixed(2)} historical balance)`;
-          } else {
-            paymentStatus = 'paid';
-            paymentAnalysis = `Likely paid off`;
+      // Step 2: Calculate accounted balance
+      const accountedBalance = openCycleSpend + mostRecentClosedBalance;
+      
+      // Step 3: Determine payment status
+      if (currentBalance <= accountedBalance) {
+        // All prior statements are paid
+        if (isHistorical && cycle.statementBalance > 0) {
+          paymentStatus = 'paid';
+          paymentAnalysis = `Paid off`;
+        }
+      } else {
+        // Step 4: Iteratively determine which statements are still outstanding
+        const historicalStatements = allCycles.filter(c => 
+          c.statementBalance && c.statementBalance > 0 && 
+          new Date(c.endDate) <= new Date()
+        ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+        
+        let runningTotal = accountedBalance;
+        let foundThisCycle = false;
+        
+        for (const stmt of historicalStatements) {
+          runningTotal += stmt.statementBalance || 0;
+          
+          if (stmt.id === cycle.id) {
+            foundThisCycle = true;
+            if (runningTotal <= currentBalance) {
+              paymentStatus = 'outstanding';
+              paymentAnalysis = `Still outstanding`;
+            } else {
+              paymentStatus = 'paid';
+              paymentAnalysis = `Paid off`;
+            }
+            break;
           }
-        } else {
-          paymentStatus = 'outstanding';
-          paymentAnalysis = `Outstanding`;
         }
       }
+      
+      console.log('Payment analysis for', cycle.creditCardName || card.name, formatDate(cycle.endDate), {
+        currentBalance,
+        openCycleSpend,
+        mostRecentClosedBalance,
+        accountedBalance,
+        statementBalance: cycle.statementBalance,
+        paymentStatus,
+        paymentAnalysis
+      });
     }
     
     // Hide due date info if total spend and statement balance are both $0

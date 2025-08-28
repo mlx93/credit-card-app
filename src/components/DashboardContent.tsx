@@ -198,7 +198,23 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const displayCards = isLoggedIn ? creditCards : mockCards;
   const displayCycles = isLoggedIn ? billingCycles : mockCycles;
   
-  const totalSpendThisMonth = displayCycles.reduce((sum, cycle) => sum + cycle.totalSpend, 0);
+  // Calculate actual current month spending from transactions
+  const totalSpendThisMonth = (() => {
+    if (!isLoggedIn) return displayCycles.reduce((sum, cycle) => sum + cycle.totalSpend, 0);
+    
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    // Find current month cycle (cycle that includes current date)
+    const currentCycle = displayCycles.find(cycle => {
+      const cycleStart = new Date(cycle.startDate);
+      const cycleEnd = new Date(cycle.endDate);
+      const now = new Date();
+      return now >= cycleStart && now <= cycleEnd;
+    });
+    
+    return currentCycle ? currentCycle.totalSpend : 0;
+  })();
   const totalBalance = displayCards.reduce((sum, card) => 
     sum + Math.abs(card.balanceCurrent || 0), 0
   );
