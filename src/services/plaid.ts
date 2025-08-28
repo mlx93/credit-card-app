@@ -102,40 +102,24 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`=== GET TRANSACTIONS DEBUG ===`);
       console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
       
-      let allTransactions: any[] = [];
-      let offset = 0;
-      const batchSize = 500;
-      let hasMore = true;
+      const request: TransactionsGetRequest = {
+        access_token: accessToken,
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0]
+      };
 
-      while (hasMore) {
-        const request: TransactionsGetRequest = {
-          access_token: accessToken,
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0],
-          offset: offset,
-          count: batchSize
-        };
-
-        console.log(`Fetching batch ${Math.floor(offset / batchSize) + 1} (offset: ${offset})`);
-        const response = await plaidClient.transactionsGet(request);
-        
-        if (offset === 0) {
-          console.log('Total transactions available:', response.data.total_transactions);
-          console.log('Will need', Math.ceil(response.data.total_transactions / batchSize), 'batches to get all data');
-        }
-
-        allTransactions.push(...response.data.transactions);
-        console.log(`Batch ${Math.floor(offset / batchSize) + 1}: Got ${response.data.transactions.length} transactions (total so far: ${allTransactions.length})`);
-
-        // Check if we have more data
-        if (allTransactions.length >= response.data.total_transactions || response.data.transactions.length < batchSize) {
-          hasMore = false;
-        } else {
-          offset += batchSize;
-        }
+      console.log('Making single transaction request (pagination disabled due to API parameter issues)');
+      const response = await plaidClient.transactionsGet(request);
+      
+      const allTransactions = response.data.transactions;
+      console.log('Total transactions available:', response.data.total_transactions);
+      console.log('Transactions returned in this request:', allTransactions.length);
+      
+      if (allTransactions.length < response.data.total_transactions) {
+        console.warn(`⚠️ Only got ${allTransactions.length} of ${response.data.total_transactions} transactions. Some data may be missing due to Plaid API limits.`);
       }
 
-      console.log(`✅ Successfully fetched all ${allTransactions.length} transactions with pagination`);
+      console.log(`✅ Successfully fetched ${allTransactions.length} transactions`);
       
       if (allTransactions.length > 0) {
         const dates = allTransactions.map(t => t.date).sort();
@@ -175,12 +159,8 @@ class PlaidServiceImpl implements PlaidService {
 
   async getBalances(accessToken: string): Promise<any> {
     try {
-      const minLastUpdated = new Date();
-      minLastUpdated.setDate(minLastUpdated.getDate() - 30); // 30 days ago
-      
       const request: AccountsBalanceGetRequest = {
-        access_token: accessToken,
-        min_last_updated_datetime: minLastUpdated.toISOString(),
+        access_token: accessToken
       };
 
       const response = await plaidClient.accountsBalanceGet(request);
@@ -206,13 +186,21 @@ class PlaidServiceImpl implements PlaidService {
   }
 
   async getStatements(accessToken: string, accountId: string): Promise<any[]> {
-    const request: StatementsListRequest = {
-      access_token: accessToken,
-      account_id: accountId,
-    };
-
-    const response = await plaidClient.statementsList(request);
-    return response.data.statements;
+    try {
+      const request: StatementsListRequest = {
+        access_token: accessToken
+      };
+      
+      // Note: account_id parameter is not supported by statementsList endpoint
+      // This endpoint returns statements for all accounts on the item
+      const response = await plaidClient.statementsList(request);
+      
+      // Filter statements for the specific account ID after receiving the response
+      return response.data.statements.filter(statement => statement.account_id === accountId);
+    } catch (error) {
+      console.error('Error fetching statements:', error);
+      return [];
+    }
   }
 
   async syncAccounts(accessToken: string, itemId: string): Promise<void> {
