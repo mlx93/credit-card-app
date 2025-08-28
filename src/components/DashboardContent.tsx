@@ -88,6 +88,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   };
 
   const handleRefresh = async () => {
+    console.log('=== HANDLEREFRESH CALLED ===');
     setRefreshing(true);
     try {
       console.log('=== FRONTEND: Starting refresh process ===');
