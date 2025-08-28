@@ -117,6 +117,80 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   };
 
+  const handleCardSync = async (itemId: string) => {
+    try {
+      const response = await fetch('/api/sync', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId })
+      });
+      
+      if (response.ok) {
+        await fetchUserData(); // Refresh data after sync
+        console.log('Card sync successful');
+      } else {
+        console.error('Card sync failed:', response.status);
+        alert('Failed to sync card data. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error syncing card:', error);
+      alert('Network error during sync. Please try again.');
+    }
+  };
+
+  const handleCardReconnect = async (itemId: string) => {
+    try {
+      const response = await fetch('/api/plaid/reconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.link_token) {
+        // Use Plaid Link to handle the reconnection
+        // For now, just alert the user - we'd need to integrate with PlaidLink component
+        alert(`Reconnection link created for ${data.institution_name}. Feature coming soon!`);
+      } else {
+        console.error('Failed to create reconnection link:', data.error);
+        alert('Failed to create reconnection link. Please try again or contact support.');
+      }
+    } catch (error) {
+      console.error('Error creating reconnection link:', error);
+      alert('Network error. Please try again.');
+    }
+  };
+
+  const handleCardRemove = async (itemId: string) => {
+    const confirmed = window.confirm(
+      'Are you sure you want to remove this credit card connection? This will delete all associated data and cannot be undone.'
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch('/api/plaid/remove-connection', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        await fetchUserData(); // Refresh data after removal
+        alert(data.message);
+      } else {
+        console.error('Failed to remove connection:', data.error);
+        alert('Failed to remove connection. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error removing connection:', error);
+      alert('Network error. Please try again.');
+    }
+  };
+
   useEffect(() => {
     fetchUserData();
   }, [isLoggedIn]);
@@ -231,7 +305,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             ) : displayCards.length > 0 ? (
               <div className="space-y-4">
                 {displayCards.map((card, index) => (
-                  <DueDateCard key={card.id || index} card={card} />
+                  <DueDateCard 
+                    key={card.id || index} 
+                    card={card}
+                    onSync={handleCardSync}
+                    onReconnect={handleCardReconnect}
+                    onRemove={handleCardRemove}
+                  />
                 ))}
               </div>
             ) : isLoggedIn ? (

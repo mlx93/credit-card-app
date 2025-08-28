@@ -19,6 +19,9 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
     env: process.env.NEXT_PUBLIC_PLAID_ENV as 'sandbox' | 'development' | 'production' || 'production',
     // Additional configurations for sandbox
     product: ['liabilities', 'transactions'],
+    // Disable guest mode - force real authentication
+    selectAccount: true,
+    receivedRedirectUri: null,
     onSuccess: async (public_token, metadata) => {
       try {
         console.log('Plaid Link success:', { public_token, metadata });
