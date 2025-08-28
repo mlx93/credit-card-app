@@ -20,7 +20,12 @@ export async function GET() {
       include: {
         plaidItem: {
           select: {
+            id: true,
+            itemId: true,
             institutionName: true,
+            status: true,
+            lastSyncAt: true,
+            errorMessage: true,
           },
         },
         aprs: true,

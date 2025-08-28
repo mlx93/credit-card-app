@@ -69,6 +69,10 @@ model PlaidItem {
   accessToken String
   institutionId String?
   institutionName String?
+  status      String   @default("active") // active, error, expired, disconnected
+  lastSyncAt  DateTime?
+  errorCode   String?
+  errorMessage String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

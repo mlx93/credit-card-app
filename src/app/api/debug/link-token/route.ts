@@ -33,21 +33,29 @@ export async function POST(request: NextRequest) {
       
     } catch (plaidError) {
       console.error('=== PLAID LINK TOKEN ERROR ===');
-      console.error('Error details:', plaidError);
+      console.error('Full error object:', plaidError);
+      console.error('Error name:', plaidError.name);
+      console.error('Error message:', plaidError.message);
+      console.error('Error stack:', plaidError.stack);
       console.error('Error code:', plaidError.error_code);
       console.error('Error type:', plaidError.error_type);
-      console.error('Error message:', plaidError.message);
       console.error('Display message:', plaidError.display_message);
+      console.error('Response data:', plaidError.response?.data);
+      console.error('Response status:', plaidError.response?.status);
       console.error('=== END PLAID ERROR ===');
       
       return NextResponse.json({
         success: false,
         error: 'Plaid link token creation failed',
         plaidError: {
+          name: plaidError.name,
+          message: plaidError.message,
           error_code: plaidError.error_code,
           error_type: plaidError.error_type,
           error_message: plaidError.message,
-          display_message: plaidError.display_message
+          display_message: plaidError.display_message,
+          response_status: plaidError.response?.status,
+          response_data: plaidError.response?.data
         },
         plaidEnv: process.env.PLAID_ENV
       });
