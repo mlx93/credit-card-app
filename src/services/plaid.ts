@@ -8,16 +8,21 @@ import {
   AccountsBalanceGetRequest,
   LinkTokenCreateRequest,
   ItemPublicTokenExchangeRequest,
+  ItemRemoveRequest,
+  LinkTokenCreateRequestUpdate,
   WebhookVerificationKeyGetRequest
 } from 'plaid';
 
 export interface PlaidService {
   createLinkToken(userId: string): Promise<string>;
+  createUpdateLinkToken(userId: string, itemId: string): Promise<string>;
   exchangePublicToken(publicToken: string, userId: string): Promise<string>;
+  removeItem(accessToken: string): Promise<void>;
   getTransactions(accessToken: string, startDate: Date, endDate: Date): Promise<any[]>;
   getLiabilities(accessToken: string): Promise<any>;
   getBalances(accessToken: string): Promise<any>;
   getStatements(accessToken: string, accountId: string): Promise<any[]>;
+  syncAccounts(accessToken: string, itemId: string): Promise<void>;
   syncTransactions(itemId: string): Promise<void>;
 }
 
@@ -371,6 +376,48 @@ class PlaidServiceImpl implements PlaidService {
       console.error('Stack trace:', error.stack);
       console.error('=== END TRANSACTION SYNC ERROR ===');
       throw error; // Re-throw to propagate error up
+    }
+  }
+
+  async createUpdateLinkToken(userId: string, itemId: string): Promise<string> {
+    const request: LinkTokenCreateRequest = {
+      user: {
+        client_user_id: userId,
+      },
+      client_name: "Credit Card Tracker",
+      products: ['liabilities', 'transactions'],
+      country_codes: ['US'],
+      language: 'en',
+      webhook: process.env.APP_URL + '/api/webhooks/plaid',
+      update: {
+        account_selection_enabled: true,
+      } as LinkTokenCreateRequestUpdate,
+      access_token: itemId, // This should be the access token, but we'll handle it in the calling code
+    };
+
+    console.log('Creating update link token for itemId:', itemId);
+    
+    try {
+      const response = await plaidClient.linkTokenCreate(request);
+      console.log('Update link token created successfully');
+      return response.data.link_token;
+    } catch (error) {
+      console.error('Failed to create update link token:', error);
+      throw error;
+    }
+  }
+
+  async removeItem(accessToken: string): Promise<void> {
+    const request: ItemRemoveRequest = {
+      access_token: accessToken,
+    };
+
+    try {
+      await plaidClient.itemRemove(request);
+      console.log('Successfully removed item from Plaid');
+    } catch (error) {
+      console.error('Failed to remove item from Plaid:', error);
+      throw error;
     }
   }
 }
