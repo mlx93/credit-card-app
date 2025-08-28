@@ -1,5 +1,6 @@
 import { plaidClient } from '@/lib/plaid';
 import { prisma } from '@/lib/db';
+import { encrypt, decrypt } from '@/lib/encryption';
 import { 
   TransactionsGetRequest,
   LiabilitiesGetRequest,
@@ -33,6 +34,15 @@ class PlaidServiceImpl implements PlaidService {
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
+      // Remove guest access and ensure all institutions are visible
+      link_customization_name: 'default',
+      account_filters: {
+        liabilities: {
+          account_subtypes: ['credit card']
+        }
+      },
+      // Force authentication - no guest access
+      required_if_supported_auth_type_codes: ['credential', 'selection'],
     };
 
     console.log('Creating link token for environment:', process.env.PLAID_ENV);
@@ -78,7 +88,7 @@ class PlaidServiceImpl implements PlaidService {
       data: {
         userId,
         itemId: item_id,
-        accessToken: access_token,
+        accessToken: encrypt(access_token),
         institutionId,
         institutionName,
       },
@@ -227,12 +237,14 @@ class PlaidServiceImpl implements PlaidService {
       throw new Error('Plaid item not found');
     }
 
+    const decryptedAccessToken = decrypt(plaidItem.accessToken);
+    
     const endDate = new Date();
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 24);
 
     const transactions = await this.getTransactions(
-      plaidItem.accessToken,
+      decryptedAccessToken,
       startDate,
       endDate
     );
