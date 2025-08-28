@@ -150,19 +150,19 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
           </div>
         </div>
       ) : card.nextPaymentDueDate ? (
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-gray-600">Due Date:</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Due:</span>
           <div className="text-right">
-            <p className="font-medium text-gray-900">{formatDate(card.nextPaymentDueDate)}</p>
+            <p className="font-medium text-gray-900 text-sm">{formatDate(card.nextPaymentDueDate)}</p>
             {daysUntilDue !== null && (
-              <p className={`${
+              <p className={`text-xs ${
                 isOverdue 
                   ? 'text-red-600' 
                   : isDueSoon 
                     ? 'text-yellow-600' 
                     : 'text-green-600'
               }`}>
-                {Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'remaining'}
+                {Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'left'}
               </p>
             )}
           </div>

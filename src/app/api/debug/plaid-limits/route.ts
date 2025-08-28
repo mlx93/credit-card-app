@@ -1,0 +1,97 @@
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { plaidClient } from '@/lib/plaid';
+import { decrypt } from '@/lib/encryption';
+
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get all Plaid items for the user
+    const plaidItems = await prisma.plaidItem.findMany({
+      where: { userId: session.user.id },
+    });
+
+    const results = [];
+
+    for (const item of plaidItems) {
+      const decryptedAccessToken = decrypt(item.accessToken);
+      
+      // Test multiple Plaid endpoints for credit limits
+      
+      // 1. Liabilities endpoint
+      try {
+        const liabilitiesResponse = await plaidClient.liabilitiesGet({
+          access_token: decryptedAccessToken,
+        });
+        
+        results.push({
+          itemId: item.itemId,
+          institutionName: item.institutionName,
+          endpoint: 'liabilities',
+          data: liabilitiesResponse.data
+        });
+      } catch (error) {
+        results.push({
+          itemId: item.itemId,
+          institutionName: item.institutionName,
+          endpoint: 'liabilities',
+          error: error.message
+        });
+      }
+
+      // 2. Accounts balance endpoint
+      try {
+        const balanceResponse = await plaidClient.accountsBalanceGet({
+          access_token: decryptedAccessToken,
+        });
+        
+        results.push({
+          itemId: item.itemId,
+          institutionName: item.institutionName,
+          endpoint: 'accounts_balance',
+          data: balanceResponse.data
+        });
+      } catch (error) {
+        results.push({
+          itemId: item.itemId,
+          institutionName: item.institutionName,
+          endpoint: 'accounts_balance',
+          error: error.message
+        });
+      }
+
+      // 3. Accounts get endpoint
+      try {
+        const accountsResponse = await plaidClient.accountsGet({
+          access_token: decryptedAccessToken,
+        });
+        
+        results.push({
+          itemId: item.itemId,
+          institutionName: item.institutionName,
+          endpoint: 'accounts_get',
+          data: accountsResponse.data
+        });
+      } catch (error) {
+        results.push({
+          itemId: item.itemId,
+          institutionName: item.institutionName,
+          endpoint: 'accounts_get',
+          error: error.message
+        });
+      }
+    }
+
+    return NextResponse.json({ results });
+  } catch (error) {
+    console.error('Plaid limits debug error:', error);
+    return NextResponse.json({ error: 'Failed to debug Plaid limits' }, { status: 500 });
+  }
+}
