@@ -1,0 +1,40 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { plaidService } from '@/services/plaid';
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const plaidItems = await prisma.plaidItem.findMany({
+      where: { userId: session.user.id },
+    });
+
+    const syncPromises = plaidItems.map(async (item) => {
+      try {
+        await plaidService.syncAccounts(item.accessToken, item.itemId);
+        await plaidService.syncTransactions(item.itemId);
+        return { itemId: item.itemId, status: 'success' };
+      } catch (error) {
+        console.error(`Sync error for item ${item.itemId}:`, error);
+        return { itemId: item.itemId, status: 'error', error: error.message };
+      }
+    });
+
+    const results = await Promise.all(syncPromises);
+    
+    return NextResponse.json({ 
+      message: 'Sync completed',
+      results 
+    });
+  } catch (error) {
+    console.error('Sync error:', error);
+    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
+  }
+}
