@@ -34,7 +34,6 @@ class PlaidServiceImpl implements PlaidService {
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
-      auth_type_select_enabled: false,  // Disable "continue as guest"
     };
 
     console.log('Creating link token for environment:', process.env.PLAID_ENV);

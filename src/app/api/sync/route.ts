@@ -49,10 +49,32 @@ export async function POST(request: NextRequest) {
         await plaidService.syncTransactions(item.itemId);
         console.log('Step 2: Transaction sync completed');
         
+        // Update connection status to active on successful sync
+        await prisma.plaidItem.update({
+          where: { itemId: item.itemId },
+          data: {
+            status: 'active',
+            lastSyncAt: new Date(),
+            errorCode: null,
+            errorMessage: null
+          }
+        });
+        
         console.log(`=== SYNC DEBUG: Completed sync for ${item.institutionName} ===`);
         return { itemId: item.itemId, status: 'success' };
       } catch (error) {
         console.error(`=== SYNC ERROR for ${item.institutionName} (${item.itemId}):`, error);
+        
+        // Update connection status to error
+        await prisma.plaidItem.update({
+          where: { itemId: item.itemId },
+          data: {
+            status: 'error',
+            errorCode: error.error_code || 'SYNC_ERROR',
+            errorMessage: error.message || 'Unknown sync error'
+          }
+        });
+        
         return { itemId: item.itemId, status: 'error', error: error.message };
       }
     });

@@ -1,5 +1,6 @@
 import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/utils/format';
-import { AlertTriangle, CreditCard } from 'lucide-react';
+import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
 
 interface CreditCardInfo {
   id: string;
@@ -10,11 +11,22 @@ interface CreditCardInfo {
   lastStatementBalance?: number;
   nextPaymentDueDate?: Date;
   minimumPaymentAmount?: number;
+  plaidItem?: {
+    id: string;
+    itemId: string;
+    institutionName: string;
+    status: string;
+    lastSyncAt?: Date;
+    errorMessage?: string;
+  };
 }
 
 interface DueDateCardProps {
   card: CreditCardInfo;
   colorIndex?: number;
+  onReconnect?: (itemId: string) => void;
+  onRemove?: (itemId: string) => void;
+  onSync?: (itemId: string) => void;
 }
 
 const cardColors = [
@@ -28,7 +40,8 @@ const cardColors = [
   'bg-red-50 border-red-200 border-l-red-500'
 ];
 
-export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
+export function DueDateCard({ card, colorIndex = 0, onReconnect, onRemove, onSync }: DueDateCardProps) {
+  const [syncing, setSyncing] = useState(false);
   const daysUntilDue = card.nextPaymentDueDate ? getDaysUntil(card.nextPaymentDueDate) : null;
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
@@ -54,19 +67,91 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
 
   const cardColorClass = cardColors[colorIndex % cardColors.length];
   
+  // Connection status logic
+  const connectionStatus = card.plaidItem?.status || 'unknown';
+  const hasConnectionIssue = ['error', 'expired', 'disconnected'].includes(connectionStatus);
+  const lastSyncDaysAgo = card.plaidItem?.lastSyncAt ? 
+    Math.floor((new Date().getTime() - new Date(card.plaidItem.lastSyncAt).getTime()) / (1000 * 60 * 60 * 24)) : null;
+  const isStale = lastSyncDaysAgo !== null && lastSyncDaysAgo > 7; // Consider stale if no sync in 7+ days
+
+  const handleSync = async () => {
+    if (!card.plaidItem || !onSync) return;
+    setSyncing(true);
+    try {
+      await onSync(card.plaidItem.itemId);
+    } finally {
+      setSyncing(false);
+    }
+  };
+  
   return (
-    <div className={`p-6 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass}`}>
+    <div className={`p-6 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center">
           <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
           <div>
-            <h3 className="font-semibold text-gray-900">{card.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900">{card.name}</h3>
+              {hasConnectionIssue && (
+                <WifiOff className="h-4 w-4 text-red-500" title="Connection issue" />
+              )}
+              {isStale && !hasConnectionIssue && (
+                <AlertTriangle className="h-4 w-4 text-yellow-500" title="Data may be outdated" />
+              )}
+            </div>
             <p className="text-sm text-gray-600">•••• {card.mask}</p>
+            {card.plaidItem && (
+              <p className="text-xs text-gray-500">
+                {hasConnectionIssue ? (
+                  <span className="text-red-600">Connection: {connectionStatus}</span>
+                ) : lastSyncDaysAgo !== null ? (
+                  <span>Last sync: {lastSyncDaysAgo === 0 ? 'Today' : `${lastSyncDaysAgo}d ago`}</span>
+                ) : (
+                  <span>Never synced</span>
+                )}
+              </p>
+            )}
           </div>
         </div>
-        {!isPaidOff && (isOverdue || isDueSoon) && (
-          <AlertTriangle className={`h-5 w-5 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />
-        )}
+        <div className="flex items-center gap-2">
+          {!isPaidOff && (isOverdue || isDueSoon) && (
+            <AlertTriangle className={`h-5 w-5 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />
+          )}
+          
+          {/* Connection management buttons */}
+          {card.plaidItem && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                title="Refresh data"
+              >
+                <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              </button>
+              
+              {hasConnectionIssue && onReconnect && (
+                <button
+                  onClick={() => onReconnect(card.plaidItem!.itemId)}
+                  className="p-1 rounded hover:bg-blue-100 text-blue-500 hover:text-blue-700"
+                  title="Reconnect account"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </button>
+              )}
+              
+              {onRemove && (
+                <button
+                  onClick={() => onRemove(card.plaidItem!.itemId)}
+                  className="p-1 rounded hover:bg-red-100 text-red-500 hover:text-red-700"
+                  title="Remove connection"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Balance Information - Show statement balance when there's a due date OR when balances differ */}
