@@ -228,12 +228,12 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
             )}
             {shouldShowDueDate && (
               <p className={`text-sm ${
-                isOverdue ? 'text-red-600' : isDueSoon ? 'text-yellow-600' : 'text-green-600'
+                isOverdue && paymentStatus !== 'paid' ? 'text-red-600' : isDueSoon && paymentStatus !== 'paid' ? 'text-yellow-600' : 'text-green-600'
               }`}>
                 Due: {formatDate(cycle.dueDate!)}
                 {daysUntilDue !== null && (
                   <span className="block">
-                    ({Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'remaining'})
+                    ({Math.abs(daysUntilDue)} days {isOverdue && paymentStatus !== 'paid' ? 'overdue' : 'remaining'})
                   </span>
                 )}
               </p>
@@ -244,13 +244,13 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
         {shouldShowDueDate && (
           <div className="flex justify-end">
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-              isOverdue 
+              isOverdue && paymentStatus !== 'paid'
                 ? 'bg-red-100 text-red-800' 
-                : isDueSoon 
+                : isDueSoon && paymentStatus !== 'paid'
                   ? 'bg-yellow-100 text-yellow-800' 
                   : 'bg-green-100 text-green-800'
             }`}>
-              {isOverdue ? 'Overdue' : isDueSoon ? 'Due Soon' : 'On Track'}
+              {isOverdue && paymentStatus !== 'paid' ? 'Overdue' : isDueSoon && paymentStatus !== 'paid' ? 'Due Soon' : paymentStatus === 'paid' ? 'Paid' : 'On Track'}
             </span>
           </div>
         )}
