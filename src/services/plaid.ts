@@ -41,6 +41,9 @@ class PlaidServiceImpl implements PlaidService {
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
+      transactions: {
+        days_requested: 730, // Request 24 months of transaction history
+      },
     };
 
     console.log('Creating link token for environment:', process.env.PLAID_ENV);
@@ -441,7 +444,7 @@ class PlaidServiceImpl implements PlaidService {
       
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 15); // Extended to 15 months to ensure coverage
+      startDate.setMonth(startDate.getMonth() - 24); // Extended to 24 months to match Link configuration
 
       console.log(`=== TRANSACTION DATE RANGE DEBUG ===`);
       console.log(`Current date: ${new Date().toISOString()}`);
@@ -561,6 +564,9 @@ class PlaidServiceImpl implements PlaidService {
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
+      transactions: {
+        days_requested: 730, // Request 24 months of transaction history
+      },
       update: {
         account_selection_enabled: true,
       } as LinkTokenCreateRequestUpdate,
