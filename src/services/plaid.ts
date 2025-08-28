@@ -167,8 +167,28 @@ class PlaidServiceImpl implements PlaidService {
           (c: any) => c.account_id === account.account_id
         );
 
+        // Find corresponding balance data which might have more complete limit info
+        const balanceAccount = balancesData.accounts.find(
+          (a: any) => a.account_id === account.account_id
+        );
+
         const existingCard = await prisma.creditCard.findUnique({
           where: { accountId: account.account_id },
+        });
+
+        // Use balance limit as primary source, fallback to liabilities limit
+        const creditLimit = balanceAccount?.balances?.limit ?? account.balances.limit;
+
+        // Debug logging for credit limits
+        console.log('Plaid account data for', account.name, {
+          accountId: account.account_id,
+          liabilitiesLimit: account.balances.limit,
+          balancesLimit: balanceAccount?.balances?.limit,
+          finalLimit: creditLimit,
+          subtype: account.subtype,
+          limitType: typeof creditLimit,
+          isFinite: isFinite(creditLimit),
+          isNaN: isNaN(creditLimit)
         });
 
         const cardData = {
@@ -178,7 +198,7 @@ class PlaidServiceImpl implements PlaidService {
           mask: account.mask,
           balanceCurrent: account.balances.current,
           balanceAvailable: account.balances.available,
-          balanceLimit: account.balances.limit,
+          balanceLimit: creditLimit,
           isoCurrencyCode: account.balances.iso_currency_code,
           lastStatementIssueDate: liability?.last_statement_issue_date 
             ? new Date(liability.last_statement_issue_date) 
