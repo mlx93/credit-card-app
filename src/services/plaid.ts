@@ -274,10 +274,24 @@ class PlaidServiceImpl implements PlaidService {
       endDate
     );
 
+    console.log(`=== TRANSACTION SYNC DEBUG ===`);
+    console.log(`Total transactions to process: ${transactions.length}`);
+    
     for (const transaction of transactions) {
       const creditCard = await prisma.creditCard.findUnique({
         where: { accountId: transaction.account_id },
       });
+
+      // Debug transaction to credit card association
+      if (!creditCard) {
+        console.log('No credit card found for transaction:', {
+          transactionId: transaction.transaction_id,
+          accountId: transaction.account_id,
+          amount: transaction.amount,
+          date: transaction.date,
+          name: transaction.name
+        });
+      }
 
       const existingTransaction = await prisma.transaction.findUnique({
         where: { transactionId: transaction.transaction_id },
@@ -314,6 +328,8 @@ class PlaidServiceImpl implements PlaidService {
         });
       }
     }
+    
+    console.log(`=== END TRANSACTION SYNC DEBUG ===`);
   }
 }
 

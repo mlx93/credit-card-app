@@ -51,6 +51,12 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   console.log('Last statement date:', lastStatementDate);
   console.log('Next due date:', nextDueDate);
   console.log('Cycle length:', cycleLength);
+  console.log('Total transactions for card:', creditCard.transactions?.length || 0);
+  console.log('Sample transactions:', creditCard.transactions?.slice(0, 3).map(t => ({
+    date: t.date,
+    amount: t.amount,
+    name: t.name
+  })));
   
   // Create the closed cycle with statement balance
   console.log('Creating closed cycle:', closedCycleStart, 'to', closedCycleEnd);
