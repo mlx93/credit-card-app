@@ -435,6 +435,7 @@ class PlaidServiceImpl implements PlaidService {
   }
 
   async syncTransactions(itemId: string, accessToken: string): Promise<void> {
+    console.log('🚀 TRANSACTION SYNC METHOD CALLED!', { itemId, hasAccessToken: !!accessToken });
     try {
       console.log(`=== TRANSACTION SYNC START for itemId: ${itemId} ===`);
       
