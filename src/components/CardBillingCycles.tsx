@@ -97,60 +97,64 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     let paymentStatus: 'paid' | 'outstanding' | 'current' | 'due' = 'current';
     let paymentAnalysis = '';
     
-    // Only analyze cycles with statement balances when we have full cycle data
-    if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles.length > 0) {
+    // Only analyze cycles with statement balances when we have full data
+    if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
       const currentBalance = Math.abs(card.balanceCurrent || 0);
       
       // Step 1: Find current open cycle and most recent closed cycle
       const openCycle = allCycles.find(c => !c.statementBalance || c.statementBalance === 0);
       const openCycleSpend = openCycle?.totalSpend || 0;
       
-      const closedCyclesWithFutureDue = allCycles.filter(c => 
-        c.statementBalance && c.statementBalance > 0 && c.dueDate && new Date(c.dueDate) > new Date()
+      // Find ALL closed cycles (with statement balance), sorted by end date
+      const allClosedCycles = allCycles.filter(c => 
+        c.statementBalance && c.statementBalance > 0
       ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
       
-      const mostRecentClosedBalance = closedCyclesWithFutureDue[0]?.statementBalance || 0;
+      // The most recent closed cycle is the first one in the sorted list
+      const mostRecentClosedCycle = allClosedCycles[0];
+      const mostRecentClosedBalance = mostRecentClosedCycle?.statementBalance || 0;
       
       // Step 2: Calculate baseline (current open cycle + most recent closed cycle)
       const baseline = openCycleSpend + mostRecentClosedBalance;
-      
-      // Check if this cycle IS the most recent closed cycle (should show "Due By")
-      const mostRecentClosedCycle = closedCyclesWithFutureDue[0];
       if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
         paymentStatus = 'due';
         paymentAnalysis = `Most recent closed cycle - Due By ${formatDate(cycle.dueDate)}`;
       }
-      // Step 3: Check if all prior bills are paid (excluding most recent closed cycle)
-      else if (currentBalance <= baseline) {
-        // All historical cycles (except most recent closed) are paid
-        paymentStatus = 'paid';
-        paymentAnalysis = `Paid - current balance (${formatCurrency(currentBalance)}) ≤ baseline (${formatCurrency(baseline)})`;
-      } else {
-        // Step 4: Iteratively add historical cycles from newest to oldest
-        const historicalCycles = allCycles.filter(c => 
-          c.statementBalance && c.statementBalance > 0 && 
-          new Date(c.endDate) <= new Date() && // Past cycles only
-          c.id !== mostRecentClosedCycle?.id // Exclude most recent closed cycle
-        ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()); // Newest to oldest
+      // Step 3: Calculate remaining balance after accounting for current activity
+      // Remaining = Current Balance - Most Recent Closed - Open Cycle Spend
+      else {
+        const remainingAfterCurrent = currentBalance - baseline;
         
-        let runningTotal = baseline;
-        let foundThisCycle = false;
-        
-        for (const historicalCycle of historicalCycles) {
-          runningTotal += historicalCycle.statementBalance || 0;
+        if (remainingAfterCurrent <= 0) {
+          // All historical cycles (except most recent closed) are paid
+          paymentStatus = 'paid';
+          paymentAnalysis = `Paid - remaining after current (${formatCurrency(remainingAfterCurrent)}) ≤ 0`;
+        } else {
+          // Step 4: Check historical cycles from newest to oldest
+          const historicalCycles = allCycles.filter(c => 
+            c.statementBalance && c.statementBalance > 0 && 
+            c.id !== mostRecentClosedCycle?.id && // Exclude most recent closed cycle
+            c.id !== openCycle?.id // Exclude open cycle
+          ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()); // Newest to oldest
           
-          if (historicalCycle.id === cycle.id) {
-            foundThisCycle = true;
-            if (currentBalance <= runningTotal) {
-              paymentStatus = 'paid';
-              paymentAnalysis = `Paid - current balance (${formatCurrency(currentBalance)}) ≤ running total (${formatCurrency(runningTotal)})`;
-            } else {
-              paymentStatus = 'outstanding';
-              paymentAnalysis = `Outstanding - current balance (${formatCurrency(currentBalance)}) > running total (${formatCurrency(runningTotal)})`;
+          let remainingBalance = remainingAfterCurrent;
+          let foundThisCycle = false;
+          
+          for (const historicalCycle of historicalCycles) {
+            if (historicalCycle.id === cycle.id) {
+              foundThisCycle = true;
+              if (remainingBalance > 0) {
+                paymentStatus = 'outstanding';
+                paymentAnalysis = `Outstanding - ${formatCurrency(remainingBalance)} still owed from older cycles`;
+              } else {
+                paymentStatus = 'paid';
+                paymentAnalysis = `Paid - all newer cycles accounted for`;
+              }
+              break;
             }
-            break;
+            // Subtract this historical cycle from remaining balance
+            remainingBalance -= historicalCycle.statementBalance || 0;
           }
-        }
         
         // If this cycle wasn't found in historical cycles, it might be current/future
         if (!foundThisCycle) {
@@ -160,16 +164,19 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
       }
       
       console.log('Payment analysis for', cycle.creditCardName || card?.name, formatDate(cycle.endDate), {
+        cycleId: cycle.id,
         currentBalance,
         openCycleSpend,
         mostRecentClosedBalance,
         baseline,
+        remainingAfterBaseline: currentBalance - baseline,
         statementBalance: cycle.statementBalance,
+        isMostRecentClosed: mostRecentClosedCycle?.id === cycle.id,
         paymentStatus,
         paymentAnalysis,
-        cycleEndDate: formatDate(cycle.endDate),
-        isHistorical: new Date(cycle.endDate) <= new Date()
+        cycleEndDate: formatDate(cycle.endDate)
       });
+      }
     }
     
     // Hide due date info if total spend and statement balance are both $0
@@ -200,11 +207,14 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                     <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
                   </div>
                 ) : paymentStatus === 'due' ? (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 -m-2">
-                    <p className="font-bold text-xl text-yellow-800">DUE BY</p>
-                    <p className="font-semibold text-lg text-yellow-900">{formatCurrency(cycle.statementBalance)}</p>
-                    <p className="text-xs text-yellow-600">{formatDate(cycle.dueDate!)}</p>
-                    <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                  <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 -m-2">
+                    <p className="font-bold text-lg text-yellow-800">DUE BY</p>
+                    <p className="font-bold text-xl text-yellow-900">{formatDate(cycle.dueDate!)}</p>
+                    <p className="font-semibold text-2xl text-yellow-900">{formatCurrency(cycle.statementBalance)}</p>
+                    {daysUntilDue !== null && daysUntilDue > 0 && (
+                      <p className="text-sm font-medium text-yellow-700">{daysUntilDue} days remaining</p>
+                    )}
+                    <p className="text-sm text-gray-600 mt-1">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
                   </div>
                 ) : paymentStatus === 'outstanding' ? (
                   <div>
