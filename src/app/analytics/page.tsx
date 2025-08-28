@@ -1,6 +1,8 @@
 import { getSession } from '@/lib/session';
 import { AnalyticsContent } from '@/components/AnalyticsContent';
 
+export const dynamic = 'force-dynamic';
+
 export default async function Analytics() {
   const session = await getSession();
 
