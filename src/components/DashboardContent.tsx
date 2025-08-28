@@ -90,10 +90,27 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await fetch('/api/sync', { method: 'POST' });
+      console.log('=== FRONTEND: Starting refresh process ===');
+      console.log('Calling /api/sync...');
+      
+      const syncResponse = await fetch('/api/sync', { method: 'POST' });
+      console.log('Sync API response status:', syncResponse.status);
+      
+      if (!syncResponse.ok) {
+        console.error('Sync API failed with status:', syncResponse.status);
+        const errorText = await syncResponse.text();
+        console.error('Sync API error response:', errorText);
+        throw new Error(`Sync API failed: ${syncResponse.status}`);
+      }
+      
+      const syncResult = await syncResponse.json();
+      console.log('Sync API success result:', syncResult);
+      
+      console.log('Fetching user data after sync...');
       await fetchUserData();
+      console.log('=== FRONTEND: Refresh process completed ===');
     } catch (error) {
-      console.error('Error refreshing data:', error);
+      console.error('=== FRONTEND: Error refreshing data ===', error);
     } finally {
       setRefreshing(false);
     }

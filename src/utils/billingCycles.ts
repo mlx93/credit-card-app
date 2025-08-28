@@ -29,6 +29,40 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     throw new Error('Credit card not found');
   }
 
+  // Debug transaction association
+  console.log(`=== BILLING CYCLE TRANSACTION DEBUG for ${creditCard.name} ===`);
+  console.log(`Credit card ID: ${creditCard.id}`);
+  console.log(`Credit card accountId: ${creditCard.accountId}`);
+  console.log(`Transactions linked to this credit card: ${creditCard.transactions?.length || 0}`);
+  
+  // Check for transactions in database that might not be linked
+  const allTransactionsForItem = await prisma.transaction.findMany({
+    where: { plaidItemId: creditCard.plaidItemId },
+    select: {
+      id: true,
+      transactionId: true,
+      creditCardId: true,
+      name: true,
+      amount: true,
+      date: true
+    },
+    orderBy: { date: 'desc' },
+    take: 5
+  });
+  
+  console.log(`Total transactions for this Plaid item: ${allTransactionsForItem.length}`);
+  console.log('Sample transactions for this item:', allTransactionsForItem.map(t => ({
+    id: t.id,
+    transactionId: t.transactionId,
+    creditCardId: t.creditCardId,
+    linkedToThisCard: t.creditCardId === creditCard.id,
+    name: t.name,
+    amount: t.amount,
+    date: t.date
+  })));
+  
+  console.log(`=== END BILLING CYCLE TRANSACTION DEBUG ===`);
+
   const cycles: BillingCycleData[] = [];
   
   const lastStatementDate = creditCard.lastStatementIssueDate;

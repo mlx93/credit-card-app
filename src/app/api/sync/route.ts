@@ -7,16 +7,35 @@ import { decrypt } from '@/lib/encryption';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== SYNC ROUTE CALLED ===');
+    
     const session = await getServerSession(authOptions);
+    console.log('Session check:', session?.user?.id ? 'Authorized' : 'Not authorized');
     
     if (!session?.user?.id) {
+      console.log('Returning 401 - unauthorized');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    console.log('Fetching Plaid items for user:', session.user.id);
     const plaidItems = await prisma.plaidItem.findMany({
       where: { userId: session.user.id },
     });
+    
+    console.log(`Found ${plaidItems.length} Plaid items for user`);
+    plaidItems.forEach((item, index) => {
+      console.log(`Item ${index + 1}: ${item.institutionName} (${item.itemId})`);
+    });
 
+    if (plaidItems.length === 0) {
+      console.log('No Plaid items found - returning early');
+      return NextResponse.json({ 
+        message: 'No Plaid items to sync',
+        results: [] 
+      });
+    }
+
+    console.log('Starting sync promises...');
     const syncPromises = plaidItems.map(async (item) => {
       try {
         console.log(`=== SYNC DEBUG: Starting sync for ${item.institutionName} (${item.itemId}) ===`);
@@ -38,14 +57,21 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    console.log('Waiting for all sync promises to complete...');
     const results = await Promise.all(syncPromises);
+    
+    console.log('All sync promises completed. Results:', results);
+    console.log('=== SYNC ROUTE COMPLETED SUCCESSFULLY ===');
     
     return NextResponse.json({ 
       message: 'Sync completed',
       results 
     });
   } catch (error) {
+    console.error('=== SYNC ROUTE ERROR ===');
     console.error('Sync error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('=== END SYNC ROUTE ERROR ===');
     return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }
