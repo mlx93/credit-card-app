@@ -111,14 +111,14 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   console.log('Total cycles created:', cycles.length);
   console.log('=== END BILLING CYCLE DEBUG ===');
   
-  // Create historical cycles going back 24 months
+  // Create historical cycles going back 12 months
   let historicalCycleEnd = new Date(closedCycleStart);
   historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
   
-  const twoYearsAgo = new Date();
-  twoYearsAgo.setMonth(twoYearsAgo.getMonth() - 24);
+  const oneYearAgo = new Date();
+  oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
   
-  while (historicalCycleEnd >= twoYearsAgo) {
+  while (historicalCycleEnd >= oneYearAgo) {
     const historicalCycleStart = new Date(historicalCycleEnd);
     historicalCycleStart.setDate(historicalCycleStart.getDate() - cycleLength + 1);
     
