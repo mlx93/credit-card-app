@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
-import { DueDateCard } from '@/components/DueDateCard';
+import { DueDateCard, DueDateCards } from '@/components/DueDateCard';
 import { PlaidLink } from '@/components/PlaidLink';
 
 interface DashboardContentProps {
@@ -356,17 +356,12 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 <p className="text-gray-500">Loading credit cards...</p>
               </div>
             ) : displayCards.length > 0 ? (
-              <div className="space-y-4">
-                {displayCards.map((card, index) => (
-                  <DueDateCard 
-                    key={card.id || index} 
-                    card={card}
-                    onSync={handleCardSync}
-                    onReconnect={handleCardReconnect}
-                    onRemove={handleCardRemove}
-                  />
-                ))}
-              </div>
+              <DueDateCards 
+                cards={displayCards}
+                onSync={handleCardSync}
+                onReconnect={handleCardReconnect}
+                onRemove={handleCardRemove}
+              />
             ) : isLoggedIn ? (
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <p className="text-gray-500 text-center">No credit cards connected yet.</p>
