@@ -93,15 +93,15 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
     const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
     
-    // Smart payment status analysis
+    // Smart payment status analysis using iterative approach
     let paymentStatus: 'paid' | 'outstanding' | 'current' = 'current';
     let paymentAnalysis = '';
     
-    // Apply payment analysis to any cycle with a statement balance
+    // Only analyze cycles with statement balances when we have full cycle data
     if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles.length > 0) {
       const currentBalance = Math.abs(card.balanceCurrent || 0);
       
-      // Step 1: Find open cycle (no statement) and most recent closed cycle with future due date
+      // Step 1: Find current open cycle and most recent closed cycle
       const openCycle = allCycles.find(c => !c.statementBalance || c.statementBalance === 0);
       const openCycleSpend = openCycle?.totalSpend || 0;
       
@@ -111,73 +111,57 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
       
       const mostRecentClosedBalance = closedCyclesWithFutureDue[0]?.statementBalance || 0;
       
-      // Step 2: Calculate accounted balance
-      const accountedBalance = openCycleSpend + mostRecentClosedBalance;
+      // Step 2: Calculate baseline (current open cycle + most recent closed cycle)
+      const baseline = openCycleSpend + mostRecentClosedBalance;
       
-      // Step 3: Determine payment status  
-      console.log('Payment status check:', {
-        currentBalance,
-        accountedBalance,
-        difference: currentBalance - accountedBalance,
-        isHistorical,
-        cycleId: cycle.id,
-        shouldBePaid: currentBalance <= accountedBalance
-      });
-      
-      if (currentBalance <= accountedBalance) {
-        // All prior statements are paid
-        if (cycle.statementBalance > 0) {  // Remove isHistorical check - apply to all cycles with statements
-          paymentStatus = 'paid';
-          paymentAnalysis = `Paid off (current balance ≤ accounted balance)`;
-        }
+      // Step 3: Check if all prior bills are paid
+      if (currentBalance <= baseline) {
+        // All historical cycles are paid
+        paymentStatus = 'paid';
+        paymentAnalysis = `Paid - current balance (${formatCurrency(currentBalance)}) ≤ baseline (${formatCurrency(baseline)})`;
       } else {
-        // Step 4: Iteratively determine which statements are still outstanding
-        const historicalStatements = allCycles.filter(c => 
+        // Step 4: Iteratively add historical cycles from newest to oldest
+        const historicalCycles = allCycles.filter(c => 
           c.statementBalance && c.statementBalance > 0 && 
-          new Date(c.endDate) <= new Date()
-        ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+          new Date(c.endDate) <= new Date() // Past cycles only
+        ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()); // Newest to oldest
         
-        let runningTotal = accountedBalance;
+        let runningTotal = baseline;
         let foundThisCycle = false;
         
-        for (const stmt of historicalStatements) {
-          runningTotal += stmt.statementBalance || 0;
+        for (const historicalCycle of historicalCycles) {
+          runningTotal += historicalCycle.statementBalance || 0;
           
-          if (stmt.id === cycle.id) {
+          if (historicalCycle.id === cycle.id) {
             foundThisCycle = true;
-            if (runningTotal <= currentBalance) {
-              paymentStatus = 'outstanding';
-              paymentAnalysis = `Still outstanding`;
-            } else {
+            if (currentBalance <= runningTotal) {
               paymentStatus = 'paid';
-              paymentAnalysis = `Paid off (iterative calculation)`;
+              paymentAnalysis = `Paid - current balance (${formatCurrency(currentBalance)}) ≤ running total (${formatCurrency(runningTotal)})`;
+            } else {
+              paymentStatus = 'outstanding';
+              paymentAnalysis = `Outstanding - current balance (${formatCurrency(currentBalance)}) > running total (${formatCurrency(runningTotal)})`;
             }
             break;
           }
         }
+        
+        // If this cycle wasn't found in historical cycles, it might be current/future
+        if (!foundThisCycle) {
+          paymentStatus = 'current';
+          paymentAnalysis = `Current or future cycle`;
+        }
       }
       
-      console.log('Payment analysis for', cycle.creditCardName || card.name, formatDate(cycle.endDate), {
+      console.log('Payment analysis for', cycle.creditCardName || card?.name, formatDate(cycle.endDate), {
         currentBalance,
         openCycleSpend,
         mostRecentClosedBalance,
-        accountedBalance,
+        baseline,
         statementBalance: cycle.statementBalance,
         paymentStatus,
         paymentAnalysis,
-        allCyclesCount: allCycles.length,
-        openCycle: openCycle ? {
-          id: openCycle.id,
-          endDate: openCycle.endDate,
-          totalSpend: openCycle.totalSpend,
-          statementBalance: openCycle.statementBalance
-        } : 'none',
-        closedWithFutureDue: closedCyclesWithFutureDue.map(c => ({
-          id: c.id,
-          endDate: c.endDate,
-          statementBalance: c.statementBalance,
-          dueDate: c.dueDate
-        }))
+        cycleEndDate: formatDate(cycle.endDate),
+        isHistorical: new Date(cycle.endDate) <= new Date()
       });
     }
     
@@ -254,7 +238,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                       ? 'bg-yellow-100 text-yellow-800' 
                       : 'bg-green-100 text-green-800'
             }`}>
-              {paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'outstanding' ? 'Outstanding' : isOverdue ? 'Overdue' : isDueSoon ? 'Due Soon' : 'On Track'}
+{paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'outstanding' ? 'Outstanding' : paymentStatus === 'current' ? (isDueSoon ? 'Due Soon' : 'Current') : isOverdue ? 'Overdue' : 'On Track'}
             </span>
           </div>
         )}
