@@ -555,6 +555,17 @@ class PlaidServiceImpl implements PlaidService {
   }
 
   async createUpdateLinkToken(userId: string, itemId: string): Promise<string> {
+    // Get the access token from the database
+    const plaidItem = await prisma.plaidItem.findUnique({
+      where: { itemId },
+    });
+
+    if (!plaidItem || plaidItem.userId !== userId) {
+      throw new Error('Plaid item not found or unauthorized');
+    }
+
+    const accessToken = decrypt(plaidItem.accessToken);
+
     const request: LinkTokenCreateRequest = {
       user: {
         client_user_id: userId,
@@ -570,7 +581,7 @@ class PlaidServiceImpl implements PlaidService {
       update: {
         account_selection_enabled: true,
       } as LinkTokenCreateRequestUpdate,
-      access_token: itemId, // This should be the access token, but we'll handle it in the calling code
+      access_token: accessToken,
     };
 
     console.log('Creating update link token for itemId:', itemId);
