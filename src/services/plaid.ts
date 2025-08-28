@@ -101,6 +101,9 @@ class PlaidServiceImpl implements PlaidService {
 
   async getTransactions(accessToken: string, startDate: Date, endDate: Date): Promise<any[]> {
     try {
+      console.log(`=== GET TRANSACTIONS DEBUG ===`);
+      console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
+      
       const request: TransactionsGetRequest = {
         access_token: accessToken,
         start_date: startDate.toISOString().split('T')[0],
@@ -108,10 +111,26 @@ class PlaidServiceImpl implements PlaidService {
         count: 500,
       };
 
+      console.log('Calling Plaid transactionsGet...');
       const response = await plaidClient.transactionsGet(request);
+      console.log('Plaid transactionsGet response:', response.data.transactions.length, 'transactions');
+      console.log('Sample transactions:', response.data.transactions.slice(0, 3).map(t => ({
+        id: t.transaction_id,
+        account_id: t.account_id,
+        amount: t.amount,
+        date: t.date,
+        name: t.name
+      })));
+      console.log(`=== END GET TRANSACTIONS DEBUG ===`);
+      
       return response.data.transactions;
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.error('=== PLAID TRANSACTION ERROR ===');
+      console.error('Full error details:', error);
+      console.error('Error code:', error.error_code);
+      console.error('Error type:', error.error_type);
+      console.error('Display message:', error.display_message);
+      console.error('=== END PLAID TRANSACTION ERROR ===');
       return []; // Return empty array on error
     }
   }
@@ -254,82 +273,114 @@ class PlaidServiceImpl implements PlaidService {
   }
 
   async syncTransactions(itemId: string): Promise<void> {
-    const plaidItem = await prisma.plaidItem.findUnique({
-      where: { itemId },
-    });
-
-    if (!plaidItem) {
-      throw new Error('Plaid item not found');
-    }
-
-    const decryptedAccessToken = decrypt(plaidItem.accessToken);
-    
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 24);
-
-    const transactions = await this.getTransactions(
-      decryptedAccessToken,
-      startDate,
-      endDate
-    );
-
-    console.log(`=== TRANSACTION SYNC DEBUG ===`);
-    console.log(`Total transactions to process: ${transactions.length}`);
-    
-    for (const transaction of transactions) {
-      const creditCard = await prisma.creditCard.findUnique({
-        where: { accountId: transaction.account_id },
+    try {
+      console.log(`=== TRANSACTION SYNC START for itemId: ${itemId} ===`);
+      
+      const plaidItem = await prisma.plaidItem.findUnique({
+        where: { itemId },
       });
 
-      // Debug transaction to credit card association
-      if (!creditCard) {
-        console.log('No credit card found for transaction:', {
-          transactionId: transaction.transaction_id,
-          accountId: transaction.account_id,
-          amount: transaction.amount,
-          date: transaction.date,
-          name: transaction.name
-        });
+      if (!plaidItem) {
+        console.error(`No Plaid item found for itemId: ${itemId}`);
+        throw new Error('Plaid item not found');
       }
 
-      const existingTransaction = await prisma.transaction.findUnique({
-        where: { transactionId: transaction.transaction_id },
-      });
+      console.log(`Found Plaid item for ${plaidItem.institutionName} (${itemId})`);
+      const decryptedAccessToken = decrypt(plaidItem.accessToken);
+      
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 24);
 
-      const transactionData = {
-        amount: transaction.amount,
-        isoCurrencyCode: transaction.iso_currency_code,
-        date: new Date(transaction.date),
-        authorizedDate: transaction.authorized_date 
-          ? new Date(transaction.authorized_date) 
-          : null,
-        name: transaction.name,
-        merchantName: transaction.merchant_name,
-        category: transaction.category?.[0] || null,
-        categoryId: transaction.category_id,
-        subcategory: transaction.category?.[1] || null,
-        accountOwner: transaction.account_owner,
-      };
+      console.log(`Fetching transactions from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
 
-      if (existingTransaction) {
-        await prisma.transaction.update({
-          where: { id: existingTransaction.id },
-          data: transactionData,
+      const transactions = await this.getTransactions(
+        decryptedAccessToken,
+        startDate,
+        endDate
+      );
+
+      console.log(`=== TRANSACTION SYNC DEBUG ===`);
+      console.log(`Total transactions to process: ${transactions.length}`);
+      
+      if (transactions.length === 0) {
+        console.warn('No transactions returned from Plaid API - this might indicate an error');
+      }
+      
+      let processedCount = 0;
+      let creditCardFoundCount = 0;
+      
+      for (const transaction of transactions) {
+        const creditCard = await prisma.creditCard.findUnique({
+          where: { accountId: transaction.account_id },
         });
-      } else {
-        await prisma.transaction.create({
-          data: {
-            ...transactionData,
+
+        // Debug transaction to credit card association
+        if (!creditCard) {
+          console.log('No credit card found for transaction:', {
             transactionId: transaction.transaction_id,
-            plaidItemId: plaidItem.id,
-            creditCardId: creditCard?.id || null,
-          },
+            accountId: transaction.account_id,
+            amount: transaction.amount,
+            date: transaction.date,
+            name: transaction.name
+          });
+        } else {
+          creditCardFoundCount++;
+        }
+
+        const existingTransaction = await prisma.transaction.findUnique({
+          where: { transactionId: transaction.transaction_id },
         });
+
+        const transactionData = {
+          amount: transaction.amount,
+          isoCurrencyCode: transaction.iso_currency_code,
+          date: new Date(transaction.date),
+          authorizedDate: transaction.authorized_date 
+            ? new Date(transaction.authorized_date) 
+            : null,
+          name: transaction.name,
+          merchantName: transaction.merchant_name,
+          category: transaction.category?.[0] || null,
+          categoryId: transaction.category_id,
+          subcategory: transaction.category?.[1] || null,
+          accountOwner: transaction.account_owner,
+        };
+
+        if (existingTransaction) {
+          await prisma.transaction.update({
+            where: { id: existingTransaction.id },
+            data: transactionData,
+          });
+          console.log(`Updated transaction: ${transaction.name} (${transaction.amount})`);
+        } else {
+          await prisma.transaction.create({
+            data: {
+              ...transactionData,
+              transactionId: transaction.transaction_id,
+              plaidItemId: plaidItem.id,
+              creditCardId: creditCard?.id || null,
+            },
+          });
+          console.log(`Created transaction: ${transaction.name} (${transaction.amount})`);
+        }
+        
+        processedCount++;
       }
+      
+      console.log(`=== TRANSACTION SYNC SUMMARY ===`);
+      console.log(`Total transactions processed: ${processedCount}`);
+      console.log(`Transactions with credit card match: ${creditCardFoundCount}`);
+      console.log(`Transactions without credit card match: ${processedCount - creditCardFoundCount}`);
+      console.log(`=== END TRANSACTION SYNC DEBUG ===`);
+      
+    } catch (error) {
+      console.error('=== TRANSACTION SYNC ERROR ===');
+      console.error('Error in syncTransactions:', error);
+      console.error('Stack trace:', error.stack);
+      console.error('=== END TRANSACTION SYNC ERROR ===');
+      throw error; // Re-throw to propagate error up
     }
-    
-    console.log(`=== END TRANSACTION SYNC DEBUG ===`);
   }
 }
 

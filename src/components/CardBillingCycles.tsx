@@ -155,11 +155,6 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Billing Cycles</h2>
-        <p className="text-sm text-gray-600">Color-coded to match your credit cards</p>
-      </div>
-
       {Object.entries(cyclesByCard).map(([cardName, cardCycles]) => {
         const colorIndex = getCardColorIndex(cardName);
         const card = cards.find(c => c.name === cardName);
