@@ -393,7 +393,7 @@ class PlaidServiceImpl implements PlaidService {
       
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 12); // Changed from 24 to 12 months
+      startDate.setMonth(startDate.getMonth() - 15); // Extended to 15 months to ensure coverage
 
       console.log(`Fetching transactions from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
 
@@ -408,6 +408,17 @@ class PlaidServiceImpl implements PlaidService {
       
       if (transactions.length === 0) {
         console.warn('No transactions returned from Plaid API - this might indicate an error');
+      } else {
+        // Show transaction date range for debugging
+        const sortedByDate = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const oldestTransaction = sortedByDate[0];
+        const newestTransaction = sortedByDate[sortedByDate.length - 1];
+        
+        console.log(`Transaction date range: ${oldestTransaction.date} to ${newestTransaction.date}`);
+        console.log(`Account breakdown:`, transactions.reduce((acc, t) => {
+          acc[t.account_id] = (acc[t.account_id] || 0) + 1;
+          return acc;
+        }, {}));
       }
       
       let processedCount = 0;

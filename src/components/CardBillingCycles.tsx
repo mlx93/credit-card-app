@@ -113,12 +113,21 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
       // Step 2: Calculate accounted balance
       const accountedBalance = openCycleSpend + mostRecentClosedBalance;
       
-      // Step 3: Determine payment status
+      // Step 3: Determine payment status  
+      console.log('Payment status check:', {
+        currentBalance,
+        accountedBalance,
+        difference: currentBalance - accountedBalance,
+        isHistorical,
+        cycleId: cycle.id,
+        shouldBePaid: currentBalance <= accountedBalance
+      });
+      
       if (currentBalance <= accountedBalance) {
         // All prior statements are paid
         if (isHistorical && cycle.statementBalance > 0) {
           paymentStatus = 'paid';
-          paymentAnalysis = `Paid off`;
+          paymentAnalysis = `Paid off (current balance ≤ accounted balance)`;
         }
       } else {
         // Step 4: Iteratively determine which statements are still outstanding
@@ -154,7 +163,20 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
         accountedBalance,
         statementBalance: cycle.statementBalance,
         paymentStatus,
-        paymentAnalysis
+        paymentAnalysis,
+        allCyclesCount: allCycles.length,
+        openCycle: openCycle ? {
+          id: openCycle.id,
+          endDate: openCycle.endDate,
+          totalSpend: openCycle.totalSpend,
+          statementBalance: openCycle.statementBalance
+        } : 'none',
+        closedWithFutureDue: closedCyclesWithFutureDue.map(c => ({
+          id: c.id,
+          endDate: c.endDate,
+          statementBalance: c.statementBalance,
+          dueDate: c.dueDate
+        }))
       });
     }
     
