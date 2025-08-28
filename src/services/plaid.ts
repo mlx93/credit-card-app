@@ -191,28 +191,56 @@ class PlaidServiceImpl implements PlaidService {
           where: { accountId: account.account_id },
         });
 
-        // Try multiple sources for credit limit
-        let creditLimit = balanceAccount?.balances?.limit ?? account.balances.limit;
+        // Try multiple sources for credit limit - prioritize liability data for Capital One
+        let creditLimit = null;
         
-        // For Capital One and other issuers, try alternative fields
-        if (!creditLimit || creditLimit === null) {
-          // Try balances.available + balances.current (total credit line)
-          const available = balanceAccount?.balances?.available ?? account.balances.available;
-          const current = Math.abs(balanceAccount?.balances?.current ?? account.balances.current ?? 0);
-          if (available && available > 0) {
-            creditLimit = available + current;
-          }
+        // For Capital One, try liability sources first since balances endpoint often fails
+        const isCapitalOne = account.name?.toLowerCase().includes('capital one') || 
+                           account.name?.toLowerCase().includes('quicksilver') ||
+                           account.name?.toLowerCase().includes('venture');
+        
+        if (isCapitalOne && liability) {
+          console.log('Capital One detected, trying liability sources first...');
           
-          // Try liability limit_current field
-          if ((!creditLimit || creditLimit <= 0) && liability?.limit_current) {
+          // Try liability limit_current field first
+          if (liability.limit_current && liability.limit_current > 0) {
             creditLimit = liability.limit_current;
+            console.log('Using liability.limit_current:', creditLimit);
           }
           
-          // Try liability aprs balance_subject_to_apr
-          if ((!creditLimit || creditLimit <= 0) && liability?.aprs?.length > 0) {
-            const aprLimit = liability.aprs.find((apr: any) => apr.balance_subject_to_apr > 0)?.balance_subject_to_apr;
+          // Try liability.limit field
+          else if (liability.limit && liability.limit > 0) {
+            creditLimit = liability.limit;
+            console.log('Using liability.limit:', creditLimit);
+          }
+          
+          // Try balances within liability
+          else if (liability.balances?.limit && liability.balances.limit > 0) {
+            creditLimit = liability.balances.limit;
+            console.log('Using liability.balances.limit:', creditLimit);
+          }
+          
+          // Try APR balance_subject_to_apr as last resort
+          else if (liability.aprs && liability.aprs.length > 0) {
+            const aprLimit = liability.aprs.find((apr: any) => apr.balance_subject_to_apr && apr.balance_subject_to_apr > 0)?.balance_subject_to_apr;
             if (aprLimit) {
               creditLimit = aprLimit;
+              console.log('Using APR balance_subject_to_apr:', creditLimit);
+            }
+          }
+        }
+        
+        // Fallback to standard balance sources for non-Capital One or if liability failed
+        if (!creditLimit || creditLimit <= 0) {
+          creditLimit = balanceAccount?.balances?.limit ?? account.balances.limit;
+          
+          // Try balances.available + balances.current (total credit line)
+          if ((!creditLimit || creditLimit <= 0) && balanceAccount?.balances) {
+            const available = balanceAccount.balances.available ?? account.balances.available;
+            const current = Math.abs(balanceAccount.balances.current ?? account.balances.current ?? 0);
+            if (available && available > 0) {
+              creditLimit = available + current;
+              console.log('Using calculated limit (available + current):', creditLimit);
             }
           }
         }

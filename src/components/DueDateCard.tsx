@@ -202,8 +202,10 @@ export function DueDateCard({ card, colorIndex = 0, onReconnect, onRemove, onSyn
       <div className="mb-4">
         <div className="flex justify-between text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
-          {hasValidLimit ? (
+          {hasValidLimit && utilization > 0 ? (
             <span>{formatPercentage(utilization)}</span>
+          ) : hasValidLimit && utilization === 0 ? (
+            <span>0%</span>
           ) : (
             <span className="text-gray-500 italic">
               {card.balanceLimit === null || card.balanceLimit === undefined ? 'Unknown Limit' : 
