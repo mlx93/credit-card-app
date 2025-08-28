@@ -6,6 +6,7 @@ import {
   LiabilitiesGetRequest,
   StatementsListRequest,
   AccountsBalanceGetRequest,
+  AccountsGetRequest,
   LinkTokenCreateRequest,
   ItemPublicTokenExchangeRequest,
   ItemRemoveRequest,
@@ -105,7 +106,6 @@ class PlaidServiceImpl implements PlaidService {
         access_token: accessToken,
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
-        count: 500,
       };
 
       console.log('Calling Plaid transactionsGet...');
@@ -143,8 +143,12 @@ class PlaidServiceImpl implements PlaidService {
 
   async getBalances(accessToken: string): Promise<any> {
     try {
+      const minLastUpdated = new Date();
+      minLastUpdated.setDate(minLastUpdated.getDate() - 30); // 30 days ago
+      
       const request: AccountsBalanceGetRequest = {
         access_token: accessToken,
+        min_last_updated_datetime: minLastUpdated.toISOString(),
       };
 
       const response = await plaidClient.accountsBalanceGet(request);
@@ -157,11 +161,11 @@ class PlaidServiceImpl implements PlaidService {
 
   async getAccounts(accessToken: string): Promise<any> {
     try {
-      const request: AccountsBalanceGetRequest = {
+      const request: AccountsGetRequest = {
         access_token: accessToken,
       };
 
-      const response = await plaidClient.accountsBalanceGet(request);
+      const response = await plaidClient.accountsGet(request);
       return response.data;
     } catch (error) {
       console.error('Error fetching accounts:', error);
