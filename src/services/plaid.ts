@@ -186,6 +186,7 @@ class PlaidServiceImpl implements PlaidService {
   async syncAccounts(accessToken: string, itemId: string): Promise<void> {
     const liabilitiesData = await this.getLiabilities(accessToken);
     const balancesData = await this.getBalances(accessToken);
+    const accountsData = await this.getAccounts(accessToken);
 
     const plaidItem = await prisma.plaidItem.findUnique({
       where: { itemId },
@@ -203,6 +204,11 @@ class PlaidServiceImpl implements PlaidService {
 
         // Find corresponding balance data which might have more complete limit info
         const balanceAccount = balancesData.accounts.find(
+          (a: any) => a.account_id === account.account_id
+        );
+
+        // Fallback to accounts endpoint if balances is empty (common for Capital One)
+        const accountsAccount = accountsData.accounts.find(
           (a: any) => a.account_id === account.account_id
         );
 
@@ -251,15 +257,19 @@ class PlaidServiceImpl implements PlaidService {
         
         // Fallback to standard balance sources for non-Capital One or if liability failed
         if (!creditLimit || creditLimit <= 0) {
-          creditLimit = balanceAccount?.balances?.limit ?? account.balances.limit;
+          creditLimit = balanceAccount?.balances?.limit ?? accountsAccount?.balances?.limit ?? account.balances.limit;
           
           // Try balances.available + balances.current (total credit line)
-          if ((!creditLimit || creditLimit <= 0) && balanceAccount?.balances) {
-            const available = balanceAccount.balances.available ?? account.balances.available;
-            const current = Math.abs(balanceAccount.balances.current ?? account.balances.current ?? 0);
-            if (available && available > 0) {
-              creditLimit = available + current;
-              console.log('Using calculated limit (available + current):', creditLimit);
+          if ((!creditLimit || creditLimit <= 0)) {
+            // Try balance account first, then accounts account, then liability account
+            const balanceSource = balanceAccount?.balances || accountsAccount?.balances || account.balances;
+            if (balanceSource) {
+              const available = balanceSource.available;
+              const current = Math.abs(balanceSource.current ?? 0);
+              if (available && available > 0) {
+                creditLimit = available + current;
+                console.log('Using calculated limit (available + current):', creditLimit);
+              }
             }
           }
         }
@@ -289,14 +299,14 @@ class PlaidServiceImpl implements PlaidService {
         });
         console.log('=== END DEBUG ===');
 
-        // For Capital One, use liability balance data if account.balances is missing/empty
+        // For Capital One, use multiple sources for balance data
         const currentBalance = (isCapitalOne && liability?.balances?.current !== undefined) 
           ? liability.balances.current 
-          : (balanceAccount?.balances?.current ?? account.balances.current);
+          : (balanceAccount?.balances?.current ?? accountsAccount?.balances?.current ?? account.balances.current);
           
         const availableBalance = (isCapitalOne && liability?.balances?.available !== undefined)
           ? liability.balances.available
-          : (balanceAccount?.balances?.available ?? account.balances.available);
+          : (balanceAccount?.balances?.available ?? accountsAccount?.balances?.available ?? account.balances.available);
 
         console.log('Balance extraction for', account.name, {
           isCapitalOne,
@@ -383,7 +393,7 @@ class PlaidServiceImpl implements PlaidService {
       
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 24);
+      startDate.setMonth(startDate.getMonth() - 12); // Changed from 24 to 12 months
 
       console.log(`Fetching transactions from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
 

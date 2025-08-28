@@ -241,9 +241,9 @@ export function DueDateCard({ card, colorIndex = 0, onReconnect, onRemove, onSyn
           </div>
         </div>
       ) : card.nextPaymentDueDate ? (
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col items-start">
           <span className="text-sm text-gray-600">Due:</span>
-          <div className="text-right">
+          <div className="text-left">
             <p className="font-medium text-gray-900 text-sm">{formatDate(card.nextPaymentDueDate)}</p>
             {daysUntilDue !== null && (
               <p className={`text-xs ${
