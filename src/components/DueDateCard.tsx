@@ -171,7 +171,7 @@ export function DueDateCard({ card, colorIndex = 0, onReconnect, onRemove, onSyn
             </p>
             <p className="text-xs text-gray-500">Includes new charges</p>
           </div>
-          {card.minimumPaymentAmount && card.minimumPaymentAmount > 0 && (
+          {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
             <div>
               <p className="text-sm text-gray-600">Minimum Payment</p>
               <p className="font-semibold text-lg text-gray-900">
@@ -188,7 +188,7 @@ export function DueDateCard({ card, colorIndex = 0, onReconnect, onRemove, onSyn
               {formatCurrency(Math.abs(card.balanceCurrent))}
             </p>
           </div>
-          {card.minimumPaymentAmount && card.minimumPaymentAmount > 0 && (
+          {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
             <div>
               <p className="text-sm text-gray-600">Minimum Payment</p>
               <p className="font-semibold text-lg text-gray-900">
