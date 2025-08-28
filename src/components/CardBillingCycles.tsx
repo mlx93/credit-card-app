@@ -163,7 +163,6 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
       paymentAnalysis,
       cycleEndDate: formatDate(cycle.endDate)
     });
-    }
   }
   
   // Hide due date info if total spend and statement balance are both $0
