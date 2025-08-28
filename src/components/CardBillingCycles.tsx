@@ -71,6 +71,196 @@ const cardBorderColors = [
   'border-l-red-500'
 ];
 
+// BillingCycleItem Component
+const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }: { cycle: BillingCycle, card?: CreditCardInfo, isHistorical?: boolean, allCycles?: BillingCycle[] }) => {
+  const daysUntilDue = cycle.dueDate ? getDaysUntil(cycle.dueDate) : null;
+  const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+  const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
+  
+  // Smart payment status analysis using iterative approach
+  let paymentStatus: 'paid' | 'outstanding' | 'current' | 'due' = 'current';
+  let paymentAnalysis = '';
+  
+  // Only analyze cycles with statement balances when we have full data
+  if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
+    const currentBalance = Math.abs(card.balanceCurrent || 0);
+    
+    // Step 1: Find current open cycle and most recent closed cycle
+    const openCycle = allCycles.find(c => !c.statementBalance || c.statementBalance === 0);
+    const openCycleSpend = openCycle?.totalSpend || 0;
+    
+    // Find ALL closed cycles (with statement balance), sorted by end date
+    const allClosedCycles = allCycles.filter(c => 
+      c.statementBalance && c.statementBalance > 0
+    ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+    
+    // The most recent closed cycle is the first one in the sorted list
+    const mostRecentClosedCycle = allClosedCycles[0];
+    const mostRecentClosedBalance = mostRecentClosedCycle?.statementBalance || 0;
+    
+    // Step 2: Calculate baseline (current open cycle + most recent closed cycle)
+    const baseline = openCycleSpend + mostRecentClosedBalance;
+    
+    // Check if this cycle IS the most recent closed cycle (should show "Due By")
+    if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
+      paymentStatus = 'due';
+      paymentAnalysis = `Most recent closed cycle - Due By ${formatDate(cycle.dueDate)}`;
+    }
+    // Step 3: Calculate remaining balance after accounting for current activity
+    // Remaining = Current Balance - Most Recent Closed - Open Cycle Spend
+    else {
+      const remainingAfterCurrent = currentBalance - baseline;
+      
+      if (remainingAfterCurrent <= 0) {
+        // All historical cycles (except most recent closed) are paid
+        paymentStatus = 'paid';
+        paymentAnalysis = `Paid - remaining after current (${formatCurrency(remainingAfterCurrent)}) ≤ 0`;
+      } else {
+        // Step 4: Check historical cycles from newest to oldest
+        const historicalCycles = allCycles.filter(c => 
+          c.statementBalance && c.statementBalance > 0 && 
+          c.id !== mostRecentClosedCycle?.id && // Exclude most recent closed cycle
+          c.id !== openCycle?.id // Exclude open cycle
+        ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()); // Newest to oldest
+        
+        let remainingBalance = remainingAfterCurrent;
+        let foundThisCycle = false;
+        
+        for (const historicalCycle of historicalCycles) {
+          if (historicalCycle.id === cycle.id) {
+            foundThisCycle = true;
+            if (remainingBalance > 0) {
+              paymentStatus = 'outstanding';
+              paymentAnalysis = `Outstanding - ${formatCurrency(remainingBalance)} still owed from older cycles`;
+            } else {
+              paymentStatus = 'paid';
+              paymentAnalysis = `Paid - all newer cycles accounted for`;
+            }
+            break;
+          }
+          // Subtract this historical cycle from remaining balance
+          remainingBalance -= historicalCycle.statementBalance || 0;
+        }
+        
+        // If this cycle wasn't found in historical cycles, it might be current/future
+        if (!foundThisCycle) {
+          paymentStatus = 'current';
+          paymentAnalysis = `Current or future cycle`;
+        }
+      }
+    }
+    
+    console.log('Payment analysis for', cycle.creditCardName || card?.name, formatDate(cycle.endDate), {
+      cycleId: cycle.id,
+      currentBalance,
+      openCycleSpend,
+      mostRecentClosedBalance,
+      baseline,
+      remainingAfterBaseline: currentBalance - baseline,
+      statementBalance: cycle.statementBalance,
+      isMostRecentClosed: mostRecentClosedCycle?.id === cycle.id,
+      paymentStatus,
+      paymentAnalysis,
+      cycleEndDate: formatDate(cycle.endDate)
+    });
+    }
+  }
+  
+  // Hide due date info if total spend and statement balance are both $0
+  const shouldShowDueDate = cycle.dueDate && (cycle.totalSpend > 0 || (cycle.statementBalance && cycle.statementBalance > 0));
+
+  return (
+    <div className={`p-4 rounded-lg border ${isHistorical ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-300'} ${isHistorical ? 'opacity-75' : ''}`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center">
+          {isHistorical && <History className="h-4 w-4 text-gray-400 mr-1" />}
+          <div>
+            <p className="font-medium text-gray-900">
+              {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
+            </p>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span>{cycle.transactionCount} transactions</span>
+              {(cycle.creditCardMask || card?.mask) && <span>•••• {cycle.creditCardMask || card?.mask}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="text-right">
+          {cycle.statementBalance && cycle.statementBalance !== cycle.totalSpend ? (
+            <div>
+              {paymentStatus === 'paid' ? (
+                <div>
+                  <p className="font-semibold text-lg text-green-600">✅ Paid</p>
+                  <p className="text-xs text-green-500">Was {formatCurrency(cycle.statementBalance)}</p>
+                  <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                </div>
+              ) : paymentStatus === 'due' ? (
+                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 -m-2">
+                  <p className="font-bold text-lg text-yellow-800">DUE BY</p>
+                  <p className="font-bold text-xl text-yellow-900">{formatDate(cycle.dueDate!)}</p>
+                  <p className="font-semibold text-2xl text-yellow-900">{formatCurrency(cycle.statementBalance)}</p>
+                  {daysUntilDue !== null && daysUntilDue > 0 && (
+                    <p className="text-sm font-medium text-yellow-700">{daysUntilDue} days remaining</p>
+                  )}
+                  <p className="text-sm text-gray-600 mt-1">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                </div>
+              ) : paymentStatus === 'outstanding' ? (
+                <div>
+                  <p className="font-semibold text-lg text-red-600">{formatCurrency(cycle.statementBalance)}</p>
+                  <p className="text-xs text-red-500">Still Outstanding</p>
+                  <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                  {paymentAnalysis && <p className="text-xs text-gray-500 mt-1">{paymentAnalysis}</p>}
+                </div>
+              ) : (
+                <div>
+                  <p className="font-semibold text-lg text-blue-600">{formatCurrency(cycle.statementBalance)}</p>
+                  <p className="text-xs text-blue-500">Statement Balance</p>
+                  <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="font-semibold text-lg text-gray-900">{formatCurrency(cycle.totalSpend)}</p>
+          )}
+          {shouldShowDueDate && paymentStatus !== 'due' && (
+            <p className={`text-sm ${
+              paymentStatus === 'paid' ? 'text-green-600' : 
+              isOverdue && paymentStatus !== 'paid' ? 'text-red-600' : 
+              isDueSoon && paymentStatus !== 'paid' ? 'text-yellow-600' : 'text-green-600'
+            }`}>
+              {paymentStatus === 'paid' ? 'Paid by:' : 'Due:'} {formatDate(cycle.dueDate!)}
+              {daysUntilDue !== null && paymentStatus !== 'paid' && (
+                <span className="block">
+                  ({Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'remaining'})
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+      
+      {shouldShowDueDate && (
+        <div className="flex justify-end">
+          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+            paymentStatus === 'paid'
+              ? 'bg-green-100 text-green-800'
+              : paymentStatus === 'due'
+                ? 'bg-yellow-100 text-yellow-800'
+              : paymentStatus === 'outstanding'
+                ? 'bg-orange-100 text-orange-800'
+              : isOverdue
+                ? 'bg-red-100 text-red-800'
+                : isDueSoon
+                  ? 'bg-yellow-100 text-yellow-800' 
+                  : 'bg-green-100 text-green-800'
+          }`}>
+{paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'due' ? 'Due' : paymentStatus === 'outstanding' ? 'Outstanding' : paymentStatus === 'current' ? (isDueSoon ? 'Due Soon' : 'Current') : isOverdue ? 'Overdue' : 'On Track'}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Sortable Card Component
 function SortableCard({ 
   cardName, 
@@ -153,192 +343,6 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
 
   const getCardColorIndex = (cardName: string) => {
     return Math.abs(cardName.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % cardColors.length;
-  };
-
-  const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }: { cycle: BillingCycle, card?: CreditCardInfo, isHistorical?: boolean, allCycles?: BillingCycle[] }) => {
-    const daysUntilDue = cycle.dueDate ? getDaysUntil(cycle.dueDate) : null;
-    const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
-    const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
-    
-    // Smart payment status analysis using iterative approach
-    let paymentStatus: 'paid' | 'outstanding' | 'current' | 'due' = 'current';
-    let paymentAnalysis = '';
-    
-    // Only analyze cycles with statement balances when we have full data
-    if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
-      const currentBalance = Math.abs(card.balanceCurrent || 0);
-      
-      // Step 1: Find current open cycle and most recent closed cycle
-      const openCycle = allCycles.find(c => !c.statementBalance || c.statementBalance === 0);
-      const openCycleSpend = openCycle?.totalSpend || 0;
-      
-      // Find ALL closed cycles (with statement balance), sorted by end date
-      const allClosedCycles = allCycles.filter(c => 
-        c.statementBalance && c.statementBalance > 0
-      ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-      
-      // The most recent closed cycle is the first one in the sorted list
-      const mostRecentClosedCycle = allClosedCycles[0];
-      const mostRecentClosedBalance = mostRecentClosedCycle?.statementBalance || 0;
-      
-      // Step 2: Calculate baseline (current open cycle + most recent closed cycle)
-      const baseline = openCycleSpend + mostRecentClosedBalance;
-      if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
-        paymentStatus = 'due';
-        paymentAnalysis = `Most recent closed cycle - Due By ${formatDate(cycle.dueDate)}`;
-      }
-      // Step 3: Calculate remaining balance after accounting for current activity
-      // Remaining = Current Balance - Most Recent Closed - Open Cycle Spend
-      else {
-        const remainingAfterCurrent = currentBalance - baseline;
-        
-        if (remainingAfterCurrent <= 0) {
-          // All historical cycles (except most recent closed) are paid
-          paymentStatus = 'paid';
-          paymentAnalysis = `Paid - remaining after current (${formatCurrency(remainingAfterCurrent)}) ≤ 0`;
-        } else {
-          // Step 4: Check historical cycles from newest to oldest
-          const historicalCycles = allCycles.filter(c => 
-            c.statementBalance && c.statementBalance > 0 && 
-            c.id !== mostRecentClosedCycle?.id && // Exclude most recent closed cycle
-            c.id !== openCycle?.id // Exclude open cycle
-          ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()); // Newest to oldest
-          
-          let remainingBalance = remainingAfterCurrent;
-          let foundThisCycle = false;
-          
-          for (const historicalCycle of historicalCycles) {
-            if (historicalCycle.id === cycle.id) {
-              foundThisCycle = true;
-              if (remainingBalance > 0) {
-                paymentStatus = 'outstanding';
-                paymentAnalysis = `Outstanding - ${formatCurrency(remainingBalance)} still owed from older cycles`;
-              } else {
-                paymentStatus = 'paid';
-                paymentAnalysis = `Paid - all newer cycles accounted for`;
-              }
-              break;
-            }
-            // Subtract this historical cycle from remaining balance
-            remainingBalance -= historicalCycle.statementBalance || 0;
-          }
-        
-        // If this cycle wasn't found in historical cycles, it might be current/future
-        if (!foundThisCycle) {
-          paymentStatus = 'current';
-          paymentAnalysis = `Current or future cycle`;
-        }
-      }
-      
-      console.log('Payment analysis for', cycle.creditCardName || card?.name, formatDate(cycle.endDate), {
-        cycleId: cycle.id,
-        currentBalance,
-        openCycleSpend,
-        mostRecentClosedBalance,
-        baseline,
-        remainingAfterBaseline: currentBalance - baseline,
-        statementBalance: cycle.statementBalance,
-        isMostRecentClosed: mostRecentClosedCycle?.id === cycle.id,
-        paymentStatus,
-        paymentAnalysis,
-        cycleEndDate: formatDate(cycle.endDate)
-      });
-      }
-    }
-    
-    // Hide due date info if total spend and statement balance are both $0
-    const shouldShowDueDate = cycle.dueDate && (cycle.totalSpend > 0 || (cycle.statementBalance && cycle.statementBalance > 0));
-
-    return (
-      <div className={`p-4 rounded-lg border ${isHistorical ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-300'} ${isHistorical ? 'opacity-75' : ''}`}>
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center">
-            {isHistorical && <History className="h-4 w-4 text-gray-400 mr-1" />}
-            <div>
-              <p className="font-medium text-gray-900">
-                {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
-              </p>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span>{cycle.transactionCount} transactions</span>
-                {(cycle.creditCardMask || card?.mask) && <span>•••• {cycle.creditCardMask || card?.mask}</span>}
-              </div>
-            </div>
-          </div>
-          <div className="text-right">
-            {cycle.statementBalance && cycle.statementBalance !== cycle.totalSpend ? (
-              <div>
-                {paymentStatus === 'paid' ? (
-                  <div>
-                    <p className="font-semibold text-lg text-green-600">✅ Paid</p>
-                    <p className="text-xs text-green-500">Was {formatCurrency(cycle.statementBalance)}</p>
-                    <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
-                  </div>
-                ) : paymentStatus === 'due' ? (
-                  <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 -m-2">
-                    <p className="font-bold text-lg text-yellow-800">DUE BY</p>
-                    <p className="font-bold text-xl text-yellow-900">{formatDate(cycle.dueDate!)}</p>
-                    <p className="font-semibold text-2xl text-yellow-900">{formatCurrency(cycle.statementBalance)}</p>
-                    {daysUntilDue !== null && daysUntilDue > 0 && (
-                      <p className="text-sm font-medium text-yellow-700">{daysUntilDue} days remaining</p>
-                    )}
-                    <p className="text-sm text-gray-600 mt-1">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
-                  </div>
-                ) : paymentStatus === 'outstanding' ? (
-                  <div>
-                    <p className="font-semibold text-lg text-red-600">{formatCurrency(cycle.statementBalance)}</p>
-                    <p className="text-xs text-red-500">Still Outstanding</p>
-                    <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
-                    {paymentAnalysis && <p className="text-xs text-gray-500 mt-1">{paymentAnalysis}</p>}
-                  </div>
-                ) : (
-                  <div>
-                    <p className="font-semibold text-lg text-blue-600">{formatCurrency(cycle.statementBalance)}</p>
-                    <p className="text-xs text-blue-500">Statement Balance</p>
-                    <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="font-semibold text-lg text-gray-900">{formatCurrency(cycle.totalSpend)}</p>
-            )}
-            {shouldShowDueDate && paymentStatus !== 'due' && (
-              <p className={`text-sm ${
-                paymentStatus === 'paid' ? 'text-green-600' : 
-                isOverdue && paymentStatus !== 'paid' ? 'text-red-600' : 
-                isDueSoon && paymentStatus !== 'paid' ? 'text-yellow-600' : 'text-green-600'
-              }`}>
-                {paymentStatus === 'paid' ? 'Paid by:' : 'Due:'} {formatDate(cycle.dueDate!)}
-                {daysUntilDue !== null && paymentStatus !== 'paid' && (
-                  <span className="block">
-                    ({Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'remaining'})
-                  </span>
-                )}
-              </p>
-            )}
-          </div>
-        </div>
-        
-        {shouldShowDueDate && (
-          <div className="flex justify-end">
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-              paymentStatus === 'paid'
-                ? 'bg-green-100 text-green-800'
-                : paymentStatus === 'due'
-                  ? 'bg-yellow-100 text-yellow-800'
-                : paymentStatus === 'outstanding'
-                  ? 'bg-orange-100 text-orange-800'
-                  : isOverdue
-                    ? 'bg-red-100 text-red-800'
-                    : isDueSoon
-                      ? 'bg-yellow-100 text-yellow-800' 
-                      : 'bg-green-100 text-green-800'
-            }`}>
-{paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'due' ? 'Due' : paymentStatus === 'outstanding' ? 'Outstanding' : paymentStatus === 'current' ? (isDueSoon ? 'Due Soon' : 'Current') : isOverdue ? 'Overdue' : 'On Track'}
-            </span>
-          </div>
-        )}
-      </div>
-    );
   };
 
   // Initialize card order when cycles change
