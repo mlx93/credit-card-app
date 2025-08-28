@@ -18,12 +18,13 @@ export interface PlaidService {
   createUpdateLinkToken(userId: string, itemId: string): Promise<string>;
   exchangePublicToken(publicToken: string, userId: string): Promise<string>;
   removeItem(accessToken: string): Promise<void>;
+  getAccounts(accessToken: string): Promise<any>;
   getTransactions(accessToken: string, startDate: Date, endDate: Date): Promise<any[]>;
   getLiabilities(accessToken: string): Promise<any>;
   getBalances(accessToken: string): Promise<any>;
   getStatements(accessToken: string, accountId: string): Promise<any[]>;
   syncAccounts(accessToken: string, itemId: string): Promise<void>;
-  syncTransactions(itemId: string): Promise<void>;
+  syncTransactions(itemId: string, accessToken: string): Promise<void>;
 }
 
 class PlaidServiceImpl implements PlaidService {
@@ -150,6 +151,20 @@ class PlaidServiceImpl implements PlaidService {
       return response.data;
     } catch (error) {
       console.error('Error fetching balances:', error);
+      return { accounts: [] }; // Return empty accounts on error
+    }
+  }
+
+  async getAccounts(accessToken: string): Promise<any> {
+    try {
+      const request: AccountsBalanceGetRequest = {
+        access_token: accessToken,
+      };
+
+      const response = await plaidClient.accountsBalanceGet(request);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
       return { accounts: [] }; // Return empty accounts on error
     }
   }
@@ -346,7 +361,7 @@ class PlaidServiceImpl implements PlaidService {
     }
   }
 
-  async syncTransactions(itemId: string): Promise<void> {
+  async syncTransactions(itemId: string, accessToken: string): Promise<void> {
     try {
       console.log(`=== TRANSACTION SYNC START for itemId: ${itemId} ===`);
       
@@ -360,7 +375,7 @@ class PlaidServiceImpl implements PlaidService {
       }
 
       console.log(`Found Plaid item for ${plaidItem.institutionName} (${itemId})`);
-      const decryptedAccessToken = decrypt(plaidItem.accessToken);
+      console.log('✅ Using already decrypted access token from sync route');
       
       const endDate = new Date();
       const startDate = new Date();
@@ -369,7 +384,7 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`Fetching transactions from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
 
       const transactions = await this.getTransactions(
-        decryptedAccessToken,
+        accessToken,
         startDate,
         endDate
       );

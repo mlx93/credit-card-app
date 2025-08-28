@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         console.log('Step 1: Account sync completed');
         
         console.log('Step 2: Syncing transactions...');
-        await plaidService.syncTransactions(item.itemId);
+        await plaidService.syncTransactions(item.itemId, decryptedAccessToken);
         console.log('Step 2: Transaction sync completed');
         
         // Update connection status to active on successful sync
