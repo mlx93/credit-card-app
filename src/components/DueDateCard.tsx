@@ -1,6 +1,23 @@
 import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/utils/format';
-import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface CreditCardInfo {
   id: string;
@@ -40,7 +57,137 @@ const cardColors = [
   'bg-red-50 border-red-200 border-l-red-500'
 ];
 
-export function DueDateCard({ card, colorIndex = 0, onReconnect, onRemove, onSync }: DueDateCardProps) {
+// Sortable Due Date Card Component
+function SortableDueDateCard({
+  card,
+  colorIndex = 0,
+  onReconnect,
+  onRemove,
+  onSync
+}: DueDateCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: card.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <DueDateCard 
+        card={card}
+        colorIndex={colorIndex}
+        onReconnect={onReconnect}
+        onRemove={onRemove}
+        onSync={onSync}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+}
+
+// Main Due Date Cards Container with Drag and Drop
+interface DueDateCardsProps {
+  cards: CreditCardInfo[];
+  onReconnect?: (itemId: string) => void;
+  onRemove?: (itemId: string) => void;
+  onSync?: (itemId: string) => void;
+}
+
+export function DueDateCards({ cards, onReconnect, onRemove, onSync }: DueDateCardsProps) {
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
+
+  // Initialize card order when cards change
+  useEffect(() => {
+    const cardIds = cards.map(card => card.id);
+    if (cardOrder.length === 0 && cardIds.length > 0) {
+      setCardOrder(cardIds);
+    } else if (cardOrder.length > 0) {
+      const newCards = cardIds.filter(id => !cardOrder.includes(id));
+      if (newCards.length > 0) {
+        setCardOrder([...cardOrder, ...newCards]);
+      }
+    }
+  }, [cards]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setCardOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const getCardColorIndex = (cardName: string) => {
+    return Math.abs(cardName.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % cardColors.length;
+  };
+
+  // Filter and sort cards based on cardOrder
+  const orderedCards = cardOrder
+    .map(cardId => cards.find(card => card.id === cardId))
+    .filter(Boolean) as CreditCardInfo[];
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext
+        items={cardOrder}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="space-y-4">
+          {orderedCards.map((card) => {
+            const colorIndex = getCardColorIndex(card.name);
+            return (
+              <SortableDueDateCard
+                key={card.id}
+                card={card}
+                colorIndex={colorIndex}
+                onReconnect={onReconnect}
+                onRemove={onRemove}
+                onSync={onSync}
+              />
+            );
+          })}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+export function DueDateCard({ 
+  card, 
+  colorIndex = 0, 
+  onReconnect, 
+  onRemove, 
+  onSync,
+  dragHandleProps 
+}: DueDateCardProps & { dragHandleProps?: any }) {
   const [syncing, setSyncing] = useState(false);
   const daysUntilDue = card.nextPaymentDueDate ? getDaysUntil(card.nextPaymentDueDate) : null;
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
@@ -88,6 +235,11 @@ export function DueDateCard({ card, colorIndex = 0, onReconnect, onRemove, onSyn
     <div className={`p-6 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center">
+          {dragHandleProps && (
+            <div {...dragHandleProps} className="cursor-move mr-2">
+              <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+            </div>
+          )}
           <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
           <div>
             <div className="flex items-center gap-2">
