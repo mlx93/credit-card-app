@@ -33,9 +33,19 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
   
-  // Handle cards with no limit or invalid limits
-  const hasValidLimit = card.balanceLimit && card.balanceLimit > 0 && isFinite(card.balanceLimit);
+  // Handle cards with no limit or invalid limits - be more permissive with Capital One
+  const hasValidLimit = card.balanceLimit && card.balanceLimit > 0 && isFinite(card.balanceLimit) && !isNaN(card.balanceLimit);
   const utilization = hasValidLimit ? Math.abs(card.balanceCurrent) / card.balanceLimit * 100 : 0;
+  
+  // Debug log for Capital One cards
+  if (card.name?.toLowerCase().includes('capital one') || card.name?.toLowerCase().includes('quicksilver') || card.name?.toLowerCase().includes('venture')) {
+    console.log('Capital One card limit debug:', {
+      name: card.name,
+      balanceLimit: card.balanceLimit,
+      hasValidLimit,
+      utilization
+    });
+  }
 
   // Check if card is paid off
   const currentBalance = Math.abs(card.balanceCurrent || 0);
@@ -59,8 +69,8 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
         )}
       </div>
 
-      {/* Balance Information */}
-      {card.lastStatementBalance && card.lastStatementBalance !== card.balanceCurrent ? (
+      {/* Balance Information - Show statement balance when there's a due date OR when balances differ */}
+      {card.lastStatementBalance && (card.nextPaymentDueDate || card.lastStatementBalance !== card.balanceCurrent) ? (
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div>
             <p className="text-sm text-gray-600">Statement Balance</p>
@@ -107,7 +117,8 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
             <span>{formatPercentage(utilization)}</span>
           ) : (
             <span className="text-gray-500 italic">
-              {card.balanceLimit === null || card.balanceLimit === undefined ? 'Unknown Limit' : 'No Limit'}
+              {card.balanceLimit === null || card.balanceLimit === undefined ? 'Unknown Limit' : 
+               isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid Limit' : 'No Limit'}
             </span>
           )}
         </div>
@@ -125,7 +136,8 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
           </div>
         ) : (
           <div className="text-center py-2 text-sm text-gray-500 italic">
-            {card.balanceLimit === null || card.balanceLimit === undefined ? 'Limit information not available' : 'Unlimited credit'}
+            {card.balanceLimit === null || card.balanceLimit === undefined ? 'Limit information not available' : 
+             isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid limit data' : 'Unlimited credit'}
           </div>
         )}
       </div>
