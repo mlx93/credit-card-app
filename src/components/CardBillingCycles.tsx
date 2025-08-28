@@ -97,6 +97,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     let paymentStatus: 'paid' | 'outstanding' | 'current' = 'current';
     let paymentAnalysis = '';
     
+    // Apply payment analysis to any cycle with a statement balance
     if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles.length > 0) {
       const currentBalance = Math.abs(card.balanceCurrent || 0);
       
@@ -125,7 +126,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
       
       if (currentBalance <= accountedBalance) {
         // All prior statements are paid
-        if (isHistorical && cycle.statementBalance > 0) {
+        if (cycle.statementBalance > 0) {  // Remove isHistorical check - apply to all cycles with statements
           paymentStatus = 'paid';
           paymentAnalysis = `Paid off (current balance ≤ accounted balance)`;
         }
@@ -149,7 +150,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
               paymentAnalysis = `Still outstanding`;
             } else {
               paymentStatus = 'paid';
-              paymentAnalysis = `Paid off`;
+              paymentAnalysis = `Paid off (iterative calculation)`;
             }
             break;
           }
