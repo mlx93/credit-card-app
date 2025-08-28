@@ -102,34 +102,48 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`=== GET TRANSACTIONS DEBUG ===`);
       console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
       
-      const request: TransactionsGetRequest = {
-        access_token: accessToken,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-      };
+      let allTransactions: any[] = [];
+      let offset = 0;
+      const batchSize = 500;
+      let hasMore = true;
 
-      console.log('Calling Plaid transactionsGet with request:', JSON.stringify(request, null, 2));
-      const response = await plaidClient.transactionsGet(request);
-      console.log('Plaid transactionsGet response:', response.data.transactions.length, 'transactions');
-      console.log('Total transactions available:', response.data.total_transactions);
-      console.log('Response includes all data:', response.data.transactions.length >= response.data.total_transactions);
+      while (hasMore) {
+        const request: TransactionsGetRequest = {
+          access_token: accessToken,
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          offset: offset,
+          count: batchSize
+        };
+
+        console.log(`Fetching batch ${Math.floor(offset / batchSize) + 1} (offset: ${offset})`);
+        const response = await plaidClient.transactionsGet(request);
+        
+        if (offset === 0) {
+          console.log('Total transactions available:', response.data.total_transactions);
+          console.log('Will need', Math.ceil(response.data.total_transactions / batchSize), 'batches to get all data');
+        }
+
+        allTransactions.push(...response.data.transactions);
+        console.log(`Batch ${Math.floor(offset / batchSize) + 1}: Got ${response.data.transactions.length} transactions (total so far: ${allTransactions.length})`);
+
+        // Check if we have more data
+        if (allTransactions.length >= response.data.total_transactions || response.data.transactions.length < batchSize) {
+          hasMore = false;
+        } else {
+          offset += batchSize;
+        }
+      }
+
+      console.log(`✅ Successfully fetched all ${allTransactions.length} transactions with pagination`);
       
-      if (response.data.transactions.length < response.data.total_transactions) {
-        console.warn(`⚠️  PAGINATION ISSUE: Only got ${response.data.transactions.length} of ${response.data.total_transactions} total transactions`);
-        console.warn('This explains why you only see 3 months of data - we need to implement pagination!');
+      if (allTransactions.length > 0) {
+        const dates = allTransactions.map(t => t.date).sort();
+        console.log('Final transaction date range:', dates[0], 'to', dates[dates.length - 1]);
+        console.log('Months of data retrieved:', Math.round((new Date(dates[dates.length - 1]).getTime() - new Date(dates[0]).getTime()) / (1000 * 60 * 60 * 24 * 30)));
       }
       
-      if (response.data.transactions.length > 0) {
-        const dates = response.data.transactions.map(t => t.date).sort();
-        console.log('Actual transaction date range returned by Plaid:', dates[0], 'to', dates[dates.length - 1]);
-        console.log('Expected vs actual months of data:', {
-          requested: Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24 * 30)),
-          actualOldest: dates[0],
-          actualNewest: dates[dates.length - 1],
-          actualMonthsSpan: Math.round((new Date(dates[dates.length - 1]).getTime() - new Date(dates[0]).getTime()) / (1000 * 60 * 60 * 24 * 30))
-        });
-      }
-      console.log('Sample transactions:', response.data.transactions.slice(0, 3).map(t => ({
+      console.log('Sample transactions:', allTransactions.slice(0, 3).map(t => ({
         id: t.transaction_id,
         account_id: t.account_id,
         amount: t.amount,
@@ -138,7 +152,7 @@ class PlaidServiceImpl implements PlaidService {
       })));
       console.log(`=== END GET TRANSACTIONS DEBUG ===`);
       
-      return response.data.transactions;
+      return allTransactions;
     } catch (error) {
       console.error('=== PLAID TRANSACTION ERROR ===');
       console.error('Full error details:', error);
@@ -296,6 +310,7 @@ class PlaidServiceImpl implements PlaidService {
         console.log('=== FULL PLAID RESPONSE DEBUG for', account.name, '===');
         console.log('Liabilities Account:', JSON.stringify(account, null, 2));
         console.log('Balance Account:', JSON.stringify(balanceAccount, null, 2));
+        console.log('Accounts Account (NEW):', JSON.stringify(accountsAccount, null, 2));
         console.log('Liability Data:', JSON.stringify(liability, null, 2));
         console.log('Final Analysis:', {
           accountId: account.account_id,
