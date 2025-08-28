@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
-import { BillingCycleCard } from '@/components/BillingCycleCard';
+import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard } from '@/components/DueDateCard';
 import { APRCalculator } from '@/components/APRCalculator';
 import { PlaidLink } from '@/components/PlaidLink';
@@ -190,17 +190,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Current Billing Cycles</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Billing Cycles</h2>
             {loading ? (
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <p className="text-gray-500">Loading billing cycles...</p>
               </div>
             ) : displayCycles.length > 0 ? (
-              <div className="space-y-4">
-                {displayCycles.slice(0, 3).map((cycle, index) => (
-                  <BillingCycleCard key={cycle.id || index} cycle={cycle} />
-                ))}
-              </div>
+              <CardBillingCycles cycles={displayCycles} cards={displayCards} />
             ) : isLoggedIn ? (
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <p className="text-gray-500 text-center">No billing cycles found. Connect a credit card to get started.</p>
