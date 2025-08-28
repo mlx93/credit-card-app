@@ -94,7 +94,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
     
     // Smart payment status analysis using iterative approach
-    let paymentStatus: 'paid' | 'outstanding' | 'current' = 'current';
+    let paymentStatus: 'paid' | 'outstanding' | 'current' | 'due' = 'current';
     let paymentAnalysis = '';
     
     // Only analyze cycles with statement balances when we have full cycle data
@@ -114,16 +114,23 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
       // Step 2: Calculate baseline (current open cycle + most recent closed cycle)
       const baseline = openCycleSpend + mostRecentClosedBalance;
       
-      // Step 3: Check if all prior bills are paid
-      if (currentBalance <= baseline) {
-        // All historical cycles are paid
+      // Check if this cycle IS the most recent closed cycle (should show "Due By")
+      const mostRecentClosedCycle = closedCyclesWithFutureDue[0];
+      if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
+        paymentStatus = 'due';
+        paymentAnalysis = `Most recent closed cycle - Due By ${formatDate(cycle.dueDate)}`;
+      }
+      // Step 3: Check if all prior bills are paid (excluding most recent closed cycle)
+      else if (currentBalance <= baseline) {
+        // All historical cycles (except most recent closed) are paid
         paymentStatus = 'paid';
         paymentAnalysis = `Paid - current balance (${formatCurrency(currentBalance)}) ≤ baseline (${formatCurrency(baseline)})`;
       } else {
         // Step 4: Iteratively add historical cycles from newest to oldest
         const historicalCycles = allCycles.filter(c => 
           c.statementBalance && c.statementBalance > 0 && 
-          new Date(c.endDate) <= new Date() // Past cycles only
+          new Date(c.endDate) <= new Date() && // Past cycles only
+          c.id !== mostRecentClosedCycle?.id // Exclude most recent closed cycle
         ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()); // Newest to oldest
         
         let runningTotal = baseline;
@@ -192,6 +199,13 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                     <p className="text-xs text-green-500">Was {formatCurrency(cycle.statementBalance)}</p>
                     <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
                   </div>
+                ) : paymentStatus === 'due' ? (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 -m-2">
+                    <p className="font-bold text-xl text-yellow-800">DUE BY</p>
+                    <p className="font-semibold text-lg text-yellow-900">{formatCurrency(cycle.statementBalance)}</p>
+                    <p className="text-xs text-yellow-600">{formatDate(cycle.dueDate!)}</p>
+                    <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                  </div>
                 ) : paymentStatus === 'outstanding' ? (
                   <div>
                     <p className="font-semibold text-lg text-red-600">{formatCurrency(cycle.statementBalance)}</p>
@@ -210,14 +224,16 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
             ) : (
               <p className="font-semibold text-lg text-gray-900">{formatCurrency(cycle.totalSpend)}</p>
             )}
-            {shouldShowDueDate && (
+            {shouldShowDueDate && paymentStatus !== 'due' && (
               <p className={`text-sm ${
-                isOverdue && paymentStatus !== 'paid' ? 'text-red-600' : isDueSoon && paymentStatus !== 'paid' ? 'text-yellow-600' : 'text-green-600'
+                paymentStatus === 'paid' ? 'text-green-600' : 
+                isOverdue && paymentStatus !== 'paid' ? 'text-red-600' : 
+                isDueSoon && paymentStatus !== 'paid' ? 'text-yellow-600' : 'text-green-600'
               }`}>
-                Due: {formatDate(cycle.dueDate!)}
-                {daysUntilDue !== null && (
+                {paymentStatus === 'paid' ? 'Paid by:' : 'Due:'} {formatDate(cycle.dueDate!)}
+                {daysUntilDue !== null && paymentStatus !== 'paid' && (
                   <span className="block">
-                    ({Math.abs(daysUntilDue)} days {isOverdue && paymentStatus !== 'paid' ? 'overdue' : 'remaining'})
+                    ({Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'remaining'})
                   </span>
                 )}
               </p>
@@ -230,6 +246,8 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
               paymentStatus === 'paid'
                 ? 'bg-green-100 text-green-800'
+                : paymentStatus === 'due'
+                  ? 'bg-yellow-100 text-yellow-800'
                 : paymentStatus === 'outstanding'
                   ? 'bg-orange-100 text-orange-800'
                   : isOverdue
@@ -238,7 +256,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                       ? 'bg-yellow-100 text-yellow-800' 
                       : 'bg-green-100 text-green-800'
             }`}>
-{paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'outstanding' ? 'Outstanding' : paymentStatus === 'current' ? (isDueSoon ? 'Due Soon' : 'Current') : isOverdue ? 'Overdue' : 'On Track'}
+{paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'due' ? 'Due' : paymentStatus === 'outstanding' ? 'Outstanding' : paymentStatus === 'current' ? (isDueSoon ? 'Due Soon' : 'Current') : isOverdue ? 'Overdue' : 'On Track'}
             </span>
           </div>
         )}
