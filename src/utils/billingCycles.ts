@@ -5,6 +5,7 @@ export interface BillingCycleData {
   id: string;
   creditCardId: string;
   creditCardName: string;
+  creditCardMask?: string;
   startDate: Date;
   endDate: Date;
   statementBalance?: number;
@@ -110,37 +111,61 @@ async function createOrUpdateCycle(
   );
 
   let totalSpend = cycleTransactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+  
+  // Debug transaction details
+  console.log(`=== TRANSACTION DEBUG for ${creditCard.name} cycle ${cycleStart.toDateString()} to ${effectiveEndDate.toDateString()} ===`);
+  console.log(`Total transactions available for card: ${creditCard.transactions?.length || 0}`);
+  console.log(`Transactions in this cycle: ${cycleTransactions.length}`);
+  console.log(`Transaction-based total spend: $${totalSpend.toFixed(2)}`);
+  console.log('Sample transactions in cycle:', cycleTransactions.slice(0, 5).map(t => ({
+    date: t.date,
+    amount: t.amount,
+    name: t.name,
+    merchant: t.merchantName
+  })));
+  console.log('=== END TRANSACTION DEBUG ===');
 
-  // For current cycles, use balance calculation instead of transaction sum if more accurate
+  // For current cycles, compare transaction-based vs balance-based calculation
   if (cycleEnd > today && !hasStatementBalance) {
     // Current cycle: new charges since statement = current balance - statement balance
     const currentBalance = Math.abs(creditCard.balanceCurrent || 0);
     const statementBalance = Math.abs(creditCard.lastStatementBalance || 0);
     const calculatedSpend = Math.max(0, currentBalance - statementBalance);
     
-    console.log('Current cycle spend calculation for', creditCard.name, {
+    console.log('Current cycle spend comparison for', creditCard.name, {
       currentBalance,
       statementBalance,
       transactionBasedSpend: totalSpend,
       calculatedSpend,
-      usingCalculated: calculatedSpend > totalSpend
+      difference: Math.abs(totalSpend - calculatedSpend),
+      usingTransactions: cycleTransactions.length > 0
     });
     
-    // Use the calculated spend if it's higher (more accurate for current cycles)
-    if (calculatedSpend > totalSpend) {
+    // Prefer transaction-based calculation if we have transactions, otherwise use balance calculation
+    if (cycleTransactions.length === 0 && calculatedSpend > 0) {
+      console.log('No transactions found for current cycle, using balance calculation');
       totalSpend = calculatedSpend;
+    } else if (cycleTransactions.length > 0) {
+      console.log(`Using transaction-based spend: $${totalSpend.toFixed(2)} from ${cycleTransactions.length} transactions`);
+      // Keep transaction-based total
     }
   }
   
-  // For closed cycles with statement balance, ensure total spend matches statement balance
+  // For closed cycles, prefer transaction-based spend but validate against statement balance
   if (hasStatementBalance && creditCard.lastStatementBalance) {
     const statementAmount = Math.abs(creditCard.lastStatementBalance);
-    if (Math.abs(totalSpend - statementAmount) > 0.01) { // Allow for small floating point differences
-      console.log('Adjusting closed cycle spend for', creditCard.name, {
-        transactionSpend: totalSpend,
-        statementBalance: statementAmount,
-        using: 'statement balance'
-      });
+    const difference = Math.abs(totalSpend - statementAmount);
+    
+    console.log('Closed cycle spend validation for', creditCard.name, {
+      transactionSpend: totalSpend,
+      statementBalance: statementAmount,
+      difference,
+      transactionCount: cycleTransactions.length
+    });
+    
+    // If we have transactions, use transaction total. If no transactions or big discrepancy, use statement balance
+    if (cycleTransactions.length === 0 || difference > statementAmount * 0.1) { // 10% tolerance
+      console.log('Using statement balance due to', cycleTransactions.length === 0 ? 'no transactions' : 'large discrepancy');
       totalSpend = statementAmount;
     }
   }
@@ -182,6 +207,7 @@ async function createOrUpdateCycle(
     id: existingCycle.id,
     creditCardId: existingCycle.creditCardId,
     creditCardName: creditCard.name,
+    creditCardMask: creditCard.mask,
     startDate: existingCycle.startDate,
     endDate: existingCycle.endDate,
     statementBalance: existingCycle.statementBalance || undefined,
@@ -229,6 +255,7 @@ function generateEstimatedCycles(creditCard: any, cycles: BillingCycleData[]): B
       id: `estimated-${creditCard.id}-${currentMonth.getTime()}`,
       creditCardId: creditCard.id,
       creditCardName: creditCard.name,
+      creditCardMask: creditCard.mask,
       startDate: cycleStart,
       endDate: cycleEnd,
       dueDate,

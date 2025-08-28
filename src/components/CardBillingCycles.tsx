@@ -5,6 +5,7 @@ import { Calendar, CreditCard, ChevronDown, ChevronRight, History } from 'lucide
 interface BillingCycle {
   id: string;
   creditCardName: string;
+  creditCardMask?: string;
   startDate: Date;
   endDate: Date;
   totalSpend: number;
@@ -106,7 +107,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
               </p>
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <span>{cycle.transactionCount} transactions</span>
-                {card && <span>•••• {card.mask}</span>}
+                {(cycle.creditCardMask || card?.mask) && <span>•••• {cycle.creditCardMask || card?.mask}</span>}
               </div>
             </div>
           </div>
