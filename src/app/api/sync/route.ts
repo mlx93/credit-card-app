@@ -7,7 +7,7 @@ import { decrypt } from '@/lib/encryption';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== SYNC ROUTE CALLED ===');
+    console.log('🎯 SYNC ROUTE CALLED - Starting sync process');
     
     const session = await getServerSession(authOptions);
     console.log('Session check:', session?.user?.id ? 'Authorized' : 'Not authorized');
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
         console.log('Step 1: Account sync completed');
         
         console.log('Step 2: Syncing transactions...');
+        console.log('About to call plaidService.syncTransactions with:', { itemId: item.itemId, hasAccessToken: !!decryptedAccessToken });
         await plaidService.syncTransactions(item.itemId, decryptedAccessToken);
         console.log('Step 2: Transaction sync completed');
         
