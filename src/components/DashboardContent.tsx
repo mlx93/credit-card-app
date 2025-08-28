@@ -249,8 +249,9 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         )}
 
         {(!isLoggedIn || !loading) && (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex items-center">
               <TrendingUp className="h-8 w-8 text-green-600 mr-3" />
               <div>
@@ -369,7 +370,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+          </>
         )}
       </div>
     </div>
