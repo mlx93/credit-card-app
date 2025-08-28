@@ -110,13 +110,20 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const totalBalance = displayCards.reduce((sum, card) => 
     sum + Math.abs(card.balanceCurrent || 0), 0
   );
-  const averageUtilization = displayCards.length > 0 
-    ? displayCards.reduce((sum, card) => {
-        const balance = Math.abs(card.balanceCurrent || 0);
-        const limit = card.balanceLimit || 1;
-        return sum + (balance / limit) * 100;
-      }, 0) / displayCards.length
-    : 0;
+  const averageUtilization = (() => {
+    const cardsWithLimits = displayCards.filter(card => {
+      const limit = card.balanceLimit;
+      return limit && limit > 0 && isFinite(limit);
+    });
+    
+    if (cardsWithLimits.length === 0) return 0;
+    
+    return cardsWithLimits.reduce((sum, card) => {
+      const balance = Math.abs(card.balanceCurrent || 0);
+      const limit = card.balanceLimit!;
+      return sum + (balance / limit) * 100;
+    }, 0) / cardsWithLimits.length;
+  })();
 
   return (
     <div className="min-h-screen bg-gray-50">
