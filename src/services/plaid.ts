@@ -270,13 +270,32 @@ class PlaidServiceImpl implements PlaidService {
         });
         console.log('=== END DEBUG ===');
 
+        // For Capital One, use liability balance data if account.balances is missing/empty
+        const currentBalance = (isCapitalOne && liability?.balances?.current !== undefined) 
+          ? liability.balances.current 
+          : (balanceAccount?.balances?.current ?? account.balances.current);
+          
+        const availableBalance = (isCapitalOne && liability?.balances?.available !== undefined)
+          ? liability.balances.available
+          : (balanceAccount?.balances?.available ?? account.balances.available);
+
+        console.log('Balance extraction for', account.name, {
+          isCapitalOne,
+          accountBalancesCurrent: account.balances.current,
+          liabilityBalancesCurrent: liability?.balances?.current,
+          finalCurrentBalance: currentBalance,
+          accountBalancesAvailable: account.balances.available,
+          liabilityBalancesAvailable: liability?.balances?.available,
+          finalAvailableBalance: availableBalance
+        });
+
         const cardData = {
           name: account.name,
           officialName: account.official_name,
           subtype: account.subtype,
           mask: account.mask,
-          balanceCurrent: account.balances.current,
-          balanceAvailable: account.balances.available,
+          balanceCurrent: currentBalance,
+          balanceAvailable: availableBalance,
           balanceLimit: creditLimit,
           isoCurrencyCode: account.balances.iso_currency_code,
           lastStatementIssueDate: liability?.last_statement_issue_date 
