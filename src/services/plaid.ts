@@ -385,6 +385,32 @@ class PlaidServiceImpl implements PlaidService {
           });
         }
 
+        // Sync historical statements for this credit card
+        console.log(`=== STATEMENT SYNC for ${account.name} ===`);
+        try {
+          const statements = await this.getStatements(accessToken, account.account_id);
+          console.log(`Found ${statements.length} historical statements`);
+          
+          for (const statement of statements) {
+            console.log('Processing statement:', {
+              statementId: statement.statement_id,
+              accountId: statement.account_id,
+              statementDate: statement.statement_date,
+              closingBalance: statement.closing_balance,
+              paymentDueDate: statement.payment_due_date,
+              minimumPaymentAmount: statement.minimum_payment_amount
+            });
+            
+            // Store historical statement as a billing cycle or update existing cycle
+            // This will populate historical statement balances that are currently null
+            await this.storeHistoricalStatement(statement, account.account_id, plaidItem.id);
+          }
+        } catch (statementError) {
+          console.error('Error syncing statements for', account.name, statementError);
+          // Continue with other processing even if statements fail
+        }
+        console.log(`=== END STATEMENT SYNC for ${account.name} ===`);
+
         if (liability?.aprs) {
           await prisma.aPR.deleteMany({
             where: { creditCard: { accountId: account.account_id } },
@@ -575,6 +601,56 @@ class PlaidServiceImpl implements PlaidService {
     } catch (error) {
       console.error('Failed to remove item from Plaid:', error);
       throw error;
+    }
+  }
+
+  private async storeHistoricalStatement(statement: any, accountId: string, plaidItemId: string): Promise<void> {
+    try {
+      // Find the credit card
+      const creditCard = await prisma.creditCard.findUnique({
+        where: { accountId: accountId }
+      });
+      
+      if (!creditCard) {
+        console.log('No credit card found for statement, skipping');
+        return;
+      }
+
+      // Find billing cycle that matches this statement date
+      const statementDate = new Date(statement.statement_date);
+      const cycleEndBuffer = 5; // Allow 5 day buffer for matching cycle end dates
+      
+      const matchingCycle = await prisma.billingCycle.findFirst({
+        where: {
+          creditCardId: creditCard.id,
+          endDate: {
+            gte: new Date(statementDate.getTime() - cycleEndBuffer * 24 * 60 * 60 * 1000),
+            lte: new Date(statementDate.getTime() + cycleEndBuffer * 24 * 60 * 60 * 1000)
+          }
+        }
+      });
+
+      if (matchingCycle) {
+        // Update existing billing cycle with statement data
+        await prisma.billingCycle.update({
+          where: { id: matchingCycle.id },
+          data: {
+            statementBalance: Math.abs(statement.closing_balance || 0),
+            minimumPayment: statement.minimum_payment_amount || 0,
+            dueDate: statement.payment_due_date ? new Date(statement.payment_due_date) : null
+          }
+        });
+        
+        console.log(`✅ Updated billing cycle ${matchingCycle.id} with statement data:`, {
+          statementBalance: Math.abs(statement.closing_balance || 0),
+          minimumPayment: statement.minimum_payment_amount || 0,
+          dueDate: statement.payment_due_date
+        });
+      } else {
+        console.log(`No matching billing cycle found for statement date ${statementDate.toISOString()}`);
+      }
+    } catch (error) {
+      console.error('Error storing historical statement:', error);
     }
   }
 }
