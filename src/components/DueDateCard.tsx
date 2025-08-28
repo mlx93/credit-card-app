@@ -7,6 +7,7 @@ interface CreditCardInfo {
   mask: string;
   balanceCurrent: number;
   balanceLimit: number;
+  lastStatementBalance?: number;
   nextPaymentDueDate?: Date;
   minimumPaymentAmount?: number;
 }
@@ -58,20 +59,46 @@ export function DueDateCard({ card, colorIndex = 0 }: DueDateCardProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <p className="text-sm text-gray-600">Current Balance</p>
-          <p className="font-semibold text-lg text-gray-900">
-            {formatCurrency(Math.abs(card.balanceCurrent))}
-          </p>
+      {/* Balance Information */}
+      {card.lastStatementBalance && card.lastStatementBalance !== card.balanceCurrent ? (
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div>
+            <p className="text-sm text-gray-600">Statement Balance</p>
+            <p className="font-semibold text-lg text-blue-600">
+              {formatCurrency(Math.abs(card.lastStatementBalance))}
+            </p>
+            <p className="text-xs text-blue-500">Due on payment date</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Current Balance</p>
+            <p className="font-semibold text-lg text-gray-900">
+              {formatCurrency(Math.abs(card.balanceCurrent))}
+            </p>
+            <p className="text-xs text-gray-500">Includes new charges</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Minimum Payment</p>
+            <p className="font-semibold text-lg text-gray-900">
+              {card.minimumPaymentAmount ? formatCurrency(card.minimumPaymentAmount) : 'N/A'}
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Minimum Payment</p>
-          <p className="font-semibold text-lg text-gray-900">
-            {card.minimumPaymentAmount ? formatCurrency(card.minimumPaymentAmount) : 'N/A'}
-          </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p className="text-sm text-gray-600">Current Balance</p>
+            <p className="font-semibold text-lg text-gray-900">
+              {formatCurrency(Math.abs(card.balanceCurrent))}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Minimum Payment</p>
+            <p className="font-semibold text-lg text-gray-900">
+              {card.minimumPaymentAmount ? formatCurrency(card.minimumPaymentAmount) : 'N/A'}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mb-4">
         <div className="flex justify-between text-sm text-gray-600 mb-1">
