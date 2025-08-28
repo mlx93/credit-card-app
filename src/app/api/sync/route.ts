@@ -47,8 +47,21 @@ export async function POST(request: NextRequest) {
         
         console.log('Step 2: Syncing transactions...');
         console.log('About to call plaidService.syncTransactions with:', { itemId: item.itemId, hasAccessToken: !!decryptedAccessToken });
-        await plaidService.syncTransactions(item.itemId, decryptedAccessToken);
-        console.log('Step 2: Transaction sync completed');
+        console.log('PlaidService method exists?', typeof plaidService.syncTransactions);
+        
+        try {
+          await plaidService.syncTransactions(item.itemId, decryptedAccessToken);
+          console.log('Step 2: Transaction sync completed successfully');
+        } catch (syncError) {
+          console.error('🚨 TRANSACTION SYNC ERROR:', syncError);
+          console.error('Error details:', {
+            message: syncError.message,
+            stack: syncError.stack,
+            code: syncError.error_code,
+            type: syncError.error_type
+          });
+          throw syncError; // Re-throw to be caught by outer try-catch
+        }
         
         // Update connection status to active on successful sync
         await prisma.plaidItem.update({
