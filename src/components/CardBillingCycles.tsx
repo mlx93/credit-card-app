@@ -165,8 +165,24 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
         const isExpanded = expandedCards.has(cardName);
         
         // Separate cycles: those with statement balance (prior/closed) and current/recent ones
+        console.log('=== BILLING CYCLE FILTERING DEBUG for', cardName, '===');
+        console.log('Total cycles received:', cardCycles.length);
+        console.log('All cycles:', cardCycles.map(c => ({
+          id: c.id,
+          startDate: c.startDate,
+          endDate: c.endDate,
+          statementBalance: c.statementBalance,
+          totalSpend: c.totalSpend,
+          transactionCount: c.transactionCount
+        })));
+        
         const closedCycles = cardCycles.filter(c => c.statementBalance && c.statementBalance > 0);
         const currentCycles = cardCycles.filter(c => !c.statementBalance || c.statementBalance <= 0);
+        
+        console.log('Closed cycles (with statement balance):', closedCycles.length);
+        console.log('Current cycles (no statement balance):', currentCycles.length);
+        console.log('=== END FILTERING DEBUG ===');
+        
         const allRecentCycles = [...closedCycles.slice(0, 1), ...currentCycles.slice(0, 1)]; // Show 1 closed + 1 current
         const historical = cardCycles.slice(2); // All others beyond the first 2
 

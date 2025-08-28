@@ -46,7 +46,13 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   const closedCycleStart = new Date(closedCycleEnd);
   closedCycleStart.setDate(closedCycleStart.getDate() - cycleLength + 1);
   
+  console.log('=== BILLING CYCLE CREATION DEBUG for', creditCard.name, '===');
+  console.log('Last statement date:', lastStatementDate);
+  console.log('Next due date:', nextDueDate);
+  console.log('Cycle length:', cycleLength);
+  
   // Create the closed cycle with statement balance
+  console.log('Creating closed cycle:', closedCycleStart, 'to', closedCycleEnd);
   await createOrUpdateCycle(creditCard, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true);
   
   // Calculate the current ongoing cycle that starts after the statement date
@@ -58,7 +64,11 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   currentDueDate.setDate(currentDueDate.getDate() + 21);
   
   // Create the current cycle (no statement balance yet)
+  console.log('Creating current cycle:', currentCycleStart, 'to', currentCycleEnd);
   await createOrUpdateCycle(creditCard, cycles, currentCycleStart, currentCycleEnd, currentDueDate, false);
+  
+  console.log('Total cycles created:', cycles.length);
+  console.log('=== END BILLING CYCLE DEBUG ===');
   
   // Create historical cycles going back 24 months
   let historicalCycleEnd = new Date(closedCycleStart);
@@ -99,7 +109,41 @@ async function createOrUpdateCycle(
     t.date >= cycleStart && t.date <= effectiveEndDate
   );
 
-  const totalSpend = cycleTransactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+  let totalSpend = cycleTransactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+
+  // For current cycles, use balance calculation instead of transaction sum if more accurate
+  if (cycleEnd > today && !hasStatementBalance) {
+    // Current cycle: new charges since statement = current balance - statement balance
+    const currentBalance = Math.abs(creditCard.balanceCurrent || 0);
+    const statementBalance = Math.abs(creditCard.lastStatementBalance || 0);
+    const calculatedSpend = Math.max(0, currentBalance - statementBalance);
+    
+    console.log('Current cycle spend calculation for', creditCard.name, {
+      currentBalance,
+      statementBalance,
+      transactionBasedSpend: totalSpend,
+      calculatedSpend,
+      usingCalculated: calculatedSpend > totalSpend
+    });
+    
+    // Use the calculated spend if it's higher (more accurate for current cycles)
+    if (calculatedSpend > totalSpend) {
+      totalSpend = calculatedSpend;
+    }
+  }
+  
+  // For closed cycles with statement balance, ensure total spend matches statement balance
+  if (hasStatementBalance && creditCard.lastStatementBalance) {
+    const statementAmount = Math.abs(creditCard.lastStatementBalance);
+    if (Math.abs(totalSpend - statementAmount) > 0.01) { // Allow for small floating point differences
+      console.log('Adjusting closed cycle spend for', creditCard.name, {
+        transactionSpend: totalSpend,
+        statementBalance: statementAmount,
+        using: 'statement balance'
+      });
+      totalSpend = statementAmount;
+    }
+  }
 
   // Debug logging for current cycles
   if (cycleEnd > today) {
@@ -108,7 +152,7 @@ async function createOrUpdateCycle(
       cycleEnd: cycleEnd.toISOString(),
       effectiveEndDate: effectiveEndDate.toISOString(),
       transactionCount: cycleTransactions.length,
-      totalSpend,
+      finalTotalSpend: totalSpend,
       hasStatementBalance
     });
   }
