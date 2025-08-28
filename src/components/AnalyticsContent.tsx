@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TrendingUp, PieChart, BarChart3, Calendar } from 'lucide-react';
+import { TrendingUp, PieChart, BarChart3, Calendar, ChevronDown, ChevronUp, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { SpendingChart } from '@/components/SpendingChart';
 import { CategoryBreakdown } from '@/components/CategoryBreakdown';
 import { MonthlyComparison } from '@/components/MonthlyComparison';
+import { APRCalculator } from '@/components/APRCalculator';
 
 interface AnalyticsContentProps {
   isLoggedIn: boolean;
@@ -14,6 +15,7 @@ interface AnalyticsContentProps {
 export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [isAPRCalculatorOpen, setIsAPRCalculatorOpen] = useState(false);
 
   const mockData = {
     totalSpendThisMonth: 4250.67,
@@ -209,6 +211,33 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
                 comparisons={displayData.monthlyComparison} 
                 isLoggedIn={isLoggedIn} 
               />
+            )}
+          </div>
+        </div>
+
+        {/* APR Cost Calculator - Expandable Section */}
+        <div className="mt-8">
+          <div className="bg-white rounded-lg shadow-sm">
+            <button
+              onClick={() => setIsAPRCalculatorOpen(!isAPRCalculatorOpen)}
+              className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center">
+                <Calculator className="h-6 w-6 text-indigo-600 mr-3" />
+                <h2 className="text-xl font-semibold text-gray-900">APR Cost Calculator</h2>
+              </div>
+              {isAPRCalculatorOpen ? (
+                <ChevronUp className="h-5 w-5 text-gray-500" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-gray-500" />
+              )}
+            </button>
+            {isAPRCalculatorOpen && (
+              <div className="px-6 pb-6 border-t">
+                <div className="pt-6">
+                  <APRCalculator />
+                </div>
+              </div>
             )}
           </div>
         </div>

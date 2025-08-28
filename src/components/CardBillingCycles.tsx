@@ -1,6 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatCurrency, formatDate, getDaysUntil } from '@/utils/format';
-import { Calendar, CreditCard, ChevronDown, ChevronRight, History } from 'lucide-react';
+import { Calendar, CreditCard, ChevronDown, ChevronRight, History, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface BillingCycle {
   id: string;
@@ -54,8 +71,58 @@ const cardBorderColors = [
   'border-l-red-500'
 ];
 
+// Sortable Card Component
+function SortableCard({ 
+  cardName, 
+  cardCycles, 
+  card, 
+  colorIndex, 
+  isExpanded, 
+  onToggleExpand,
+  allCycles
+}: {
+  cardName: string;
+  cardCycles: BillingCycle[];
+  card?: CreditCardInfo;
+  colorIndex: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  allCycles: BillingCycle[];
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: cardName });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <CardContent 
+        cardName={cardName}
+        cardCycles={cardCycles}
+        card={card}
+        colorIndex={colorIndex}
+        isExpanded={isExpanded}
+        onToggleExpand={onToggleExpand}
+        allCycles={allCycles}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+}
+
 export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
 
   // Group cycles by card and separate current/recent vs historical
   const cyclesByCard = cycles.reduce((acc, cycle) => {
@@ -274,49 +341,128 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     );
   };
 
-  return (
-    <div className="space-y-6">
-      {Object.entries(cyclesByCard).map(([cardName, cardCycles]) => {
-        const colorIndex = getCardColorIndex(cardName);
-        const card = cards.find(c => c.name === cardName);
-        const isExpanded = expandedCards.has(cardName);
-        
-        // Separate cycles: those with statement balance (prior/closed) and current/recent ones
-        console.log('=== BILLING CYCLE FILTERING DEBUG for', cardName, '===');
-        console.log('Total cycles received:', cardCycles.length);
-        console.log('All cycles:', cardCycles.map(c => ({
-          id: c.id,
-          startDate: c.startDate,
-          endDate: c.endDate,
-          statementBalance: c.statementBalance,
-          totalSpend: c.totalSpend,
-          transactionCount: c.transactionCount
-        })));
-        
-        const closedCycles = cardCycles.filter(c => c.statementBalance && c.statementBalance > 0);
-        const currentCycles = cardCycles.filter(c => !c.statementBalance || c.statementBalance <= 0);
-        
-        console.log('Closed cycles (with statement balance):', closedCycles.length);
-        console.log('Current cycles (no statement balance):', currentCycles.length);
-        console.log('=== END FILTERING DEBUG ===');
-        
-        const allRecentCycles = [...closedCycles.slice(0, 1), ...currentCycles.slice(0, 1)]; // Show 1 closed + 1 current
-        const historical = cardCycles.slice(2); // All others beyond the first 2
+  // Initialize card order when cycles change
+  useEffect(() => {
+    const cardNames = Object.keys(cyclesByCard);
+    if (cardOrder.length === 0 && cardNames.length > 0) {
+      setCardOrder(cardNames);
+    } else if (cardOrder.length > 0) {
+      // Add any new cards that aren't in the order
+      const newCards = cardNames.filter(name => !cardOrder.includes(name));
+      if (newCards.length > 0) {
+        setCardOrder([...cardOrder, ...newCards]);
+      }
+    }
+  }, [cyclesByCard]);
 
-        return (
-          <div key={cardName} className={`rounded-lg border-2 ${cardColors[colorIndex]} ${cardBorderColors[colorIndex]} border-l-4`}>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <CreditCard className="h-5 w-5 text-gray-600 mr-2" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{cardName}</h3>
-                    {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
-                  </div>
-                </div>
-                {historical.length > 0 && (
-                  <button
-                    onClick={() => toggleCardExpansion(cardName)}
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setCardOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  // Filter and sort cards based on cardOrder
+  const orderedCards = cardOrder
+    .filter(cardName => cyclesByCard[cardName])
+    .map(cardName => ({
+      cardName,
+      cardCycles: cyclesByCard[cardName]
+    }));
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext
+        items={cardOrder}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="space-y-6">
+          {orderedCards.map(({ cardName, cardCycles }) => {
+            const colorIndex = getCardColorIndex(cardName);
+            const card = cards.find(c => c.name === cardName);
+            const isExpanded = expandedCards.has(cardName);
+
+            return (
+              <SortableCard
+                key={cardName}
+                cardName={cardName}
+                cardCycles={cardCycles}
+                card={card}
+                colorIndex={colorIndex}
+                isExpanded={isExpanded}
+                onToggleExpand={() => toggleCardExpansion(cardName)}
+                allCycles={cycles}
+              />
+            );
+          })}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+// Card Content Component (extracted from the original render)
+function CardContent({
+  cardName,
+  cardCycles,
+  card,
+  colorIndex,
+  isExpanded,
+  onToggleExpand,
+  allCycles,
+  dragHandleProps
+}: {
+  cardName: string;
+  cardCycles: BillingCycle[];
+  card?: CreditCardInfo;
+  colorIndex: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  allCycles: BillingCycle[];
+  dragHandleProps?: any;
+}) {
+  const closedCycles = cardCycles.filter(c => c.statementBalance && c.statementBalance > 0);
+  const currentCycles = cardCycles.filter(c => !c.statementBalance || c.statementBalance <= 0);
+  const allRecentCycles = [...closedCycles.slice(0, 1), ...currentCycles.slice(0, 1)];
+  const historical = cardCycles.slice(2);
+
+  return (
+    <div className={`rounded-lg border-2 ${cardColors[colorIndex]} ${cardBorderColors[colorIndex]} border-l-4`}>
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <div {...dragHandleProps} className="cursor-move mr-2">
+              <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+            </div>
+            <CreditCard className="h-5 w-5 text-gray-600 mr-2" />
+            <div>
+              <h3 className="font-semibold text-gray-900">{cardName}</h3>
+              {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
+            </div>
+          </div>
+          {historical.length > 0 && (
+            <button
+              onClick={onToggleExpand}
                     className="flex items-center text-sm text-gray-600 hover:text-gray-800"
                   >
                     {isExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}
@@ -333,7 +479,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                     cycle={cycle}
                     card={card}
                     isHistorical={false}
-                    allCycles={cardCycles}
+                    allCycles={allCycles}
                   />
                 ))}
                 
@@ -344,7 +490,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                     cycle={cycle}
                     card={card}
                     isHistorical={false}
-                    allCycles={cardCycles}
+                    allCycles={allCycles}
                   />
                 ))}
 
@@ -362,7 +508,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                           cycle={cycle}
                           card={card}
                           isHistorical={true}
-                          allCycles={cardCycles}
+                          allCycles={allCycles}
                         />
                       ))}
                     </div>
@@ -371,16 +517,5 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
               </div>
             </div>
           </div>
-        );
-      })}
-
-      {Object.keys(cyclesByCard).length === 0 && (
-        <div className="text-center py-8">
-          <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Billing Cycles</h3>
-          <p className="text-gray-600">Connect your credit cards to see billing cycle information.</p>
-        </div>
-      )}
-    </div>
   );
 }

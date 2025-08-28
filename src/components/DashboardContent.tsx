@@ -5,7 +5,6 @@ import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2 } from
 import { formatCurrency } from '@/utils/format';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard } from '@/components/DueDateCard';
-import { APRCalculator } from '@/components/APRCalculator';
 import { PlaidLink } from '@/components/PlaidLink';
 
 interface DashboardContentProps {
@@ -236,14 +235,40 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Credit Card Dashboard</h1>
-          <p className="text-gray-600 mt-2">
-            {isLoggedIn 
-              ? 'Track your spending, due dates, and credit utilization' 
-              : 'Sign in to connect your credit cards and see real data'
-            }
-          </p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Credit Card Dashboard</h1>
+            <p className="text-gray-600 mt-2">
+              {isLoggedIn 
+                ? 'Track your spending, due dates, and credit utilization' 
+                : 'Sign in to connect your credit cards and see real data'
+              }
+            </p>
+          </div>
+          <div className="ml-4">
+            <div className="bg-white p-4 rounded-lg shadow-sm min-w-[250px]">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h3>
+              <div className="space-y-2">
+                {isLoggedIn ? (
+                  <>
+                    <PlaidLink onSuccess={fetchUserData} />
+                    <button 
+                      onClick={handleRefresh}
+                      disabled={refreshing}
+                      className="w-full bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+                      <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-center py-2">
+                    <p className="text-gray-600 mb-2 text-xs">Sign in to connect cards</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {!isLoggedIn && (
@@ -350,43 +375,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">APR Cost Calculator</h2>
-            <APRCalculator />
-          </div>
-          
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="space-y-4">
-                {isLoggedIn ? (
-                  <>
-                    <PlaidLink onSuccess={fetchUserData} />
-                    <button 
-                      onClick={handleRefresh}
-                      disabled={refreshing}
-                      className="w-full bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                      <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-gray-600 mb-4">Sign in to connect your credit cards</p>
-                    <button 
-                      className="bg-gray-300 text-gray-500 font-medium py-3 px-4 rounded-lg cursor-not-allowed"
-                      disabled
-                    >
-                      Connect Credit Card (Sign in required)
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          </div>
           </>
         )}
       </div>
