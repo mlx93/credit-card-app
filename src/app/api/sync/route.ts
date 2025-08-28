@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { plaidService } from '@/services/plaid';
+import { decrypt } from '@/lib/encryption';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +19,8 @@ export async function POST(request: NextRequest) {
 
     const syncPromises = plaidItems.map(async (item) => {
       try {
-        await plaidService.syncAccounts(item.accessToken, item.itemId);
+        const decryptedAccessToken = decrypt(item.accessToken);
+        await plaidService.syncAccounts(decryptedAccessToken, item.itemId);
         await plaidService.syncTransactions(item.itemId);
         return { itemId: item.itemId, status: 'success' };
       } catch (error) {
