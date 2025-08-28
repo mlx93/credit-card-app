@@ -102,24 +102,47 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`=== GET TRANSACTIONS DEBUG ===`);
       console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
       
-      const request: TransactionsGetRequest = {
-        access_token: accessToken,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0]
-      };
+      // Use date chunking to get full transaction history
+      // Break large date ranges into 3-month chunks to avoid Plaid limits
+      const allTransactions: any[] = [];
+      const chunkMonths = 3;
+      
+      let currentStart = new Date(startDate);
+      
+      while (currentStart < endDate) {
+        const currentEnd = new Date(currentStart);
+        currentEnd.setMonth(currentEnd.getMonth() + chunkMonths);
+        
+        // Don't go past the requested end date
+        if (currentEnd > endDate) {
+          currentEnd.setTime(endDate.getTime());
+        }
+        
+        console.log(`Fetching chunk: ${currentStart.toISOString().split('T')[0]} to ${currentEnd.toISOString().split('T')[0]}`);
+        
+        const request: TransactionsGetRequest = {
+          access_token: accessToken,
+          start_date: currentStart.toISOString().split('T')[0],
+          end_date: currentEnd.toISOString().split('T')[0]
+        };
 
-      console.log('Making single transaction request (pagination disabled due to API parameter issues)');
-      const response = await plaidClient.transactionsGet(request);
-      
-      const allTransactions = response.data.transactions;
-      console.log('Total transactions available:', response.data.total_transactions);
-      console.log('Transactions returned in this request:', allTransactions.length);
-      
-      if (allTransactions.length < response.data.total_transactions) {
-        console.warn(`⚠️ Only got ${allTransactions.length} of ${response.data.total_transactions} transactions. Some data may be missing due to Plaid API limits.`);
+        const response = await plaidClient.transactionsGet(request);
+        const chunkTransactions = response.data.transactions;
+        
+        console.log(`Chunk result: ${chunkTransactions.length} transactions (total available in period: ${response.data.total_transactions})`);
+        
+        if (chunkTransactions.length < response.data.total_transactions) {
+          console.warn(`⚠️ Only got ${chunkTransactions.length} of ${response.data.total_transactions} transactions in this 3-month chunk. Some data may still be missing.`);
+        }
+        
+        allTransactions.push(...chunkTransactions);
+        
+        // Move to next chunk
+        currentStart = new Date(currentEnd);
+        currentStart.setDate(currentStart.getDate() + 1);
       }
 
-      console.log(`✅ Successfully fetched ${allTransactions.length} transactions`);
+      console.log(`✅ Successfully fetched ${allTransactions.length} transactions across all chunks`);
       
       if (allTransactions.length > 0) {
         const dates = allTransactions.map(t => t.date).sort();
@@ -159,8 +182,12 @@ class PlaidServiceImpl implements PlaidService {
 
   async getBalances(accessToken: string): Promise<any> {
     try {
+      const minLastUpdated = new Date();
+      minLastUpdated.setDate(minLastUpdated.getDate() - 14); // 14 days ago
+      
       const request: AccountsBalanceGetRequest = {
-        access_token: accessToken
+        access_token: accessToken,
+        min_last_updated_datetime: minLastUpdated.toISOString()
       };
 
       const response = await plaidClient.accountsBalanceGet(request);
@@ -373,31 +400,8 @@ class PlaidServiceImpl implements PlaidService {
           });
         }
 
-        // Sync historical statements for this credit card
-        console.log(`=== STATEMENT SYNC for ${account.name} ===`);
-        try {
-          const statements = await this.getStatements(accessToken, account.account_id);
-          console.log(`Found ${statements.length} historical statements`);
-          
-          for (const statement of statements) {
-            console.log('Processing statement:', {
-              statementId: statement.statement_id,
-              accountId: statement.account_id,
-              statementDate: statement.statement_date,
-              closingBalance: statement.closing_balance,
-              paymentDueDate: statement.payment_due_date,
-              minimumPaymentAmount: statement.minimum_payment_amount
-            });
-            
-            // Store historical statement as a billing cycle or update existing cycle
-            // This will populate historical statement balances that are currently null
-            await this.storeHistoricalStatement(statement, account.account_id, plaidItem.id);
-          }
-        } catch (statementError) {
-          console.error('Error syncing statements for', account.name, statementError);
-          // Continue with other processing even if statements fail
-        }
-        console.log(`=== END STATEMENT SYNC for ${account.name} ===`);
+        // Skip historical statement sync - requires PRODUCT_STATEMENTS consent
+        console.log(`=== STATEMENT SYNC SKIPPED for ${account.name} (no PRODUCT_STATEMENTS consent) ===`);
 
         if (liability?.aprs) {
           await prisma.aPR.deleteMany({
