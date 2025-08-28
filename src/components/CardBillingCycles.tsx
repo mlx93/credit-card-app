@@ -88,10 +88,49 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     return Math.abs(cardName.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % cardColors.length;
   };
 
-  const BillingCycleItem = ({ cycle, card, isHistorical = false }: { cycle: BillingCycle, card?: CreditCardInfo, isHistorical?: boolean }) => {
+  const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }: { cycle: BillingCycle, card?: CreditCardInfo, isHistorical?: boolean, allCycles?: BillingCycle[] }) => {
     const daysUntilDue = cycle.dueDate ? getDaysUntil(cycle.dueDate) : null;
     const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
     const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
+    
+    // Analyze payment status for cycles with statement balances
+    let paymentStatus: 'paid' | 'outstanding' | 'current' = 'current';
+    let paymentAnalysis = '';
+    
+    if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles.length > 0) {
+      const currentBalance = Math.abs(card.balanceCurrent || 0);
+      
+      // Find current cycle (no statement balance yet)
+      const currentCycle = allCycles.find(c => !c.statementBalance || c.statementBalance === 0);
+      const currentCycleSpending = currentCycle?.totalSpend || 0;
+      
+      // Calculate historical balance (current balance minus current cycle spending)
+      const historicalBalance = Math.max(0, currentBalance - currentCycleSpending);
+      
+      // Sum all historical statement balances that should still be outstanding
+      const historicalStatements = allCycles.filter(c => 
+        c.statementBalance && c.statementBalance > 0 && 
+        new Date(c.endDate) <= new Date() // Only past cycles
+      );
+      const totalHistoricalStatements = historicalStatements.reduce((sum, c) => sum + (c.statementBalance || 0), 0);
+      
+      if (isHistorical && cycle.statementBalance > 0) {
+        // For this specific historical cycle
+        if (historicalBalance < totalHistoricalStatements) {
+          // Some historical statements were paid off
+          if (historicalBalance >= cycle.statementBalance) {
+            paymentStatus = 'outstanding';
+            paymentAnalysis = `Still outstanding (part of $${historicalBalance.toFixed(2)} historical balance)`;
+          } else {
+            paymentStatus = 'paid';
+            paymentAnalysis = `Likely paid off`;
+          }
+        } else {
+          paymentStatus = 'outstanding';
+          paymentAnalysis = `Outstanding`;
+        }
+      }
+    }
     
     // Hide due date info if total spend and statement balance are both $0
     const shouldShowDueDate = cycle.dueDate && (cycle.totalSpend > 0 || (cycle.statementBalance && cycle.statementBalance > 0));
@@ -114,9 +153,26 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
           <div className="text-right">
             {cycle.statementBalance && cycle.statementBalance !== cycle.totalSpend ? (
               <div>
-                <p className="font-semibold text-lg text-blue-600">{formatCurrency(cycle.statementBalance)}</p>
-                <p className="text-xs text-blue-500">Statement Balance</p>
-                <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                {paymentStatus === 'paid' ? (
+                  <div>
+                    <p className="font-semibold text-lg text-green-600">✅ Paid</p>
+                    <p className="text-xs text-green-500">Was {formatCurrency(cycle.statementBalance)}</p>
+                    <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                  </div>
+                ) : paymentStatus === 'outstanding' ? (
+                  <div>
+                    <p className="font-semibold text-lg text-red-600">{formatCurrency(cycle.statementBalance)}</p>
+                    <p className="text-xs text-red-500">Still Outstanding</p>
+                    <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                    {paymentAnalysis && <p className="text-xs text-gray-500 mt-1">{paymentAnalysis}</p>}
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-semibold text-lg text-blue-600">{formatCurrency(cycle.statementBalance)}</p>
+                    <p className="text-xs text-blue-500">Statement Balance</p>
+                    <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="font-semibold text-lg text-gray-900">{formatCurrency(cycle.totalSpend)}</p>
@@ -212,6 +268,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                     cycle={cycle}
                     card={card}
                     isHistorical={false}
+                    allCycles={cardCycles}
                   />
                 ))}
                 
@@ -222,6 +279,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                     cycle={cycle}
                     card={card}
                     isHistorical={false}
+                    allCycles={cardCycles}
                   />
                 ))}
 
@@ -239,6 +297,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
                           cycle={cycle}
                           card={card}
                           isHistorical={true}
+                          allCycles={cardCycles}
                         />
                       ))}
                     </div>
