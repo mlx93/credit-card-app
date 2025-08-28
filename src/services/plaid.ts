@@ -34,15 +34,6 @@ class PlaidServiceImpl implements PlaidService {
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
-      // Remove guest access and ensure all institutions are visible
-      link_customization_name: 'default',
-      account_filters: {
-        liabilities: {
-          account_subtypes: ['credit card']
-        }
-      },
-      // Force authentication - no guest access
-      required_if_supported_auth_type_codes: ['credential', 'selection'],
     };
 
     console.log('Creating link token for environment:', process.env.PLAID_ENV);
