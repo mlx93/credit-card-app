@@ -182,12 +182,8 @@ class PlaidServiceImpl implements PlaidService {
 
   async getBalances(accessToken: string): Promise<any> {
     try {
-      const minLastUpdated = new Date();
-      minLastUpdated.setDate(minLastUpdated.getDate() - 14); // 14 days ago
-      
       const request: AccountsBalanceGetRequest = {
-        access_token: accessToken,
-        min_last_updated_datetime: minLastUpdated.toISOString()
+        access_token: accessToken
       };
 
       const response = await plaidClient.accountsBalanceGet(request);
