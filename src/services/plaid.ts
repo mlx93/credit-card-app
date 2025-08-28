@@ -191,8 +191,31 @@ class PlaidServiceImpl implements PlaidService {
           where: { accountId: account.account_id },
         });
 
-        // Use balance limit as primary source, fallback to liabilities limit
-        const creditLimit = balanceAccount?.balances?.limit ?? account.balances.limit;
+        // Try multiple sources for credit limit
+        let creditLimit = balanceAccount?.balances?.limit ?? account.balances.limit;
+        
+        // For Capital One and other issuers, try alternative fields
+        if (!creditLimit || creditLimit === null) {
+          // Try balances.available + balances.current (total credit line)
+          const available = balanceAccount?.balances?.available ?? account.balances.available;
+          const current = Math.abs(balanceAccount?.balances?.current ?? account.balances.current ?? 0);
+          if (available && available > 0) {
+            creditLimit = available + current;
+          }
+          
+          // Try liability limit_current field
+          if ((!creditLimit || creditLimit <= 0) && liability?.limit_current) {
+            creditLimit = liability.limit_current;
+          }
+          
+          // Try liability aprs balance_subject_to_apr
+          if ((!creditLimit || creditLimit <= 0) && liability?.aprs?.length > 0) {
+            const aprLimit = liability.aprs.find((apr: any) => apr.balance_subject_to_apr > 0)?.balance_subject_to_apr;
+            if (aprLimit) {
+              creditLimit = aprLimit;
+            }
+          }
+        }
 
         // Debug logging for credit limits
         console.log('=== FULL PLAID RESPONSE DEBUG for', account.name, '===');
@@ -203,6 +226,14 @@ class PlaidServiceImpl implements PlaidService {
           accountId: account.account_id,
           liabilitiesLimit: account.balances.limit,
           balancesLimit: balanceAccount?.balances?.limit,
+          balancesAvailable: balanceAccount?.balances?.available ?? account.balances.available,
+          balancesCurrent: balanceAccount?.balances?.current ?? account.balances.current,
+          liabilityLimitCurrent: liability?.limit_current,
+          liabilityAprs: liability?.aprs?.map((apr: any) => ({
+            type: apr.apr_type,
+            percentage: apr.apr_percentage,
+            balanceSubjectToApr: apr.balance_subject_to_apr
+          })),
           finalLimit: creditLimit,
           subtype: account.subtype,
           limitType: typeof creditLimit,

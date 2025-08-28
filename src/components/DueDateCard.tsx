@@ -183,7 +183,7 @@ export function DueDateCard({ card, colorIndex = 0, onReconnect, onRemove, onSyn
       ) : (
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <p className="text-sm text-gray-600">Current Balance</p>
+            <p className="text-sm text-gray-600">Balance</p>
             <p className="font-semibold text-lg text-gray-900">
               {formatCurrency(Math.abs(card.balanceCurrent))}
             </p>
