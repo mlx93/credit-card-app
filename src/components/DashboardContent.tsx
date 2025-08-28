@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw } from 'lucide-react';
+import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard } from '@/components/DueDateCard';
@@ -238,7 +238,18 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {isLoggedIn && loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-indigo-600 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading your credit card data...</h3>
+              <p className="text-gray-600">Please wait while we fetch your latest information</p>
+            </div>
+          </div>
+        )}
+
+        {(!isLoggedIn || !loading) && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex items-center">
               <TrendingUp className="h-8 w-8 text-green-600 mr-3" />
@@ -359,6 +370,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
