@@ -367,10 +367,10 @@ export function DueDateCard({
   };
   
   return (
-    <div className={`p-6 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
-      <div className="mb-6">
+    <div className={`p-3 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
+      <div className="mb-3">
         {/* Header Row with Due Date Box */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-2">
           <div className="flex items-center flex-1 min-w-0 pr-4">
             {dragHandleProps && (
               <div {...dragHandleProps} className="cursor-move mr-2 flex-shrink-0">
@@ -497,17 +497,17 @@ export function DueDateCard({
 
       {/* Balance Information - Show statement balance when there's a due date OR when balances differ */}
       {card.lastStatementBalance && (card.nextPaymentDueDate || card.lastStatementBalance !== card.balanceCurrent) ? (
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-2 mb-3">
           <div>
             <p className="text-sm text-gray-600">Statement Balance</p>
-            <p className="font-semibold text-lg text-blue-600">
+            <p className="font-semibold text-base text-blue-600">
               {formatCurrency(Math.abs(card.lastStatementBalance))}
             </p>
             <p className="text-xs text-blue-500">Due on payment date</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Current Balance</p>
-            <p className="font-semibold text-lg text-gray-900">
+            <p className="font-semibold text-base text-gray-900">
               {formatCurrency(Math.abs(card.balanceCurrent))}
             </p>
             <p className="text-xs text-gray-500">Includes new charges</p>
@@ -515,24 +515,24 @@ export function DueDateCard({
           {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
             <div>
               <p className="text-sm text-gray-600">Minimum Payment</p>
-              <p className="font-semibold text-lg text-gray-900">
+              <p className="font-semibold text-base text-gray-900">
                 {formatCurrency(card.minimumPaymentAmount)}
               </p>
             </div>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-2 mb-3">
           <div>
             <p className="text-sm text-gray-600">Balance</p>
-            <p className="font-semibold text-lg text-gray-900">
+            <p className="font-semibold text-base text-gray-900">
               {formatCurrency(Math.abs(card.balanceCurrent))}
             </p>
           </div>
           {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
             <div>
               <p className="text-sm text-gray-600">Minimum Payment</p>
-              <p className="font-semibold text-lg text-gray-900">
+              <p className="font-semibold text-base text-gray-900">
                 {formatCurrency(card.minimumPaymentAmount)}
               </p>
             </div>
@@ -540,7 +540,7 @@ export function DueDateCard({
         </div>
       )}
 
-      <div className="mb-6">
+      <div className="mb-3">
         <div className="flex justify-between items-center text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
           <div className="flex items-center gap-2">

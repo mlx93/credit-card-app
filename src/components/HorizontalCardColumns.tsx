@@ -88,7 +88,7 @@ function SortableCardColumn({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex-shrink-0 w-80 ${isDragging ? 'z-50' : ''}`}
+      className={`flex-shrink-0 w-96 ${isDragging ? 'z-50' : ''}`}
     >
       {/* iOS-Inspired Card Column */}
       <div className="relative">
@@ -104,14 +104,14 @@ function SortableCardColumn({
           <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl"></div>
           
           {/* Card content */}
-          <div className="relative p-6 rounded-2xl spring-bounce group-hover:scale-[1.02]">
+          <div className="relative p-4 rounded-2xl spring-bounce group-hover:scale-[1.02]">
             {/* Drag handle */}
             <div 
               {...attributes}
               {...listeners}
-              className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing"
+              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing"
             >
-              <GripVertical className="h-5 w-5 text-gray-400" />
+              <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
 
             <DueDateCard
@@ -125,7 +125,7 @@ function SortableCardColumn({
             {/* Expand/Collapse Button - iOS Style */}
             <button
               onClick={onToggleExpand}
-              className="w-full mt-4 flex items-center justify-center py-3 px-4 bg-gradient-to-r from-white/60 to-white/40 backdrop-blur-lg rounded-xl border border-white/40 hover:from-white/80 hover:to-white/60 shadow-lg hover:shadow-xl spring-smooth group/btn active:scale-95"
+              className="w-full mt-3 flex items-center justify-center py-2 px-3 bg-gradient-to-r from-white/60 to-white/40 backdrop-blur-lg rounded-lg border border-white/40 hover:from-white/80 hover:to-white/60 shadow-lg hover:shadow-xl spring-smooth group/btn active:scale-95"
             >
               <span className="text-sm font-semibold bg-gradient-to-r from-gray-700 to-gray-900 bg-clip-text text-transparent mr-2">
                 {isExpanded ? 'Hide' : 'Show'} Billing Cycles
@@ -279,7 +279,7 @@ export function HorizontalCardColumns({
       {/* Premium gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-purple-50/30 to-pink-50/50 rounded-3xl"></div>
       
-      <div className="relative p-6">
+      <div className="relative p-4">
         <DndContext 
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -289,7 +289,7 @@ export function HorizontalCardColumns({
             items={cardOrder}
             strategy={horizontalListSortingStrategy}
           >
-            <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-premium">
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-premium min-h-[300px]">
               {orderedCards.map((card, index) => (
                 <SortableCardColumn
                   key={card.id}

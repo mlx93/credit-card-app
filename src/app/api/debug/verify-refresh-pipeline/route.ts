@@ -88,11 +88,6 @@ export async function GET() {
           select: {
             name: true
           }
-        },
-        transactions: {
-          select: {
-            id: true
-          }
         }
       }
     });
@@ -129,9 +124,7 @@ export async function GET() {
         totalCreditCards: creditCards.length,
         cardsWithTransactions: creditCards.filter(c => c._count.transactions > 0).length,
         cardsWithoutTransactions: creditCards.filter(c => c._count.transactions === 0).length,
-        totalUnlinkedTransactions: unlinkedTransactions.length,
-        cyclesWithTransactions: billingCycles.filter(c => c.transactions.length > 0).length,
-        cyclesWithoutTransactions: billingCycles.filter(c => c.transactions.length === 0).length
+        totalUnlinkedTransactions: unlinkedTransactions.length
       },
       potentialIssues: []
     };
@@ -157,15 +150,6 @@ export async function GET() {
       });
     }
 
-    if (analysis.dataIntegrity.cyclesWithoutTransactions > 0) {
-      analysis.potentialIssues.push({
-        type: 'EMPTY_BILLING_CYCLES',
-        severity: 'MEDIUM',
-        count: analysis.dataIntegrity.cyclesWithoutTransactions,
-        message: `${analysis.dataIntegrity.cyclesWithoutTransactions} billing cycles have no transactions`,
-        impact: 'Cycles show $0.00 spend despite totalSpend values'
-      });
-    }
 
     const lastSyncTimes = plaidItems.map(item => ({
       institution: item.institutionName,
@@ -202,15 +186,13 @@ export async function GET() {
           card: cycle.creditCard.name,
           period: `${new Date(cycle.startDate).toLocaleDateString()} - ${new Date(cycle.endDate).toLocaleDateString()}`,
           totalSpend: cycle.totalSpend,
-          transactionCount: cycle.transactions.length,
-          discrepancy: cycle.totalSpend > 0 && cycle.transactions.length === 0
+          statementBalance: cycle.statementBalance
         })),
         lastSyncTimes
       },
       recommendations: [
         unlinkedTransactions.length > 0 && 'Run billing cycle regeneration to link orphaned transactions',
-        analysis.dataIntegrity.errorItems > 0 && 'Reconnect failed Plaid items',
-        analysis.dataIntegrity.cyclesWithoutTransactions > 0 && 'Investigate why billing cycles have no linked transactions'
+        analysis.dataIntegrity.errorItems > 0 && 'Reconnect failed Plaid items'
       ].filter(Boolean)
     });
 
