@@ -125,7 +125,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   })));
   
   // Create the closed cycle with statement balance
-  console.log('Creating closed cycle:', closedCycleStart, 'to', closedCycleEnd);
+  console.log('🏦 Creating CLOSED cycle for', creditCard.name, ':', closedCycleStart.toDateString(), 'to', closedCycleEnd.toDateString(), '- hasStatementBalance: TRUE');
   await createOrUpdateCycle(creditCard, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true);
   
   // Calculate the current ongoing cycle that starts after the statement date
@@ -137,7 +137,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   currentDueDate.setDate(currentDueDate.getDate() + 21);
   
   // Create the current cycle (no statement balance yet)
-  console.log('Creating current cycle:', currentCycleStart, 'to', currentCycleEnd);
+  console.log('🏦 Creating CURRENT cycle for', creditCard.name, ':', currentCycleStart.toDateString(), 'to', currentCycleEnd.toDateString(), '- hasStatementBalance: FALSE');
   await createOrUpdateCycle(creditCard, cycles, currentCycleStart, currentCycleEnd, currentDueDate, false);
   
   console.log('Total cycles created:', cycles.length);
@@ -191,11 +191,11 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     // Historical cycles that have ended should be treated as having statement balances
     // With PRODUCT_STATEMENTS consent, we can get actual historical statement data
     const isCompletedCycle = historicalCycleEnd < now;
-    console.log('Creating historical cycle:', {
+    console.log('🏦 Creating HISTORICAL cycle for', creditCard.name, ':', {
       cycleStart: historicalCycleStart.toDateString(),
       cycleEnd: historicalCycleEnd.toDateString(), 
       isCompleted: isCompletedCycle,
-      willHaveStatementBalance: isCompletedCycle
+      hasStatementBalance: isCompletedCycle ? 'TRUE' : 'FALSE'
     });
     await createOrUpdateCycle(creditCard, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, isCompletedCycle);
     
@@ -342,14 +342,16 @@ async function createOrUpdateCycle(
     // Check if this cycle ends exactly on the last statement date (most recent closed cycle)
     const isStatementCycle = lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime();
     
-    console.log('STATEMENT BALANCE DEBUG:', {
+    console.log('🏦 STATEMENT BALANCE DEBUG for', creditCard.name, ':', {
       cycleEnd: cycleEnd.toDateString(),
       cycleEndTime: cycleEnd.getTime(),
       lastStatementDate: lastStatementDate?.toDateString(),
       lastStatementTime: lastStatementDate?.getTime(),
       isStatementCycle,
       totalSpend,
-      creditCardLastStatementBalance: creditCard.lastStatementBalance
+      creditCardLastStatementBalance: creditCard.lastStatementBalance,
+      hasStatementBalance,
+      willAssignStatementBalance: true
     });
     
     if (isStatementCycle) {
@@ -379,7 +381,16 @@ async function createOrUpdateCycle(
         }))
       });
     }
+  } else {
+    console.log('❌ NO STATEMENT BALANCE assigned for', creditCard.name, 'cycle', cycleEnd.toDateString(), '- hasStatementBalance:', hasStatementBalance);
   }
+
+  console.log('💰 FINAL STATEMENT BALANCE for', creditCard.name, 'cycle ending', cycleEnd.toDateString(), ':', {
+    finalStatementBalance: statementBalance,
+    hasStatementBalance,
+    totalSpend,
+    cycleType: hasStatementBalance ? 'statement cycle' : 'non-statement cycle'
+  });
 
   if (!existingCycle) {
     existingCycle = await prisma.billingCycle.create({
