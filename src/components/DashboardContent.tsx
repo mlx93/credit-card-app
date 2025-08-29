@@ -283,6 +283,28 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 >
                   Rebuild Cycles
                 </button>
+                <button 
+                  onClick={async () => {
+                    console.log('Capital One Debug Sync button clicked - starting...');
+                    try {
+                      const response = await fetch('/api/debug/capital-one-sync', { method: 'POST' });
+                      const result = await response.json();
+                      
+                      if (response.ok) {
+                        console.log('Capital One Debug SUCCESS:', result);
+                        await fetchUserData();
+                        console.log('Check console for detailed Capital One sync process');
+                      } else {
+                        console.error('Capital One Debug FAILED:', response.status, result);
+                      }
+                    } catch (error) {
+                      console.error('Capital One Debug ERROR:', error);
+                    }
+                  }}
+                  className="bg-red-100 hover:bg-red-200 text-red-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
+                >
+                  Debug Capital One
+                </button>
               </>
             ) : (
               <div className="text-center py-2">
