@@ -105,7 +105,14 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
     // Check if this cycle IS the most recent closed cycle (should show "Due By")
     if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
       paymentStatus = 'due';
-      paymentAnalysis = `Most recent closed cycle - Due By ${formatDate(cycle.dueDate)}`;
+      paymentAnalysis = `Most recent closed cycle - Due By ${cycle.dueDate ? formatDate(cycle.dueDate) : 'NO DUE DATE'}`;
+      console.log('SETTING DUE STATUS:', {
+        cycleId: cycle.id,
+        cardName: cycle.creditCardName,
+        dueDate: cycle.dueDate,
+        dueDateFormatted: cycle.dueDate ? formatDate(cycle.dueDate) : 'NO DUE DATE',
+        paymentStatus
+      });
     }
     // Step 3: Calculate remaining balance after accounting for current activity
     // Remaining = Current Balance - Most Recent Closed - Open Cycle Spend
@@ -210,7 +217,7 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
           </div>
         </div>
         <div className="text-right">
-          {cycle.statementBalance && cycle.statementBalance !== cycle.totalSpend ? (
+          {cycle.statementBalance ? (
             <div>
               {paymentStatus === 'paid' ? (
                 <div>
