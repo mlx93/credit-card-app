@@ -122,13 +122,18 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
       const allOlderCyclesPaid = remainingFromOlderCycles <= 0;
       
       console.log('Payment calculation:', {
+        cardName: cycle.creditCardName,
+        cycleDate: formatDate(cycle.endDate),
         currentBalance,
         mostRecentClosedBalance,
         openCycleSpend,
         accountedFor,
         remainingFromOlderCycles,
         allOlderCyclesPaid,
-        cycleDate: formatDate(cycle.endDate)
+        mostRecentClosedCycleDate: mostRecentClosedCycle ? formatDate(mostRecentClosedCycle.endDate) : 'None',
+        isThisCycleOlder: mostRecentClosedCycle ? 
+          new Date(cycle.endDate) < new Date(mostRecentClosedCycle.endDate) : 
+          false
       });
       
       if (allOlderCyclesPaid) {
@@ -172,6 +177,17 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
               const unpaidAmount = Math.min(remainingUnpaid, historicalCycle.statementBalance || 0);
               paymentStatus = 'outstanding';
               paymentAnalysis = `Outstanding - ${formatCurrency(unpaidAmount)} of ${formatCurrency(historicalCycle.statementBalance || 0)} unpaid`;
+              
+              console.log('🚨 MARKING CYCLE AS OUTSTANDING:', {
+                cycleDate: formatDate(cycle.endDate),
+                remainingUnpaid,
+                cycleBalance: historicalCycle.statementBalance,
+                unpaidAmount,
+                currentBalance,
+                mostRecentClosedBalance,
+                openCycleSpend,
+                calculationCheck: `${currentBalance} - ${mostRecentClosedBalance} - ${openCycleSpend} = ${remainingFromOlderCycles}`
+              });
             } else {
               // No remaining unpaid balance - this cycle is paid
               paymentStatus = 'paid';
@@ -289,19 +305,35 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
                   <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
                 </div>
               ) : paymentStatus === 'due' ? (
-                <div className="relative -m-2 p-3 rounded-xl bg-gradient-to-br from-amber-50/80 to-orange-50/60 border border-amber-200/50 shadow-sm">
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Due</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {cycle.dueDate ? formatDate(cycle.dueDate) : 'Date Missing'}
-                    </p>
-                    <p className="text-xl font-bold text-gray-900">{formatCurrency(cycle.statementBalance)}</p>
-                    {daysUntilDue !== null && (
-                      <p className="text-xs font-medium text-amber-600">
-                        {daysUntilDue > 0 ? `${daysUntilDue} days left` : 
-                         daysUntilDue === 0 ? 'Due today' : 
-                         `${Math.abs(daysUntilDue)} days overdue`}
+                <div 
+                  className="relative -m-3 p-5 rounded-2xl shadow-lg border border-orange-200/40"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 247, 237, 0.95) 0%, rgba(254, 243, 199, 0.85) 50%, rgba(253, 230, 138, 0.75) 100%)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    boxShadow: '0 8px 32px rgba(251, 146, 60, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  <div className="text-center space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-lg font-bold text-amber-800 uppercase tracking-wider">DUE</p>
+                      <p className="text-2xl font-black text-gray-900">
+                        {cycle.dueDate ? formatDate(cycle.dueDate) : 'Date Missing'}
                       </p>
+                    </div>
+                    
+                    <div className="py-2 px-4 bg-white/70 rounded-xl border border-orange-100">
+                      <p className="text-2xl font-black text-gray-900">{formatCurrency(cycle.statementBalance)}</p>
+                    </div>
+                    
+                    {daysUntilDue !== null && (
+                      <div className="pt-1">
+                        <p className="text-sm font-semibold text-amber-700">
+                          {daysUntilDue > 0 ? `${daysUntilDue} days remaining` : 
+                           daysUntilDue === 0 ? 'DUE TODAY' : 
+                           `${Math.abs(daysUntilDue)} days overdue`}
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
