@@ -19,6 +19,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState(0);
+  const [refreshStep, setRefreshStep] = useState('');
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
@@ -157,10 +159,15 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const handleRefresh = async () => {
     console.log('=== HANDLEREFRESH CALLED ===');
     setRefreshing(true);
+    setRefreshProgress(0);
+    setRefreshStep('Starting refresh...');
+    
     try {
       console.log('=== FRONTEND: Starting refresh process ===');
-      console.log('Calling /api/sync...');
+      setRefreshStep('Connecting to your banks...');
+      setRefreshProgress(20);
       
+      console.log('Calling /api/sync...');
       const syncResponse = await fetch('/api/sync', { method: 'POST' });
       console.log('Sync API response status:', syncResponse.status);
       
@@ -171,8 +178,14 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         throw new Error(`Sync API failed: ${syncResponse.status}`);
       }
       
+      setRefreshStep('Syncing account data...');
+      setRefreshProgress(50);
+      
       const syncResult = await syncResponse.json();
       console.log('Sync API success result:', syncResult);
+      
+      setRefreshStep('Processing connections...');
+      setRefreshProgress(70);
       
       // Check if any connections require reconnection
       const needsReconnection = syncResult.results?.some((result: any) => result.requiresReconnection);
@@ -180,9 +193,11 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       
       if (needsReconnection) {
         console.log('⚠️ Some connections need to be reconnected');
+        setRefreshStep('Handling connection issues...');
         
         if (autoReconnectAvailable) {
           console.log('🔄 Auto-reconnection available, triggering reconnect flow...');
+          setRefreshStep('Auto-reconnecting expired cards...');
           // Auto-trigger reconnection for expired cards
           const expiredResults = syncResult.results?.filter((result: any) => result.requiresReconnection) || [];
           
@@ -199,13 +214,25 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         }
       }
       
+      setRefreshStep('Finalizing updates...');
+      setRefreshProgress(90);
+      
       console.log('Fetching user data after sync...');
       await fetchUserData();
+      
+      setRefreshStep('Complete!');
+      setRefreshProgress(100);
       console.log('=== FRONTEND: Refresh process completed ===');
     } catch (error) {
       console.error('=== FRONTEND: Error refreshing data ===', error);
+      setRefreshStep('Error occurred during refresh');
     } finally {
-      setRefreshing(false);
+      // Add a small delay to show completion state
+      setTimeout(() => {
+        setRefreshing(false);
+        setRefreshProgress(0);
+        setRefreshStep('');
+      }, 1000);
     }
   };
 
@@ -427,10 +454,18 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 <button 
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-2 text-sm whitespace-nowrap"
+                  className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-4 rounded-lg transition-all flex items-center space-x-2 text-sm whitespace-nowrap relative overflow-hidden group"
                 >
                   <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
-                  <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
+                  <span>{refreshing ? refreshStep || 'Refreshing...' : 'Refresh All Data'}</span>
+                  
+                  {/* Progress bar */}
+                  {refreshing && (
+                    <div 
+                      className="absolute bottom-0 left-0 h-0.5 bg-blue-500 transition-all duration-500 ease-out"
+                      style={{ width: `${refreshProgress}%` }}
+                    />
+                  )}
                 </button>
               </>
             ) : (
