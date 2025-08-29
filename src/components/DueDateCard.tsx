@@ -143,14 +143,11 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync }: DueDateCa
   };
 
   const getCardColorIndex = (cardName: string, cardId?: string) => {
-    // More robust hash function to avoid collisions - include card ID for uniqueness
-    const hashString = cardId ? `${cardName}-${cardId}` : cardName;
-    let hash = 0;
-    for (let i = 0; i < hashString.length; i++) {
-      hash = ((hash << 5) - hash + hashString.charCodeAt(i)) & 0xffffffff;
-    }
-    const colorIndex = Math.abs(hash) % cardColors.length;
-    console.log(`DueDate card color assignment: "${cardName}" (ID: ${cardId}) -> index ${colorIndex} (${cardColors[colorIndex]})`);
+    // Simple index-based assignment to guarantee different colors
+    const cardNames = cards.map(c => c.name).sort(); // Sort for consistency
+    const cardIndex = cardNames.indexOf(cardName);
+    const colorIndex = cardIndex >= 0 ? cardIndex % cardColors.length : 0;
+    console.log(`DueDate card color assignment: "${cardName}" (ID: ${cardId}) -> index ${colorIndex} (${cardColors[colorIndex]}) [position ${cardIndex}]`);
     return colorIndex;
   };
 

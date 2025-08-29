@@ -337,6 +337,7 @@ class PlaidServiceImpl implements PlaidService {
         
         if (isCapitalOne && liability) {
           console.log('Capital One detected, using enhanced liability-first approach...');
+          console.log('Available liability fields:', Object.keys(liability));
           
           // Priority 1: Try liability limit fields (most reliable for Capital One)
           if (liability.limit_current && liability.limit_current > 0) {
@@ -350,15 +351,29 @@ class PlaidServiceImpl implements PlaidService {
           
           // Priority 2: Check APR data (Capital One often provides limits here)
           else if (liability.aprs && liability.aprs.length > 0) {
-            // Find purchase APR which typically has the full credit limit
-            const purchaseApr = liability.aprs.find((apr: any) => 
-              apr.apr_type === 'purchase_apr' && apr.balance_subject_to_apr && apr.balance_subject_to_apr > 0
-            );
-            if (purchaseApr) {
-              creditLimit = purchaseApr.balance_subject_to_apr;
-              console.log('✅ Using purchase APR balance_subject_to_apr:', creditLimit);
-            } else {
-              // Fallback to any APR with balance info
+            console.log('Available APRs:', liability.aprs.map((apr: any) => ({
+              type: apr.apr_type,
+              percentage: apr.apr_percentage, 
+              balanceSubjectToApr: apr.balance_subject_to_apr
+            })));
+            
+            // Try multiple APR types in order of preference
+            const aprTypes = ['purchase_apr', 'balance_transfer_apr', 'cash_advance_apr', 'promotional_apr'];
+            let foundApr = null;
+            
+            for (const aprType of aprTypes) {
+              foundApr = liability.aprs.find((apr: any) => 
+                apr.apr_type === aprType && apr.balance_subject_to_apr && apr.balance_subject_to_apr > 0
+              );
+              if (foundApr) {
+                creditLimit = foundApr.balance_subject_to_apr;
+                console.log(`✅ Using ${aprType} balance_subject_to_apr:`, creditLimit);
+                break;
+              }
+            }
+            
+            // If no specific APR type worked, try any APR with balance info
+            if (!foundApr) {
               const anyAprWithBalance = liability.aprs.find((apr: any) => 
                 apr.balance_subject_to_apr && apr.balance_subject_to_apr > 0
               );
@@ -369,26 +384,95 @@ class PlaidServiceImpl implements PlaidService {
             }
           }
           
-          // Priority 3: Try liability balances (less reliable but worth trying)
+          // Priority 3: Try liability balances (less reliable but worth trying)  
           else if (liability.balances?.limit && liability.balances.limit > 0) {
             creditLimit = liability.balances.limit;
             console.log('✅ Using liability.balances.limit:', creditLimit);
+          }
+          
+          // Priority 4: Check if Capital One puts limit in different liability fields
+          else {
+            console.log('Checking alternative Capital One liability fields...');
+            const possibleLimitFields = ['credit_limit', 'maximum_balance', 'limit_amount'];
+            for (const field of possibleLimitFields) {
+              if (liability[field] && liability[field] > 0) {
+                creditLimit = liability[field];
+                console.log(`✅ Using liability.${field}:`, creditLimit);
+                break;
+              }
+            }
           }
         }
         
         // Standard approach for non-Capital One or fallback for Capital One
         if (!creditLimit || creditLimit <= 0) {
           console.log('Trying standard balance approaches...');
+          console.log('Balance sources available:', {
+            balanceAccount: !!balanceAccount,
+            accountsAccount: !!accountsAccount,
+            account: !!account
+          });
           
-          // Try direct limit fields
-          creditLimit = balanceAccount?.balances?.limit ?? accountsAccount?.balances?.limit ?? account.balances.limit;
+          // Try direct limit fields from multiple sources
+          const limitSources = [
+            { name: 'balanceAccount.balances.limit', value: balanceAccount?.balances?.limit },
+            { name: 'accountsAccount.balances.limit', value: accountsAccount?.balances?.limit },
+            { name: 'account.balances.limit', value: account.balances.limit }
+          ];
           
-          if (creditLimit && creditLimit > 0) {
-            console.log('✅ Using standard balance limit:', creditLimit);
+          for (const source of limitSources) {
+            if (source.value && source.value > 0) {
+              creditLimit = source.value;
+              console.log(`✅ Using ${source.name}:`, creditLimit);
+              break;
+            } else {
+              console.log(`❌ ${source.name}:`, source.value);
+            }
           }
           
-          // Calculate from available + current balance (total credit line)
-          else {
+          // For Capital One specifically, try more aggressive calculation methods
+          if (isCapitalOne && (!creditLimit || creditLimit <= 0)) {
+            console.log('Capital One fallback: trying aggressive calculation methods...');
+            
+            // Method 1: Try available credit calculation from any source
+            const sources = [balanceAccount?.balances, accountsAccount?.balances, account.balances].filter(Boolean);
+            for (const balanceSource of sources) {
+              const available = balanceSource.available;
+              const current = Math.abs(balanceSource.current ?? 0);
+              
+              console.log('Trying balance source:', {
+                available,
+                current,
+                calculated: available && available > 0 ? available + current : null
+              });
+              
+              if (available && available > 0) {
+                creditLimit = available + current;
+                console.log('✅ Using calculated limit (available + current):', creditLimit);
+                break;
+              }
+            }
+            
+            // Method 2: If still no limit, check for any balance fields that might be limits
+            if (!creditLimit || creditLimit <= 0) {
+              console.log('Checking for any fields that might contain Capital One credit limit...');
+              
+              for (const balanceSource of sources) {
+                const possibleFields = ['credit_limit', 'limit', 'maximum', 'max_balance'];
+                for (const field of possibleFields) {
+                  if (balanceSource[field] && balanceSource[field] > 0) {
+                    creditLimit = balanceSource[field];
+                    console.log(`✅ Using balance ${field}:`, creditLimit);
+                    break;
+                  }
+                }
+                if (creditLimit && creditLimit > 0) break;
+              }
+            }
+          }
+          
+          // Standard calculation for non-Capital One cards
+          else if (!creditLimit || creditLimit <= 0) {
             const balanceSource = balanceAccount?.balances || accountsAccount?.balances || account.balances;
             if (balanceSource) {
               const available = balanceSource.available;
@@ -411,10 +495,20 @@ class PlaidServiceImpl implements PlaidService {
 
         // Debug logging for credit limits
         console.log('=== FULL PLAID RESPONSE DEBUG for', account.name, '===');
+        console.log('Institution:', plaidItem.institutionName);
+        console.log('Is Capital One:', isCapitalOne);
         console.log('Liabilities Account:', JSON.stringify(account, null, 2));
         console.log('Balance Account:', JSON.stringify(balanceAccount, null, 2));
         console.log('Accounts Account (NEW):', JSON.stringify(accountsAccount, null, 2));
         console.log('Liability Data:', JSON.stringify(liability, null, 2));
+        
+        if (isCapitalOne) {
+          console.log('=== CAPITAL ONE SPECIFIC DEBUG ===');
+          console.log('All liability fields:', liability ? Object.keys(liability) : 'No liability data');
+          console.log('All balance fields (balance account):', balanceAccount?.balances ? Object.keys(balanceAccount.balances) : 'No balance data');
+          console.log('All balance fields (accounts account):', accountsAccount?.balances ? Object.keys(accountsAccount.balances) : 'No accounts data');
+          console.log('All balance fields (liability account):', account.balances ? Object.keys(account.balances) : 'No account balance data');
+        }
         console.log('Final Analysis:', {
           accountId: account.account_id,
           liabilitiesLimit: account.balances.limit,
