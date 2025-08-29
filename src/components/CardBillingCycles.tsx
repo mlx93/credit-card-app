@@ -159,10 +159,27 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
     const remainingFromOlderCycles = currentBalance - accountedFor;
     
     // Check if this cycle IS the most recent closed cycle (should show "Due By")
+    console.log('🔍 CYCLE COMPARISON DEBUG:', {
+      cardName: cycle.creditCardName,
+      currentCycleId: cycle.id,
+      currentCycleEndDate: formatDate(cycle.endDate),
+      currentCycleStatementBalance: cycle.statementBalance,
+      mostRecentClosedCycleId: mostRecentClosedCycle?.id,
+      mostRecentClosedCycleEndDate: mostRecentClosedCycle ? formatDate(mostRecentClosedCycle.endDate) : 'None',
+      mostRecentClosedCycleBalance: mostRecentClosedCycle?.statementBalance,
+      idsMatch: mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id,
+      allClosedCyclesCount: allClosedCycles.length,
+      allClosedCyclesPreview: allClosedCycles.slice(0, 3).map(c => ({
+        id: c.id,
+        endDate: formatDate(c.endDate),
+        statementBalance: c.statementBalance
+      }))
+    });
+    
     if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
       paymentStatus = 'due';
       paymentAnalysis = `Most recent closed cycle - Due By ${cycle.dueDate ? formatDate(cycle.dueDate) : 'NO DUE DATE'}`;
-      console.log('SETTING DUE STATUS:', {
+      console.log('✅ SETTING DUE STATUS:', {
         cycleId: cycle.id,
         cardName: cycle.creditCardName,
         dueDate: cycle.dueDate,
