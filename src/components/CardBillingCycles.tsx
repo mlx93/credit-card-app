@@ -202,101 +202,99 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
   const shouldShowDueDate = cycle.dueDate && (cycle.totalSpend > 0 || (cycle.statementBalance && cycle.statementBalance > 0));
 
   return (
-    <div className={`p-4 rounded-lg border ${isHistorical ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-300'} ${isHistorical ? 'opacity-75' : ''}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center">
-          {isHistorical && <History className="h-4 w-4 text-gray-400 mr-1" />}
-          <div>
-            <p className="font-medium text-gray-900">
+    <div 
+      className={`
+        relative p-4 rounded-2xl
+        ${isHistorical 
+          ? 'bg-gradient-to-b from-gray-50 to-gray-100/50 shadow-sm' 
+          : 'bg-gradient-to-b from-white to-gray-50/30 shadow-md shadow-gray-200/50'
+        }
+        border border-gray-200/60
+        backdrop-blur-xl
+        transition-all duration-200
+        hover:shadow-lg hover:shadow-gray-200/60
+        hover:scale-[1.01]
+        hover:border-gray-300/60
+      `}
+      style={{
+        background: isHistorical 
+          ? 'linear-gradient(135deg, rgba(249, 250, 251, 0.95) 0%, rgba(243, 244, 246, 0.85) 100%)'
+          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 250, 251, 0.9) 100%)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            {isHistorical && <History className="h-3.5 w-3.5 text-gray-400" />}
+            <p className="text-sm font-medium text-gray-700">
               {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
             </p>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span>{cycle.transactionCount} transactions</span>
-              {(cycle.creditCardMask || card?.mask) && <span>•••• {cycle.creditCardMask || card?.mask}</span>}
-            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span>{cycle.transactionCount} transactions</span>
+            {(cycle.creditCardMask || card?.mask) && <span className="text-gray-400">•••• {cycle.creditCardMask || card?.mask}</span>}
           </div>
         </div>
+        
         <div className="text-right">
           {cycle.statementBalance ? (
             <div>
               {paymentStatus === 'paid' ? (
-                <div>
-                  <p className="font-semibold text-lg text-green-600">✅ Paid</p>
-                  <p className="text-xs text-green-500">Was {formatCurrency(cycle.statementBalance)}</p>
-                  <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span className="text-xs font-medium text-gray-500">Paid</span>
+                    <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
                 </div>
               ) : paymentStatus === 'due' ? (
-                <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-300 rounded-lg p-3 -m-2 shadow-sm">
-                  <div className="text-center">
-                    <p className="font-semibold text-lg text-orange-800">Due By</p>
-                    <p className="font-bold text-xl text-orange-900 mt-1 mb-2">
+                <div className="relative -m-2 p-3 rounded-xl bg-gradient-to-br from-amber-50/80 to-orange-50/60 border border-amber-200/50 shadow-sm">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Due</p>
+                    <p className="text-lg font-bold text-gray-900">
                       {cycle.dueDate ? formatDate(cycle.dueDate) : 'Date Missing'}
                     </p>
-                    <div className="bg-white rounded-md p-2 border border-orange-200">
-                      <p className="font-bold text-xl text-orange-900">{formatCurrency(cycle.statementBalance)}</p>
-                    </div>
+                    <p className="text-xl font-bold text-gray-900">{formatCurrency(cycle.statementBalance)}</p>
                     {daysUntilDue !== null && (
-                      <p className="text-sm font-medium text-orange-700 mt-2">
-                        {daysUntilDue > 0 ? `${daysUntilDue} days remaining` : 
-                         daysUntilDue === 0 ? 'DUE TODAY!' : 
+                      <p className="text-xs font-medium text-amber-600">
+                        {daysUntilDue > 0 ? `${daysUntilDue} days left` : 
+                         daysUntilDue === 0 ? 'Due today' : 
                          `${Math.abs(daysUntilDue)} days overdue`}
                       </p>
                     )}
-                    <p className="text-xs text-gray-600 mt-1">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
                   </div>
                 </div>
               ) : paymentStatus === 'outstanding' ? (
-                <div>
-                  <p className="font-semibold text-lg text-red-600">{formatCurrency(cycle.statementBalance)}</p>
-                  <p className="text-xs text-red-500">Still Outstanding</p>
-                  <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
-                  {paymentAnalysis && <p className="text-xs text-gray-500 mt-1">{paymentAnalysis}</p>}
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-red-600">Outstanding</p>
+                  <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
+                </div>
+              ) : paymentStatus === 'current' ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-500">Current</p>
+                  <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
                 </div>
               ) : (
-                <div>
-                  <p className="font-semibold text-lg text-blue-600">{formatCurrency(cycle.statementBalance)}</p>
-                  <p className="text-xs text-blue-500">Statement Balance</p>
-                  <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-500">Balance</p>
+                  <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
                 </div>
               )}
             </div>
           ) : (
-            <p className="font-semibold text-lg text-gray-900">{formatCurrency(cycle.totalSpend)}</p>
-          )}
-          {shouldShowDueDate && paymentStatus !== 'due' && (
-            <p className={`text-sm ${
-              paymentStatus === 'paid' ? 'text-green-600' : 
-              isOverdue && paymentStatus !== 'paid' ? 'text-red-600' : 
-              isDueSoon && paymentStatus !== 'paid' ? 'text-yellow-600' : 'text-green-600'
-            }`}>
-              {paymentStatus === 'paid' ? 'Paid by:' : 'Due:'} {formatDate(cycle.dueDate!)}
-              {daysUntilDue !== null && paymentStatus !== 'paid' && (
-                <span className="block">
-                  ({Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'remaining'})
-                </span>
-              )}
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-500">Spent</p>
+              <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.totalSpend)}</p>
+            </div>
           )}
         </div>
       </div>
-      
-      {shouldShowDueDate && paymentStatus !== 'due' && (
-        <div className="flex justify-end">
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-            paymentStatus === 'paid'
-              ? 'bg-green-100 text-green-800'
-              : paymentStatus === 'outstanding'
-                ? 'bg-orange-100 text-orange-800'
-              : isOverdue
-                ? 'bg-red-100 text-red-800'
-                : isDueSoon
-                  ? 'bg-yellow-100 text-yellow-800' 
-                  : 'bg-green-100 text-green-800'
-          }`}>
-{paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'outstanding' ? 'Outstanding' : paymentStatus === 'current' ? (isDueSoon ? 'Due Soon' : 'Current') : isOverdue ? 'Overdue' : 'On Track'}
-          </span>
-        </div>
-      )}
     </div>
   );
 };
