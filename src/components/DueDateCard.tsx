@@ -259,8 +259,8 @@ export function DueDateCard({
                 )}
               </div>
               
-              {/* Right-aligned Status/Due Info with more spacing */}
-              <div className="flex items-center ml-8">
+              {/* Right-aligned Status/Due Info - use flex-1 and justify-end for consistent alignment */}
+              <div className="flex items-center flex-1 justify-end">
                 {isPaidOff ? (
                   <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
                     ✅ Paid Off

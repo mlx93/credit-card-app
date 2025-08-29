@@ -368,13 +368,12 @@ function estimateCycleLength(
   lastStatementDate: Date, 
   nextDueDate: Date | null
 ): number {
-  if (nextDueDate) {
-    const daysBetween = differenceInDays(nextDueDate, lastStatementDate);
-    if (daysBetween > 25 && daysBetween < 35) {
-      return daysBetween - 21;
-    }
-  }
+  // Most credit cards have monthly billing cycles of 28-31 days
+  // The due date is typically 21-25 days AFTER the statement date
+  // So we can't use the due date to calculate cycle length
   
+  // Default to 30 days for most cards
+  // Could be enhanced to look at historical statement dates if available
   return 30;
 }
 
