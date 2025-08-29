@@ -99,8 +99,10 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
     const mostRecentClosedCycle = allClosedCycles[0];
     const mostRecentClosedBalance = mostRecentClosedCycle?.statementBalance || 0;
     
-    // Step 2: Calculate baseline (current open cycle + most recent closed cycle)
-    const baseline = openCycleSpend + mostRecentClosedBalance;
+    // Step 2: Calculate what's accounted for by recent activity
+    // Current Balance - Most Recent Statement - Current Cycle Spend = Amount from older cycles
+    const accountedFor = mostRecentClosedBalance + openCycleSpend;
+    const remainingFromOlderCycles = currentBalance - accountedFor;
     
     // Check if this cycle IS the most recent closed cycle (should show "Due By")
     if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
@@ -114,53 +116,47 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
         paymentStatus
       });
     }
-    // Step 3: Calculate remaining balance after accounting for current activity
-    // Remaining = Current Balance - Most Recent Closed - Open Cycle Spend
+    // Step 3: Check if older cycles are paid
     else {
-      const remainingAfterCurrent = currentBalance - baseline;
+      // If remaining is negative or zero, all older cycles are paid
+      const allOlderCyclesPaid = remainingFromOlderCycles <= 0;
       
-      if (remainingAfterCurrent <= 0) {
+      console.log('Payment calculation:', {
+        currentBalance,
+        mostRecentClosedBalance,
+        openCycleSpend,
+        accountedFor,
+        remainingFromOlderCycles,
+        allOlderCyclesPaid,
+        cycleDate: formatDate(cycle.endDate)
+      });
+      
+      if (allOlderCyclesPaid) {
         // All historical cycles (except most recent closed) are paid
-        paymentStatus = 'paid';
-        paymentAnalysis = `Paid - remaining after current (${formatCurrency(remainingAfterCurrent)}) ≤ 0`;
-      } else {
-        // Step 4: Check historical cycles from newest to oldest
-        const historicalCycles = allCycles.filter(c => 
-          c.statementBalance && c.statementBalance > 0 && 
-          c.id !== mostRecentClosedCycle?.id && // Exclude most recent closed cycle
-          c.id !== openCycle?.id // Exclude open cycle
-        ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()); // Newest to oldest
-        
-        let remainingBalance = remainingAfterCurrent;
-        let foundThisCycle = false;
-        
-        for (const historicalCycle of historicalCycles) {
-          if (historicalCycle.id === cycle.id) {
-            foundThisCycle = true;
-            if (remainingBalance > 0) {
-              paymentStatus = 'outstanding';
-              paymentAnalysis = `Outstanding - ${formatCurrency(remainingBalance)} still owed from older cycles`;
-            } else {
-              paymentStatus = 'paid';
-              paymentAnalysis = `Paid - all newer cycles accounted for`;
-            }
-            break;
-          }
-          // Subtract this historical cycle from remaining balance
-          remainingBalance -= historicalCycle.statementBalance || 0;
+        if (cycle.statementBalance && cycle.statementBalance > 0 && 
+            new Date(cycle.endDate) < new Date(mostRecentClosedCycle?.endDate || new Date())) {
+          paymentStatus = 'paid';
+          paymentAnalysis = `Paid - all older cycles accounted for (remaining: ${formatCurrency(remainingFromOlderCycles)})`;
+        } else if (!cycle.statementBalance || cycle.statementBalance === 0) {
+          paymentStatus = 'current';
+          paymentAnalysis = `Current cycle - no statement balance yet`;
+        } else {
+          paymentStatus = 'current';
+          paymentAnalysis = `Current or future cycle`;
         }
-        
-        // If this cycle wasn't found in historical cycles, determine if it's actually paid or current
-        if (!foundThisCycle) {
-          // If this is a historical cycle with statement balance, it's likely paid
-          if (cycle.statementBalance && cycle.statementBalance > 0 && 
-              new Date(cycle.endDate) < new Date(mostRecentClosedCycle?.endDate || new Date())) {
-            paymentStatus = 'paid';
-            paymentAnalysis = `Historical cycle - likely paid`;
-          } else {
-            paymentStatus = 'current';
-            paymentAnalysis = `Current or future cycle`;
-          }
+      } else {
+        // There's outstanding balance from older cycles
+        // But we can't determine which specific cycle is unpaid without payment history
+        // So we'll conservatively mark older cycles as paid unless we have specific evidence
+        if (cycle.statementBalance && cycle.statementBalance > 0 && 
+            new Date(cycle.endDate) < new Date(mostRecentClosedCycle?.endDate || new Date())) {
+          // For now, assume historical cycles are paid
+          // In reality, we'd need payment history to know for sure
+          paymentStatus = 'paid';
+          paymentAnalysis = `Historical cycle - assumed paid`;
+        } else {
+          paymentStatus = 'current';
+          paymentAnalysis = `Current cycle`;
         }
       }
     }
