@@ -263,25 +263,26 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 </button>
                 <button 
                   onClick={async () => {
-                    console.log('Fix Cycles button clicked - starting...');
+                    console.log('Full Sync button clicked - starting...');
                     try {
-                      const response = await fetch('/api/debug/fix-cycles', { method: 'POST' });
-                      const result = await response.json();
+                      // First do a full sync to get all transactions
+                      const syncResponse = await fetch('/api/sync', { method: 'POST' });
+                      console.log('Full sync response:', syncResponse.status);
                       
-                      if (response.ok) {
-                        console.log('Fix Cycles SUCCESS:', result);
+                      if (syncResponse.ok) {
+                        // Then refresh the data
                         await fetchUserData();
-                        console.log('Data refreshed - check openCycleSpend in next cycle render');
+                        console.log('Full sync completed - historical data should be restored');
                       } else {
-                        console.error('Fix Cycles FAILED:', response.status, result);
+                        console.error('Full sync FAILED:', syncResponse.status);
                       }
                     } catch (error) {
-                      console.error('Fix Cycles ERROR:', error);
+                      console.error('Full sync ERROR:', error);
                     }
                   }}
-                  className="bg-orange-100 hover:bg-orange-200 text-orange-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
+                  className="bg-green-100 hover:bg-green-200 text-green-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
                 >
-                  Fix Cycles
+                  Full Sync
                 </button>
               </>
             ) : (
