@@ -340,7 +340,12 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 <p className="text-gray-500">Loading billing cycles...</p>
               </div>
             ) : displayCycles.length > 0 ? (
-              <CardBillingCycles cycles={displayCycles} cards={displayCards} cardOrder={sharedCardOrder} />
+              <CardBillingCycles 
+                cycles={displayCycles} 
+                cards={displayCards} 
+                cardOrder={sharedCardOrder} 
+                onOrderChange={setSharedCardOrder}
+              />
             ) : isLoggedIn ? (
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <p className="text-gray-500 text-center">No billing cycles found. Connect a credit card to get started.</p>
