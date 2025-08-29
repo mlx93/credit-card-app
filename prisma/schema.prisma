@@ -99,6 +99,9 @@ model CreditCard {
   lastStatementBalance   Float?
   minimumPaymentAmount   Float?
   nextPaymentDueDate     DateTime?
+  openDate          DateTime?
+  annualFee         Float?
+  annualFeeDueDate  DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

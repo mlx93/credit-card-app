@@ -289,79 +289,96 @@ export function DueDateCard({
   
   return (
     <div className={`p-6 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center">
-          {dragHandleProps && (
-            <div {...dragHandleProps} className="cursor-move mr-2">
-              <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-            </div>
-          )}
-          <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
-          <div>
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-gray-900">{card.name}</h3>
+      <div className="mb-6">
+        {/* Header Row with Due Date Box */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center flex-1 min-w-0 pr-4">
+            {dragHandleProps && (
+              <div {...dragHandleProps} className="cursor-move mr-2 flex-shrink-0">
+                <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              </div>
+            )}
+            <CreditCard className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 
+                  className="font-semibold text-gray-900 break-words leading-tight"
+                  style={{ 
+                    maxWidth: '280px',
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word',
+                    hyphens: 'auto'
+                  }}
+                  title={card.name}
+                >
+                  {card.name}
+                </h3>
                 {hasConnectionIssue && (
-                  <WifiOff className="h-4 w-4 text-red-500" title="Connection issue" />
+                  <WifiOff className="h-4 w-4 text-red-500 flex-shrink-0" title="Connection issue" />
                 )}
                 {isStale && !hasConnectionIssue && (
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" title="Data may be outdated" />
+                  <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" title="Data may be outdated" />
                 )}
               </div>
-              
-              {/* Right-aligned Status/Due Info - use flex-1 and justify-end for consistent alignment */}
-              <div className="flex items-center flex-1 justify-end">
-                {isPaidOff ? (
-                  <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
-                    ✅ Paid Off
-                  </div>
-                ) : card.nextPaymentDueDate ? (
-                  <div 
-                    className="relative px-3 py-2 rounded-xl border border-blue-200 bg-gradient-to-b from-blue-50 to-blue-100/50 shadow-sm"
-                    style={{
-                      backdropFilter: 'blur(4px)',
-                      WebkitBackdropFilter: 'blur(4px)',
-                    }}
-                  >
-                    <div className="text-right space-y-0.5">
-                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">DUE</p>
-                      <p className="text-sm font-semibold text-gray-900">{formatDate(card.nextPaymentDueDate)}</p>
-                      {daysUntilDue !== null && (
-                        <p className={`text-xs font-medium ${
-                          isOverdue 
-                            ? 'text-red-600' 
-                            : isDueSoon 
-                              ? 'text-orange-600' 
-                              : 'text-blue-600'
-                        }`}>
-                          {Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'left'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+              <p className="text-sm text-gray-600">•••• {card.mask}</p>
+              {card.plaidItem && (
+                <p className="text-xs text-gray-500">
+                  {hasConnectionIssue ? (
+                    <span className="text-red-600">Connection: {connectionStatus}</span>
+                  ) : lastSyncDaysAgo !== null ? (
+                    <span>Last sync: {lastSyncDaysAgo === 0 ? 'Today' : `${lastSyncDaysAgo}d ago`}</span>
+                  ) : (
+                    <span>Never synced</span>
+                  )}
+                </p>
+              )}
             </div>
-            <p className="text-sm text-gray-600">•••• {card.mask}</p>
-            {card.plaidItem && (
-              <p className="text-xs text-gray-500">
-                {hasConnectionIssue ? (
-                  <span className="text-red-600">Connection: {connectionStatus}</span>
-                ) : lastSyncDaysAgo !== null ? (
-                  <span>Last sync: {lastSyncDaysAgo === 0 ? 'Today' : `${lastSyncDaysAgo}d ago`}</span>
-                ) : (
-                  <span>Never synced</span>
-                )}
-              </p>
-            )}
+          </div>
+          
+          {/* Due Date Box - Right Aligned */}
+          <div className="flex-shrink-0">
+            {isPaidOff ? (
+              <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
+                ✅ Paid Off
+              </div>
+            ) : card.nextPaymentDueDate ? (
+              <div 
+                className="relative px-3 py-2 rounded-xl border border-blue-200 bg-gradient-to-b from-blue-50 to-blue-100/50 shadow-sm text-center"
+                style={{
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
+                  minWidth: '90px'
+                }}
+              >
+                <div className="space-y-0.5">
+                  <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">DUE</p>
+                  <p className="text-sm font-semibold text-gray-900">{formatDate(card.nextPaymentDueDate)}</p>
+                  {daysUntilDue !== null && (
+                    <p className={`text-xs font-medium ${
+                      isOverdue 
+                        ? 'text-red-600' 
+                        : isDueSoon 
+                          ? 'text-orange-600' 
+                          : 'text-blue-600'
+                    }`}>
+                      {Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'left'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {!isPaidOff && (isOverdue || isDueSoon) && (
-            <AlertTriangle className={`h-5 w-5 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />
-          )}
+        
+        {/* Action Buttons Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {!isPaidOff && (isOverdue || isDueSoon) && (
+              <AlertTriangle className={`h-5 w-5 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />
+            )}
+          </div>
           
-          {/* Connection management buttons */}
+          {/* Connection management buttons - Right aligned */}
           {card.plaidItem && (
             <div className="flex items-center gap-1">
               <button
