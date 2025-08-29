@@ -226,23 +226,23 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
                   <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
                 </div>
               ) : paymentStatus === 'due' ? (
-                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-4 border-yellow-400 rounded-xl p-4 -m-3 shadow-lg">
+                <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-300 rounded-lg p-3 -m-2 shadow-sm">
                   <div className="text-center">
-                    <p className="font-black text-2xl text-yellow-900 tracking-wide">DUE BY</p>
-                    <p className="font-black text-3xl text-yellow-900 mt-1 mb-2">
+                    <p className="font-semibold text-lg text-orange-800">Due By</p>
+                    <p className="font-bold text-xl text-orange-900 mt-1 mb-2">
                       {cycle.dueDate ? formatDate(cycle.dueDate) : 'Date Missing'}
                     </p>
-                    <div className="bg-white rounded-lg p-2 border-2 border-yellow-300">
-                      <p className="font-black text-3xl text-yellow-900">{formatCurrency(cycle.statementBalance)}</p>
+                    <div className="bg-white rounded-md p-2 border border-orange-200">
+                      <p className="font-bold text-xl text-orange-900">{formatCurrency(cycle.statementBalance)}</p>
                     </div>
                     {daysUntilDue !== null && (
-                      <p className="text-lg font-bold text-yellow-800 mt-2">
+                      <p className="text-sm font-medium text-orange-700 mt-2">
                         {daysUntilDue > 0 ? `${daysUntilDue} days remaining` : 
                          daysUntilDue === 0 ? 'DUE TODAY!' : 
                          `${Math.abs(daysUntilDue)} days overdue`}
                       </p>
                     )}
-                    <p className="text-sm text-gray-700 mt-2">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
+                    <p className="text-xs text-gray-600 mt-1">{formatCurrency(cycle.totalSpend)} spent this cycle</p>
                   </div>
                 </div>
               ) : paymentStatus === 'outstanding' ? (
@@ -280,13 +280,11 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
         </div>
       </div>
       
-      {shouldShowDueDate && (
+      {shouldShowDueDate && paymentStatus !== 'due' && (
         <div className="flex justify-end">
           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
             paymentStatus === 'paid'
               ? 'bg-green-100 text-green-800'
-              : paymentStatus === 'due'
-                ? 'bg-yellow-100 text-yellow-800'
               : paymentStatus === 'outstanding'
                 ? 'bg-orange-100 text-orange-800'
               : isOverdue
@@ -295,7 +293,7 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
                   ? 'bg-yellow-100 text-yellow-800' 
                   : 'bg-green-100 text-green-800'
           }`}>
-{paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'due' ? 'Due' : paymentStatus === 'outstanding' ? 'Outstanding' : paymentStatus === 'current' ? (isDueSoon ? 'Due Soon' : 'Current') : isOverdue ? 'Overdue' : 'On Track'}
+{paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'outstanding' ? 'Outstanding' : paymentStatus === 'current' ? (isDueSoon ? 'Due Soon' : 'Current') : isOverdue ? 'Overdue' : 'On Track'}
           </span>
         </div>
       )}
