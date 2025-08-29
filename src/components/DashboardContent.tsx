@@ -5,6 +5,7 @@ import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2 } from
 import { formatCurrency } from '@/utils/format';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard, DueDateCards } from '@/components/DueDateCard';
+import { HorizontalCardColumns } from '@/components/HorizontalCardColumns';
 import { PlaidLink } from '@/components/PlaidLink';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { PlaidUpdateLink } from '@/components/PlaidUpdateLink';
@@ -537,47 +538,41 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         {(!isLoggedIn || !loading) && (
           <>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Billing Cycles</h2>
-            {loading ? (
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <p className="text-gray-500">Loading billing cycles...</p>
-              </div>
-            ) : displayCycles.length > 0 ? (
-              <CardBillingCycles 
-                cycles={displayCycles} 
-                cards={displayCards} 
-                cardOrder={sharedCardOrder} 
-              />
-            ) : isLoggedIn ? (
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <p className="text-gray-500 text-center">No billing cycles found. Connect a credit card to get started.</p>
-              </div>
-            ) : null}
+        {/* Revolutionary Horizontal Card Layout */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent">
+                Credit Card Dashboard
+              </h2>
+              <p className="text-gray-600 mt-1">Swipe horizontally to see all your cards • Expand to view billing cycles</p>
+            </div>
           </div>
-
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Upcoming Due Dates</h2>
-            {loading ? (
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <p className="text-gray-500">Loading credit cards...</p>
+          
+          {loading ? (
+            <div className="bg-white/50 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg p-12 text-center">
+              <div className="flex items-center justify-center mb-4">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
               </div>
-            ) : displayCards.length > 0 ? (
-              <DueDateCards 
-                cards={displayCards}
-                onSync={handleCardSync}
-                onReconnect={handleCardReconnect}
-                onRemove={handleCardRemove}
-                initialCardOrder={sharedCardOrder}
-                onOrderChange={setSharedCardOrder}
-              />
-            ) : isLoggedIn ? (
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <p className="text-gray-500 text-center">No credit cards connected yet.</p>
-              </div>
-            ) : null}
-          </div>
+              <p className="text-gray-600">Loading your credit cards...</p>
+            </div>
+          ) : displayCards.length > 0 ? (
+            <HorizontalCardColumns
+              cards={displayCards}
+              cycles={displayCycles}
+              onSync={handleCardSync}
+              onReconnect={handleCardReconnect}
+              onRemove={handleCardRemove}
+              initialCardOrder={sharedCardOrder}
+              onOrderChange={setSharedCardOrder}
+            />
+          ) : isLoggedIn ? (
+            <div className="bg-white/50 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg p-12 text-center">
+              <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 text-lg">No credit cards connected yet</p>
+              <p className="text-gray-500 text-sm mt-2">Connect your first card to get started with tracking</p>
+            </div>
+          ) : null}
         </div>
 
           </>
