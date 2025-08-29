@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { addMonths, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
 
-// Helper function to detect Capital One cards
+// Helper function to detect Capital One cards based on institution and card names
 function isCapitalOneCard(institutionName?: string, cardName?: string): boolean {
   const capitalOneIndicators = ['capital one', 'quicksilver', 'venture', 'savor', 'spark'];
   const institutionMatch = institutionName?.toLowerCase().includes('capital one') || false;
