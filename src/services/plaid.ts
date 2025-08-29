@@ -716,30 +716,35 @@ class PlaidServiceImpl implements PlaidService {
               return estimatedOpenDate;
             }
             
-            // Priority 5: Institution-specific intelligent defaults
-            const now = new Date();
-            let institutionBasedDate = new Date();
+            // Priority 5: Transaction-based fallback (most reliable)
+            console.log(`⚠️ No origination date available, using transaction-based fallback`);
             
-            if (plaidItem.institutionName?.toLowerCase().includes('bank of america')) {
-              // Bank of America cards likely opened in June 2025
-              institutionBasedDate = new Date('2025-06-28');
-              console.log(`🏦 Bank of America detected - using institution-based date: ${institutionBasedDate.toDateString()}`);
-            } else if (plaidItem.institutionName?.toLowerCase().includes('capital one')) {
-              // Capital One cards likely opened earlier
-              institutionBasedDate.setMonth(institutionBasedDate.getMonth() - 6);
-              console.log(`🏦 Capital One detected - using institution-based date: ${institutionBasedDate.toDateString()}`);
-            } else if (plaidItem.institutionName?.toLowerCase().includes('american express')) {
-              // Amex cards likely opened even earlier
-              institutionBasedDate.setFullYear(institutionBasedDate.getFullYear() - 1);
-              console.log(`🏦 American Express detected - using institution-based date: ${institutionBasedDate.toDateString()}`);
+            // Get earliest transaction for this account to estimate open date
+            const earliestTransactions = await prisma.transaction.findMany({
+              where: { 
+                creditCardId: existingCard?.id 
+              },
+              orderBy: { date: 'asc' },
+              take: 1
+            });
+            
+            const now = new Date();
+            let fallbackDate = new Date();
+            
+            if (earliestTransactions.length > 0) {
+              const earliestTransactionDate = new Date(earliestTransactions[0].date);
+              // Set open date 3 weeks (21 days) before earliest transaction
+              fallbackDate = new Date(earliestTransactionDate);
+              fallbackDate.setDate(fallbackDate.getDate() - 21);
+              console.log(`📊 Transaction-based fallback: earliest transaction ${earliestTransactionDate.toDateString()} -> open date ${fallbackDate.toDateString()}`);
             } else {
-              // Generic fallback: 1 year ago
-              institutionBasedDate.setFullYear(institutionBasedDate.getFullYear() - 1);
-              console.log(`🏦 Generic institution - using 1-year-ago date: ${institutionBasedDate.toDateString()}`);
+              // Ultimate fallback: 1 year ago
+              fallbackDate.setFullYear(fallbackDate.getFullYear() - 1);
+              console.log(`🛡️ Ultimate fallback (no transactions): ${fallbackDate.toDateString()}`);
             }
             
             console.log(`=== END OPEN DATE EXTRACTION DEBUG ===`);
-            return institutionBasedDate;
+            return fallbackDate;
           })(),
           annualFee: liability?.annual_fee || null,
           annualFeeDueDate: liability?.annual_fee_due_date
@@ -1168,25 +1173,24 @@ class PlaidServiceImpl implements PlaidService {
           let estimatedOpenDate: Date;
           const now = new Date();
           
-          // Apply institution-specific intelligent defaults based on user context
-          if (card.plaidItem?.institutionName?.toLowerCase().includes('bank of america')) {
-            // Based on the script analysis, BOA card opened in June 2025
-            estimatedOpenDate = new Date('2025-06-28');
-            console.log(`📅 Setting BOA card ${card.name} open date to ${estimatedOpenDate.toDateString()}`);
-          } else if (card.plaidItem?.institutionName?.toLowerCase().includes('capital one')) {
-            // Capital One likely opened earlier
-            estimatedOpenDate = new Date(now);
-            estimatedOpenDate.setMonth(estimatedOpenDate.getMonth() - 6);
-            console.log(`📅 Setting Capital One card ${card.name} open date to ${estimatedOpenDate.toDateString()}`);
-          } else if (card.plaidItem?.institutionName?.toLowerCase().includes('american express')) {
-            // Amex likely opened much earlier
-            estimatedOpenDate = new Date('2024-08-01');
-            console.log(`📅 Setting Amex card ${card.name} open date to ${estimatedOpenDate.toDateString()}`);
+          // Use transaction-based estimation for all cards (most reliable approach)
+          const cardTransactions = await prisma.transaction.findMany({
+            where: { creditCardId: card.id },
+            orderBy: { date: 'asc' },
+            take: 1
+          });
+          
+          if (cardTransactions.length > 0) {
+            const earliestTransactionDate = new Date(cardTransactions[0].date);
+            // Set open date 3 weeks (21 days) before earliest transaction
+            estimatedOpenDate = new Date(earliestTransactionDate);
+            estimatedOpenDate.setDate(estimatedOpenDate.getDate() - 21);
+            console.log(`📊 Transaction-based open date for ${card.name}: earliest transaction ${earliestTransactionDate.toDateString()} -> estimated open ${estimatedOpenDate.toDateString()}`);
           } else {
-            // Generic fallback - 1 year ago
+            // Fallback if no transactions available
             estimatedOpenDate = new Date(now);
             estimatedOpenDate.setFullYear(estimatedOpenDate.getFullYear() - 1);
-            console.log(`📅 Setting generic card ${card.name} open date to ${estimatedOpenDate.toDateString()}`);
+            console.log(`🛡️ No transactions found for ${card.name}, using 1-year fallback: ${estimatedOpenDate.toDateString()}`);
           }
 
           await prisma.creditCard.update({
