@@ -5,7 +5,7 @@ require('dotenv').config({ path: '.env.local' });
 
 async function callProductionAPI(endpoint, method = 'POST') {
   return new Promise((resolve, reject) => {
-    const url = new URL(`/api/debug/${endpoint}`, process.env.NEXTAUTH_URL || 'https://cardcycle.app');
+    const url = new URL(`/api/debug/${endpoint}`, process.env.NEXTAUTH_URL || 'https://www.cardcycle.app');
     
     const options = {
       hostname: url.hostname,
