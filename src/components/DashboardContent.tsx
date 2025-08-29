@@ -309,6 +309,29 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     setTimeout(checkConnectionHealth, 1000);
   }, [isLoggedIn]);
 
+  // Listen for credit limit updates
+  useEffect(() => {
+    const handleCreditLimitUpdate = (event: any) => {
+      const { cardId, newLimit } = event.detail;
+      console.log('📝 Credit limit updated event received:', { cardId, newLimit });
+      
+      // Update the credit card data in state
+      setCreditCards(prevCards => 
+        prevCards.map(card => 
+          card.id === cardId 
+            ? { ...card, balanceLimit: newLimit }
+            : card
+        )
+      );
+    };
+
+    window.addEventListener('creditLimitUpdated', handleCreditLimitUpdate);
+    
+    return () => {
+      window.removeEventListener('creditLimitUpdated', handleCreditLimitUpdate);
+    };
+  }, []);
+
   // Set default order for mock cards when not logged in
   useEffect(() => {
     if (!isLoggedIn && sharedCardOrder.length === 0 && mockCards.length > 0) {
