@@ -83,7 +83,7 @@ const cardBorderColors = [
 ];
 
 // BillingCycleItem Component
-const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }: { cycle: BillingCycle, card?: CreditCardInfo, isHistorical?: boolean, allCycles?: BillingCycle[] }) => {
+const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], compactMode = false }: { cycle: BillingCycle, card?: CreditCardInfo, isHistorical?: boolean, allCycles?: BillingCycle[], compactMode?: boolean }) => {
   const daysUntilDue = cycle.dueDate ? getDaysUntil(cycle.dueDate) : null;
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
@@ -329,6 +329,48 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
   // Hide due date info if total spend and statement balance are both $0
   const shouldShowDueDate = cycle.dueDate && (cycle.totalSpend > 0 || (cycle.statementBalance && cycle.statementBalance > 0));
 
+  // Compact mode for horizontal card columns
+  if (compactMode) {
+    return (
+      <div className="p-3 rounded-lg bg-white/60 backdrop-blur-sm border border-white/40 mb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-gray-700 truncate">
+              {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
+            </p>
+            <p className="text-xs text-gray-500">
+              {cycle.transactionCount} transactions • {formatCurrency(cycle.totalSpend)}
+            </p>
+          </div>
+          <div className="text-right ml-2">
+            {cycle.statementBalance ? (
+              <div className="flex items-center gap-1">
+                <p className="text-sm font-semibold text-gray-900">
+                  {formatCurrency(cycle.statementBalance)}
+                </p>
+                {paymentStatus === 'paid' && (
+                  <div className="w-3 h-3 rounded-full bg-green-100 flex items-center justify-center">
+                    <svg className="w-2 h-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+                {paymentStatus === 'outstanding' && (
+                  <div className="w-3 h-3 rounded-full bg-red-100 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Full mode for the main billing cycles view
   return (
     <div 
       className={`
@@ -740,6 +782,7 @@ function CardContent({
                     card={card}
                     isHistorical={false}
                     allCycles={allCycles}
+                    compactMode={compactMode}
                   />
                 ))}
                 
@@ -751,6 +794,7 @@ function CardContent({
                     card={card}
                     isHistorical={false}
                     allCycles={allCycles}
+                    compactMode={compactMode}
                   />
                 ))}
 
@@ -769,6 +813,7 @@ function CardContent({
                           card={card}
                           isHistorical={true}
                           allCycles={allCycles}
+                          compactMode={compactMode}
                         />
                       ))}
                     </div>
