@@ -57,6 +57,7 @@ interface SortableCardColumnProps {
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
   colorIndex: number;
+  billingCycleGradient: string;
 }
 
 function SortableCardColumn({ 
@@ -67,7 +68,8 @@ function SortableCardColumn({
   onSync, 
   onReconnect, 
   onRemove, 
-  colorIndex 
+  colorIndex,
+  billingCycleGradient
 }: SortableCardColumnProps) {
   const {
     attributes,
@@ -152,7 +154,7 @@ function SortableCardColumn({
               <div className="p-4">
                 {/* Section Header */}
                 <div className="flex items-center mb-4">
-                  <div className={`w-1 h-4 bg-gradient-to-b ${getBillingCycleGradient(colorIndex)} rounded-full mr-3`}></div>
+                  <div className={`w-1 h-4 bg-gradient-to-b ${billingCycleGradient} rounded-full mr-3`}></div>
                   <h3 className="text-sm font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
                     Recent Billing Cycles
                   </h3>
@@ -307,19 +309,23 @@ export function HorizontalCardColumns({
             strategy={horizontalListSortingStrategy}
           >
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-premium min-h-[300px]">
-              {orderedCards.map((card, index) => (
-                <SortableCardColumn
-                  key={card.id}
-                  card={card}
-                  cycles={getCardCycles(card.id)}
-                  isExpanded={expandedCards.has(card.id)}
-                  onToggleExpand={() => toggleCardExpansion(card.id)}
-                  onSync={onSync}
-                  onReconnect={onReconnect}
-                  onRemove={onRemove}
-                  colorIndex={getCardColorIndex(card.name, card.id)}
-                />
-              ))}
+              {orderedCards.map((card, index) => {
+                const colorIndex = getCardColorIndex(card.name, card.id);
+                return (
+                  <SortableCardColumn
+                    key={card.id}
+                    card={card}
+                    cycles={getCardCycles(card.id)}
+                    isExpanded={expandedCards.has(card.id)}
+                    onToggleExpand={() => toggleCardExpansion(card.id)}
+                    onSync={onSync}
+                    onReconnect={onReconnect}
+                    onRemove={onRemove}
+                    colorIndex={colorIndex}
+                    billingCycleGradient={getBillingCycleGradient(colorIndex)}
+                  />
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
