@@ -344,7 +344,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 cycles={displayCycles} 
                 cards={displayCards} 
                 cardOrder={sharedCardOrder} 
-                onOrderChange={setSharedCardOrder}
               />
             ) : isLoggedIn ? (
               <div className="bg-white p-6 rounded-lg shadow-sm">

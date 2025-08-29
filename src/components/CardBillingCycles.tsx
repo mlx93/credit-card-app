@@ -510,32 +510,36 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
     return colorIndex;
   };
 
-  // Initialize card order when cycles change or propCardOrder is provided
+  // Initialize card order only once when component mounts or when cards first become available
   useEffect(() => {
     const cardNames = Object.keys(cyclesByCard);
     
-    if (propCardOrder && propCardOrder.length > 0) {
-      // Use the order from DueDateCards component - convert card IDs to card names
-      const orderedCardNames = propCardOrder
-        .map(cardId => {
-          const card = cards.find(c => c.id === cardId);
-          return card ? card.name : null;
-        })
-        .filter((name): name is string => name !== null && cardNames.includes(name));
-      
-      // Add any remaining cards not in the provided order
-      const remainingCards = cardNames.filter(name => !orderedCardNames.includes(name));
-      setCardOrder([...orderedCardNames, ...remainingCards]);
-    } else if (cardOrder.length === 0 && cardNames.length > 0) {
-      setCardOrder(cardNames);
-    } else if (cardOrder.length > 0) {
-      // Add any new cards that aren't in the order
-      const newCards = cardNames.filter(name => !cardOrder.includes(name));
-      if (newCards.length > 0) {
-        setCardOrder([...cardOrder, ...newCards]);
+    // Only initialize if we don't have an order set yet and we have cards
+    if (cardOrder.length === 0 && cardNames.length > 0) {
+      if (propCardOrder && propCardOrder.length > 0) {
+        // Use the initial order from parent - convert card IDs to card names
+        const orderedCardNames = propCardOrder
+          .map(cardId => {
+            const card = cards.find(c => c.id === cardId);
+            return card ? card.name : null;
+          })
+          .filter((name): name is string => name !== null && cardNames.includes(name));
+        
+        // Add any remaining cards not in the provided order
+        const remainingCards = cardNames.filter(name => !orderedCardNames.includes(name));
+        setCardOrder([...orderedCardNames, ...remainingCards]);
+      } else {
+        setCardOrder(cardNames);
       }
     }
-  }, [cyclesByCard, propCardOrder, cards]);
+    // Handle new cards being added (but don't re-sync existing order)
+    else if (cardOrder.length > 0) {
+      const newCards = cardNames.filter(name => !cardOrder.includes(name));
+      if (newCards.length > 0) {
+        setCardOrder(prev => [...prev, ...newCards]);
+      }
+    }
+  }, [cyclesByCard, cards]); // Removed propCardOrder dependency to prevent re-syncing
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -557,21 +561,10 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
         const newIndex = items.indexOf(over.id as string);
         const newOrder = arrayMove(items, oldIndex, newIndex);
         
-        // Convert card names back to card IDs and notify parent
-        if (onOrderChange) {
-          const cardIds = newOrder
-            .map(cardName => {
-              const card = cards.find(c => c.name === cardName);
-              return card ? card.id : null;
-            })
-            .filter((id): id is string => id !== null);
-          
-          console.log('CardBillingCycles: Notifying parent of order change', { 
-            newCardOrder: newOrder,
-            newCardIds: cardIds 
-          });
-          onOrderChange(cardIds);
-        }
+        // Independent drag and drop - no longer sync with other components
+        console.log('CardBillingCycles: Order changed independently', { 
+          newCardOrder: newOrder
+        });
         
         return newOrder;
       });

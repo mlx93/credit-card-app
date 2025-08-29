@@ -108,17 +108,12 @@ interface DueDateCardsProps {
 export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChange, initialCardOrder }: DueDateCardsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
 
-  // Initialize card order when cards change (but not when user is dragging)
+  // Initialize card order only once when component mounts or when cards first become available
   useEffect(() => {
     const cardIds = cards.map(card => card.id);
     
-    // Only initialize if we don't have a current order, or if cards have actually changed
-    const currentCardIds = cardOrder.filter(id => cardIds.includes(id));
-    const hasNewCards = cardIds.some(id => !cardOrder.includes(id));
-    const hasRemovedCards = cardOrder.some(id => !cardIds.includes(id));
-    
-    if (cardOrder.length === 0) {
-      // First initialization
+    // Only initialize if we don't have an order set yet and we have cards
+    if (cardOrder.length === 0 && cardIds.length > 0) {
       if (initialCardOrder && initialCardOrder.length > 0) {
         const validOrder = initialCardOrder.filter(id => cardIds.includes(id));
         const newCards = cardIds.filter(id => !validOrder.includes(id));
@@ -129,26 +124,21 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChan
         setCardOrder(cardIds);
         onOrderChange?.(cardIds);
       }
-    } else if (hasNewCards || hasRemovedCards) {
-      // Only update if cards have actually been added/removed
-      const validOrder = cardOrder.filter(id => cardIds.includes(id));
-      const newCards = cardIds.filter(id => !validOrder.includes(id));
-      const fullOrder = [...validOrder, ...newCards];
-      setCardOrder(fullOrder);
-      onOrderChange?.(fullOrder);
     }
-  }, [cards]); // Remove initialCardOrder from dependencies to prevent conflicts
-
-  // Handle initialCardOrder changes separately (only when it's first provided)
-  useEffect(() => {
-    if (initialCardOrder && initialCardOrder.length > 0 && cardOrder.length === 0) {
-      const cardIds = cards.map(card => card.id);
-      const validOrder = initialCardOrder.filter(id => cardIds.includes(id));
-      const newCards = cardIds.filter(id => !validOrder.includes(id));
-      const fullOrder = [...validOrder, ...newCards];
-      setCardOrder(fullOrder);
+    // Handle new cards being added (but don't re-sync existing order)
+    else if (cardOrder.length > 0) {
+      const newCards = cardIds.filter(id => !cardOrder.includes(id));
+      const removedCards = cardOrder.filter(id => !cardIds.includes(id));
+      
+      // Only update if there are actual changes
+      if (newCards.length > 0 || removedCards.length > 0) {
+        const validOrder = cardOrder.filter(id => cardIds.includes(id));
+        const fullOrder = [...validOrder, ...newCards];
+        setCardOrder(fullOrder);
+        onOrderChange?.(fullOrder);
+      }
     }
-  }, [initialCardOrder, cards]);
+  }, [cards]); // Removed initialCardOrder dependency to prevent re-syncing
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
