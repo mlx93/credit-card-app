@@ -100,7 +100,14 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
       foundOpenCycle: !!openCycle,
       openCycleDate: openCycle ? `${formatDate(openCycle.startDate)} - ${formatDate(openCycle.endDate)}` : 'None',
       openCycleSpend,
-      openCycleStatementBalance: openCycle?.statementBalance
+      openCycleStatementBalance: openCycle?.statementBalance,
+      allCyclesCount: allCycles.length,
+      cyclesWithSpend: allCycles.filter(c => c.totalSpend > 0).length,
+      allCyclesPreview: allCycles.slice(0, 3).map(c => ({
+        dates: `${formatDate(c.startDate)} - ${formatDate(c.endDate)}`,
+        totalSpend: c.totalSpend,
+        isOpen: today >= new Date(c.startDate) && today <= new Date(c.endDate)
+      }))
     });
     
     // Find ALL closed cycles (with statement balance), sorted by end date
