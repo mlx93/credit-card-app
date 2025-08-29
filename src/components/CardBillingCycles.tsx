@@ -43,6 +43,14 @@ interface CreditCardInfo {
   minimumPaymentAmount?: number;
 }
 
+// Helper function to detect Capital One cards
+function isCapitalOneCard(cardName?: string): boolean {
+  const capitalOneIndicators = ['capital one', 'quicksilver', 'venture', 'savor', 'spark'];
+  return capitalOneIndicators.some(indicator => 
+    cardName?.toLowerCase().includes(indicator)
+  ) || false;
+}
+
 interface CardBillingCyclesProps {
   cycles: BillingCycle[];
   cards: CreditCardInfo[];
@@ -594,7 +602,14 @@ function CardContent({
             </div>
             <CreditCard className="h-5 w-5 text-gray-600 mr-2" />
             <div>
-              <h3 className="font-semibold text-gray-900">{cardName}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-gray-900">{cardName}</h3>
+                {isCapitalOneCard(cardName) && (
+                  <span className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-full font-medium">
+                    90-day limit
+                  </span>
+                )}
+              </div>
               {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
             </div>
           </div>
