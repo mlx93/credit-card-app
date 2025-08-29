@@ -185,30 +185,32 @@ async function createOrUpdateCycle(
   })));
   console.log('=== END TRANSACTION DEBUG ===');
 
-  // For current cycles, compare transaction-based vs balance-based calculation
+  // For current cycles, use balance-based calculation to exclude pending transactions
   if (cycleEnd > today && !hasStatementBalance) {
-    // Current cycle: new charges since statement = current balance - statement balance
+    // Current cycle: committed charges = current balance - statement balance
     const currentBalance = Math.abs(creditCard.balanceCurrent || 0);
     const statementBalance = Math.abs(creditCard.lastStatementBalance || 0);
-    const calculatedSpend = Math.max(0, currentBalance - statementBalance);
+    const committedSpend = Math.max(0, currentBalance - statementBalance);
     
-    console.log('Current cycle spend comparison for', creditCard.name, {
+    // Count only authorized (non-pending) transactions for comparison
+    const authorizedTransactions = cycleTransactions.filter((t: any) => t.authorizedDate);
+    const authorizedSpend = authorizedTransactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+    
+    console.log('Current cycle spend calculation for', creditCard.name, {
       currentBalance,
       statementBalance,
-      transactionBasedSpend: totalSpend,
-      calculatedSpend,
-      difference: Math.abs(totalSpend - calculatedSpend),
-      usingTransactions: cycleTransactions.length > 0
+      committedSpend: `${currentBalance} - ${statementBalance} = ${committedSpend}`,
+      allTransactions: cycleTransactions.length,
+      authorizedTransactions: authorizedTransactions.length,
+      pendingTransactions: cycleTransactions.length - authorizedTransactions.length,
+      transactionBasedTotal: totalSpend,
+      authorizedTransactionTotal: authorizedSpend,
+      usingCommittedAmount: committedSpend
     });
     
-    // Prefer transaction-based calculation if we have transactions, otherwise use balance calculation
-    if (cycleTransactions.length === 0 && calculatedSpend > 0) {
-      console.log('No transactions found for current cycle, using balance calculation');
-      totalSpend = calculatedSpend;
-    } else if (cycleTransactions.length > 0) {
-      console.log(`Using transaction-based spend: $${totalSpend.toFixed(2)} from ${cycleTransactions.length} transactions`);
-      // Keep transaction-based total
-    }
+    // Use balance-based calculation for current cycles (excludes pending transactions)
+    totalSpend = committedSpend;
+    console.log(`✅ Current cycle using committed balance: $${totalSpend.toFixed(2)} (excludes pending transactions)`);
   }
   
   // For closed cycles, only use the actual statement balance for the EXACT statement cycle
