@@ -441,9 +441,6 @@ export function DueDateCard({
         {/* Action Buttons Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {!isPaidOff && (isOverdue || isDueSoon) && (
-              <AlertTriangle className={`h-5 w-5 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />
-            )}
           </div>
           
           {/* Connection management buttons - Right aligned */}
