@@ -234,39 +234,79 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Credit Card Dashboard</h1>
-            <p className="text-gray-600 mt-2">
-              {isLoggedIn 
-                ? 'Track your spending, due dates, and credit utilization' 
-                : 'Sign in to connect your credit cards and see real data'
-              }
-            </p>
-          </div>
-          <div className="ml-4">
-            <div className="bg-white p-4 rounded-lg shadow-sm min-w-[250px]">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h3>
-              <div className="space-y-2">
-                {isLoggedIn ? (
-                  <>
-                    <PlaidLink onSuccess={fetchUserData} />
-                    <button 
-                      onClick={handleRefresh}
-                      disabled={refreshing}
-                      className="w-full bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm"
-                    >
-                      <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
-                      <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-center py-2">
-                    <p className="text-gray-600 mb-2 text-xs">Sign in to connect cards</p>
-                  </div>
-                )}
+      <div className="container mx-auto px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">Credit Card Dashboard</h1>
+          <p className="text-gray-600 text-sm">
+            {isLoggedIn 
+              ? 'Track your spending, due dates, and credit utilization' 
+              : 'Sign in to connect your credit cards and see real data'
+            }
+          </p>
+        </div>
+        
+        <div className="flex justify-between items-start gap-6 mb-6">
+          {/* Header Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
+            <div className="bg-white p-4 rounded-lg shadow-sm">
+              <div className="flex items-center">
+                <TrendingUp className="h-6 w-6 text-green-600 mr-3" />
+                <div>
+                  <p className="text-xs font-medium text-gray-600">This Month's Spend</p>
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalSpendThisMonth)}</p>
+                </div>
               </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm">
+              <div className="flex items-center">
+                <DollarSign className="h-6 w-6 text-blue-600 mr-3" />
+                <div>
+                  <p className="text-xs font-medium text-gray-600">Total Balance</p>
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalBalance)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm">
+              <div className="flex items-center">
+                <CreditCard className="h-6 w-6 text-purple-600 mr-3" />
+                <div>
+                  <p className="text-xs font-medium text-gray-600">Active Cards</p>
+                  <p className="text-lg font-semibold text-gray-900">{displayCards.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm">
+              <div className="flex items-center">
+                <Calendar className="h-6 w-6 text-orange-600 mr-3" />
+                <div>
+                  <p className="text-xs font-medium text-gray-600">Avg Utilization</p>
+                  <p className="text-lg font-semibold text-gray-900">{averageUtilization.toFixed(1)}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Quick Actions */}
+          <div className="bg-white p-4 rounded-lg shadow-sm min-w-[220px] flex-shrink-0">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h3>
+            <div className="space-y-2">
+              {isLoggedIn ? (
+                <>
+                  <PlaidLink onSuccess={fetchUserData} />
+                  <button 
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="w-full bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+                    <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
+                  </button>
+                </>
+              ) : (
+                <div className="text-center py-2">
+                  <p className="text-gray-600 mb-2 text-xs">Sign in to connect cards</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -291,47 +331,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
         {(!isLoggedIn || !loading) && (
           <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-green-600 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">This Month&apos;s Spend</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalSpendThisMonth)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex items-center">
-              <DollarSign className="h-8 w-8 text-red-600 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Balance</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalBalance)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex items-center">
-              <CreditCard className="h-8 w-8 text-blue-600 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Avg Utilization</p>
-                <p className="text-2xl font-bold text-gray-900">{averageUtilization.toFixed(1)}%</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-purple-600 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Cards Connected</p>
-                <p className="text-2xl font-bold text-gray-900">{displayCards.length}</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <div>
