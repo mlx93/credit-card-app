@@ -712,17 +712,65 @@ function CardContent({
   let historicalCycles = [];
   
   if (sortedCycles.length > 0) {
+    // Debug logging for BoA card specifically
+    if (cardName.toLowerCase().includes('customized')) {
+      console.log('🔍 BOA CYCLE CLASSIFICATION DEBUG:', {
+        cardName,
+        totalCycles: sortedCycles.length,
+        today: today.toDateString(),
+        cycles: sortedCycles.map(c => ({
+          id: c.id,
+          period: `${new Date(c.startDate).toLocaleDateString()} - ${new Date(c.endDate).toLocaleDateString()}`,
+          endDate: new Date(c.endDate).toDateString(),
+          hasStatement: !!(c.statementBalance && c.statementBalance > 0),
+          statementBalance: c.statementBalance,
+          endedBeforeToday: new Date(c.endDate) < today,
+          includesHEOday: today >= new Date(c.startDate) && today <= new Date(c.endDate)
+        }))
+      });
+    }
+    
     // Find current ongoing cycle (cycle that includes today)
     const currentCycle = sortedCycles.find(c => {
       const start = new Date(c.startDate);
       const end = new Date(c.endDate);
-      return today >= start && today <= end;
+      const includesHEOday = today >= start && today <= end;
+      
+      if (cardName.toLowerCase().includes('customized') && includesHEOday) {
+        console.log('✅ Found current cycle for BoA:', {
+          period: `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`,
+          id: c.id
+        });
+      }
+      
+      return includesHEOday;
     });
     
     // Find most recently closed cycle (has statement balance and ended before today)
     const mostRecentClosedCycle = sortedCycles.find(c => {
       const end = new Date(c.endDate);
-      return c.statementBalance && c.statementBalance > 0 && end < today;
+      const hasStatement = c.statementBalance && c.statementBalance > 0;
+      const endedBeforeToday = end < today;
+      const qualifies = hasStatement && endedBeforeToday;
+      
+      if (cardName.toLowerCase().includes('customized')) {
+        console.log(`Checking cycle for most recent closed: ${new Date(c.startDate).toLocaleDateString()} - ${end.toLocaleDateString()}`, {
+          hasStatement,
+          statementBalance: c.statementBalance,
+          endedBeforeToday,
+          qualifies
+        });
+        
+        if (qualifies) {
+          console.log('✅ Found most recent closed cycle for BoA:', {
+            period: `${new Date(c.startDate).toLocaleDateString()} - ${end.toLocaleDateString()}`,
+            id: c.id,
+            statementBalance: c.statementBalance
+          });
+        }
+      }
+      
+      return qualifies;
     });
     
     // Show current cycle first (if it exists)
@@ -738,6 +786,23 @@ function CardContent({
     // All other cycles are historical
     const shownCycleIds = new Set(recentCycles.map(c => c.id));
     historicalCycles = sortedCycles.filter(c => !shownCycleIds.has(c.id));
+    
+    // Debug final classification for BoA card
+    if (cardName.toLowerCase().includes('customized')) {
+      console.log('🔍 BOA FINAL CLASSIFICATION:', {
+        currentCycleId: currentCycle?.id,
+        mostRecentClosedId: mostRecentClosedCycle?.id,
+        recentCycleIds: Array.from(shownCycleIds),
+        recentCyclesCount: recentCycles.length,
+        historicalCyclesCount: historicalCycles.length,
+        historicalCycles: historicalCycles.map(c => ({
+          id: c.id,
+          period: `${new Date(c.startDate).toLocaleDateString()} - ${new Date(c.endDate).toLocaleDateString()}`,
+          statementBalance: c.statementBalance
+        })),
+        shouldShowButton: historicalCycles.length > 0
+      });
+    }
   }
   
   const allRecentCycles = recentCycles;
