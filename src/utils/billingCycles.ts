@@ -247,11 +247,23 @@ async function createOrUpdateCycle(
     const lastStatementDate = creditCard.lastStatementIssueDate ? new Date(creditCard.lastStatementIssueDate) : null;
     
     // Check if this cycle ends exactly on the last statement date (most recent closed cycle)
-    if (lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime()) {
+    const isStatementCycle = lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime();
+    
+    console.log('STATEMENT BALANCE DEBUG:', {
+      cycleEnd: cycleEnd.toDateString(),
+      cycleEndTime: cycleEnd.getTime(),
+      lastStatementDate: lastStatementDate?.toDateString(),
+      lastStatementTime: lastStatementDate?.getTime(),
+      isStatementCycle,
+      totalSpend,
+      creditCardLastStatementBalance: creditCard.lastStatementBalance
+    });
+    
+    if (isStatementCycle) {
       // This is the exact cycle that corresponds to the last statement - use actual statement balance
       statementBalance = creditCard.lastStatementBalance;
       minimumPayment = creditCard.minimumPaymentAmount;
-      console.log('Using actual statement balance for statement cycle:', {
+      console.log('✅ Using actual statement balance for statement cycle:', {
         cycleEnd: cycleEnd.toDateString(),
         statementDate: lastStatementDate.toDateString(),
         statementBalance
@@ -260,10 +272,16 @@ async function createOrUpdateCycle(
       // This is a historical completed cycle - use calculated spend as statement balance
       statementBalance = totalSpend > 0 ? totalSpend : null;
       minimumPayment = totalSpend > 0 ? Math.max(25, totalSpend * 0.02) : null; // Estimate 2% minimum payment
-      console.log('Using calculated spend as statement balance for historical cycle:', {
+      console.log('📊 Using calculated spend as statement balance for historical cycle:', {
         cycleEnd: cycleEnd.toDateString(),
         totalSpend,
-        statementBalance
+        statementBalance,
+        transactionsFound: cycleTransactions?.length || 0,
+        sampleTransactions: cycleTransactions?.slice(0, 3).map(t => ({
+          date: t.date,
+          amount: t.amount,
+          name: t.name
+        }))
       });
     }
   }
