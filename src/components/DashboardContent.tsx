@@ -272,39 +272,39 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         
         {/* Full-width Header Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
-              <TrendingUp className="h-6 w-6 text-green-600 mr-3" />
+              <TrendingUp className="h-7 w-7 text-green-600 mr-3" />
               <div>
-                <p className="text-xs font-medium text-gray-600">This Month's Spend</p>
-                <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalSpendThisMonth)}</p>
+                <p className="text-sm font-medium text-gray-600">This Month's Spend</p>
+                <p className="text-xl font-semibold text-gray-900">{formatCurrency(totalSpendThisMonth)}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
-              <DollarSign className="h-6 w-6 text-blue-600 mr-3" />
+              <DollarSign className="h-7 w-7 text-blue-600 mr-3" />
               <div>
-                <p className="text-xs font-medium text-gray-600">Total Balance</p>
-                <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalBalance)}</p>
+                <p className="text-sm font-medium text-gray-600">Total Balance</p>
+                <p className="text-xl font-semibold text-gray-900">{formatCurrency(totalBalance)}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
-              <CreditCard className="h-6 w-6 text-purple-600 mr-3" />
+              <CreditCard className="h-7 w-7 text-purple-600 mr-3" />
               <div>
-                <p className="text-xs font-medium text-gray-600">Active Cards</p>
-                <p className="text-lg font-semibold text-gray-900">{displayCards.length}</p>
+                <p className="text-sm font-medium text-gray-600">Active Cards</p>
+                <p className="text-xl font-semibold text-gray-900">{displayCards.length}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
-              <Calendar className="h-6 w-6 text-orange-600 mr-3" />
+              <Calendar className="h-7 w-7 text-orange-600 mr-3" />
               <div>
-                <p className="text-xs font-medium text-gray-600">Avg Utilization</p>
-                <p className="text-lg font-semibold text-gray-900">{averageUtilization.toFixed(1)}%</p>
+                <p className="text-sm font-medium text-gray-600">Avg Utilization</p>
+                <p className="text-xl font-semibold text-gray-900">{averageUtilization.toFixed(1)}%</p>
               </div>
             </div>
           </div>
