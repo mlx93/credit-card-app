@@ -261,6 +261,20 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                   <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
                   <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
                 </button>
+                <button 
+                  onClick={async () => {
+                    const response = await fetch('/api/debug/fix-cycles', { method: 'POST' });
+                    if (response.ok) {
+                      console.log('Billing cycles fixed!');
+                      await fetchUserData();
+                    } else {
+                      console.error('Failed to fix cycles');
+                    }
+                  }}
+                  className="bg-orange-100 hover:bg-orange-200 text-orange-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
+                >
+                  Fix Cycles
+                </button>
               </>
             ) : (
               <div className="text-center py-2">
