@@ -17,6 +17,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [billingCycles, setBillingCycles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
 
   const mockCards = [
     {
@@ -339,7 +340,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 <p className="text-gray-500">Loading billing cycles...</p>
               </div>
             ) : displayCycles.length > 0 ? (
-              <CardBillingCycles cycles={displayCycles} cards={displayCards} />
+              <CardBillingCycles cycles={displayCycles} cards={displayCards} cardOrder={sharedCardOrder} />
             ) : isLoggedIn ? (
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <p className="text-gray-500 text-center">No billing cycles found. Connect a credit card to get started.</p>
@@ -359,6 +360,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 onSync={handleCardSync}
                 onReconnect={handleCardReconnect}
                 onRemove={handleCardRemove}
+                initialCardOrder={sharedCardOrder}
+                onOrderChange={setSharedCardOrder}
               />
             ) : isLoggedIn ? (
               <div className="bg-white p-6 rounded-lg shadow-sm">
