@@ -241,8 +241,8 @@ export function DueDateCard({
   };
   
   return (
-    <div className={`p-4 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
-      <div className="flex items-start justify-between mb-4">
+    <div className={`p-6 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
+      <div className="flex items-start justify-between mb-6">
         <div className="flex items-center">
           {dragHandleProps && (
             <div {...dragHandleProps} className="cursor-move mr-2">
@@ -343,7 +343,7 @@ export function DueDateCard({
 
       {/* Balance Information - Show statement balance when there's a due date OR when balances differ */}
       {card.lastStatementBalance && (card.nextPaymentDueDate || card.lastStatementBalance !== card.balanceCurrent) ? (
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           <div>
             <p className="text-sm text-gray-600">Statement Balance</p>
             <p className="font-semibold text-lg text-blue-600">
@@ -386,7 +386,7 @@ export function DueDateCard({
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-6">
         <div className="flex justify-between text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
           {hasValidLimit && utilization > 0 ? (
