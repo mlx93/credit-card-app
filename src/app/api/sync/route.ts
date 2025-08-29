@@ -63,6 +63,22 @@ export async function POST(request: NextRequest) {
           throw syncError; // Re-throw to be caught by outer try-catch
         }
         
+        console.log('Step 3: Regenerating billing cycles with new transaction data...');
+        // Import at the top of the file
+        const { calculateBillingCycles } = await import('@/utils/billingCycles');
+        
+        // Get all credit cards for this Plaid item
+        const creditCards = await prisma.creditCard.findMany({
+          where: { plaidItemId: item.id }
+        });
+        
+        for (const card of creditCards) {
+          console.log(`Regenerating billing cycles for ${card.name}...`);
+          const cycles = await calculateBillingCycles(card.id);
+          console.log(`Generated ${cycles.length} billing cycles for ${card.name}`);
+        }
+        console.log('Step 3: Billing cycle regeneration completed');
+        
         // Update connection status to active on successful sync
         await prisma.plaidItem.update({
           where: { itemId: item.itemId },
