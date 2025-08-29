@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/format';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard, DueDateCards } from '@/components/DueDateCard';
 import { PlaidLink } from '@/components/PlaidLink';
+import { LoadingOverlay } from '@/components/LoadingOverlay';
 
 interface DashboardContentProps {
   isLoggedIn: boolean;
@@ -376,6 +377,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           </>
         )}
       </div>
+      
+      {/* Full-page loading overlay during refresh */}
+      <LoadingOverlay 
+        isVisible={refreshing}
+        message="Refreshing Your Data"
+        subMessage="Syncing credit cards and transactions..."
+      />
     </div>
   );
 }
