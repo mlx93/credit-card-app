@@ -106,9 +106,9 @@ class PlaidServiceImpl implements PlaidService {
       console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
       
       // Use date chunking to get full transaction history
-      // Break large date ranges into 3-month chunks to avoid Plaid limits
+      // Use 1-month chunks to be compatible with all institutions (including Capital One)
       const allTransactions: any[] = [];
-      const chunkMonths = 3;
+      const chunkMonths = 1;
       
       let currentStart = new Date(startDate);
       
