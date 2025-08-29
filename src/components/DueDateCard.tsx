@@ -256,7 +256,19 @@ export function DueDateCard({
   const hasConnectionIssue = ['error', 'expired', 'disconnected'].includes(connectionStatus);
   const lastSyncDaysAgo = card.plaidItem?.lastSyncAt ? 
     Math.floor((new Date().getTime() - new Date(card.plaidItem.lastSyncAt).getTime()) / (1000 * 60 * 60 * 24)) : null;
-  const isStale = lastSyncDaysAgo !== null && lastSyncDaysAgo > 7; // Consider stale if no sync in 7+ days
+  const isStale = lastSyncDaysAgo !== null && lastSyncDaysAgo > 14; // Consider stale if no sync in 14+ days (was 7 days)
+  
+  // Debug logging for staleness detection
+  if (card.name.includes('Bank of America')) {
+    console.log('Bank of America staleness check:', {
+      cardName: card.name,
+      lastSyncAt: card.plaidItem?.lastSyncAt,
+      lastSyncDaysAgo,
+      isStale,
+      connectionStatus,
+      hasConnectionIssue
+    });
+  }
 
   const handleSync = async () => {
     if (!card.plaidItem || !onSync) return;
