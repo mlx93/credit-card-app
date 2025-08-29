@@ -620,9 +620,30 @@ class PlaidServiceImpl implements PlaidService {
           nextPaymentDueDate: liability?.next_payment_due_date 
             ? new Date(liability.next_payment_due_date) 
             : null,
-          openDate: liability?.origination_date
-            ? new Date(liability.origination_date)
-            : null,
+          openDate: (() => {
+            // First try to use Plaid's origination_date
+            if (liability?.origination_date) {
+              console.log(`Found origination_date for ${account.name}: ${liability.origination_date}`);
+              return new Date(liability.origination_date);
+            }
+            
+            // Fallback: If no origination_date but we have a statement date, estimate open date
+            if (liability?.last_statement_issue_date) {
+              const statementDate = new Date(liability.last_statement_issue_date);
+              const estimatedOpenDate = new Date(statementDate);
+              estimatedOpenDate.setMonth(estimatedOpenDate.getMonth() - 12); // Estimate 1 year before first statement
+              
+              console.log(`No origination_date for ${account.name}, estimating from statement date: ${liability.last_statement_issue_date} -> ${estimatedOpenDate.toDateString()}`);
+              return estimatedOpenDate;
+            }
+            
+            // Final fallback: Estimate as 2 years ago from today
+            const fallbackDate = new Date();
+            fallbackDate.setFullYear(fallbackDate.getFullYear() - 2);
+            
+            console.log(`No date info for ${account.name}, using fallback: ${fallbackDate.toDateString()}`);
+            return fallbackDate;
+          })(),
           annualFee: liability?.annual_fee || null,
           annualFeeDueDate: liability?.annual_fee_due_date
             ? new Date(liability.annual_fee_due_date)
