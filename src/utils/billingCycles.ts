@@ -125,7 +125,16 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     const historicalDueDate = new Date(historicalCycleEnd);
     historicalDueDate.setDate(historicalDueDate.getDate() + 21);
     
-    await createOrUpdateCycle(creditCard, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, false);
+    // Historical cycles that have ended should be treated as having statement balances
+    // This will allow them to show "Paid" status in the frontend
+    const isCompletedCycle = historicalCycleEnd < now;
+    console.log('Creating historical cycle:', {
+      cycleStart: historicalCycleStart.toDateString(),
+      cycleEnd: historicalCycleEnd.toDateString(), 
+      isCompleted: isCompletedCycle,
+      willHaveStatementBalance: isCompletedCycle
+    });
+    await createOrUpdateCycle(creditCard, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, isCompletedCycle);
     
     historicalCycleEnd = new Date(historicalCycleStart);
     historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
@@ -231,14 +240,43 @@ async function createOrUpdateCycle(
   });
 
   if (!existingCycle) {
+    // Determine statement balance for this cycle
+    let statementBalance = null;
+    let minimumPayment = null;
+    
+    if (hasStatementBalance) {
+      const lastStatementDate = creditCard.lastStatementIssueDate ? new Date(creditCard.lastStatementIssueDate) : null;
+      
+      // Check if this cycle ends exactly on the last statement date (most recent closed cycle)
+      if (lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime()) {
+        // This is the exact cycle that corresponds to the last statement - use actual statement balance
+        statementBalance = creditCard.lastStatementBalance;
+        minimumPayment = creditCard.minimumPaymentAmount;
+        console.log('Using actual statement balance for statement cycle:', {
+          cycleEnd: cycleEnd.toDateString(),
+          statementDate: lastStatementDate.toDateString(),
+          statementBalance
+        });
+      } else {
+        // This is a historical completed cycle - use calculated spend as statement balance
+        statementBalance = totalSpend > 0 ? totalSpend : null;
+        minimumPayment = totalSpend > 0 ? Math.max(25, totalSpend * 0.02) : null; // Estimate 2% minimum payment
+        console.log('Using calculated spend as statement balance for historical cycle:', {
+          cycleEnd: cycleEnd.toDateString(),
+          totalSpend,
+          statementBalance
+        });
+      }
+    }
+    
     existingCycle = await prisma.billingCycle.create({
       data: {
         creditCardId: creditCard.id,
         startDate: cycleStart,
         endDate: cycleEnd,
         dueDate: dueDate,
-        statementBalance: hasStatementBalance ? creditCard.lastStatementBalance : null,
-        minimumPayment: hasStatementBalance ? creditCard.minimumPaymentAmount : null,
+        statementBalance: statementBalance,
+        minimumPayment: minimumPayment,
       },
     });
   }

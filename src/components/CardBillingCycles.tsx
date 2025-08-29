@@ -81,15 +81,6 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
   let paymentStatus: 'paid' | 'outstanding' | 'current' | 'due' = 'current';
   let paymentAnalysis = '';
   
-  console.log('DEBUG: Analyzing cycle', {
-    cycleId: cycle.id,
-    cardName: cycle.creditCardName || card?.name,
-    cycleEndDate: formatDate(cycle.endDate),
-    statementBalance: cycle.statementBalance,
-    dueDate: cycle.dueDate ? formatDate(cycle.dueDate) : 'No due date',
-    hasCard: !!card,
-    allCyclesCount: allCycles?.length || 0
-  });
   
   // Only analyze cycles with statement balances when we have full data
   if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
