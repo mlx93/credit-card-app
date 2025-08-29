@@ -589,8 +589,15 @@ function CardContent({
 }) {
   const closedCycles = cardCycles.filter(c => c.statementBalance && c.statementBalance > 0);
   const currentCycles = cardCycles.filter(c => !c.statementBalance || c.statementBalance <= 0);
-  const allRecentCycles = [...closedCycles.slice(0, 1), ...currentCycles.slice(0, 1)];
-  const historical = cardCycles.slice(2);
+  
+  // Show the most recent closed cycle and current cycle in main section
+  const recentClosedCycle = closedCycles.slice(0, 1);
+  const recentCurrentCycle = currentCycles.slice(0, 1);
+  const allRecentCycles = [...recentClosedCycle, ...recentCurrentCycle];
+  
+  // Historical cycles = all remaining cycles that aren't shown in main section
+  const shownCycleIds = new Set(allRecentCycles.map(c => c.id));
+  const historical = cardCycles.filter(c => !shownCycleIds.has(c.id));
 
   return (
     <div className={`rounded-lg border-2 ${cardColors[colorIndex]} ${cardBorderColors[colorIndex]} border-l-4`}>
@@ -625,8 +632,8 @@ function CardContent({
               </div>
 
               <div className="space-y-3">
-                {/* Show closed cycle with statement balance first */}
-                {closedCycles.slice(0, 1).map(cycle => (
+                {/* Show recent closed cycle with statement balance first */}
+                {recentClosedCycle.map(cycle => (
                   <BillingCycleItem 
                     key={cycle.id} 
                     cycle={cycle}
@@ -636,8 +643,8 @@ function CardContent({
                   />
                 ))}
                 
-                {/* Show current cycle */}
-                {currentCycles.slice(0, 1).map(cycle => (
+                {/* Show recent current cycle */}
+                {recentCurrentCycle.map(cycle => (
                   <BillingCycleItem 
                     key={cycle.id} 
                     cycle={cycle}
