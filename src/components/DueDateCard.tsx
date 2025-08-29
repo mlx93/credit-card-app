@@ -1,5 +1,5 @@
 import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/utils/format';
-import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical } from 'lucide-react';
+import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical, Edit3, Check, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import {
   DndContext,
@@ -195,6 +195,9 @@ export function DueDateCard({
   dragHandleProps 
 }: DueDateCardProps & { dragHandleProps?: any }) {
   const [syncing, setSyncing] = useState(false);
+  const [editingLimit, setEditingLimit] = useState(false);
+  const [limitInput, setLimitInput] = useState('');
+  const [updatingLimit, setUpdatingLimit] = useState(false);
   const daysUntilDue = card.nextPaymentDueDate ? getDaysUntil(card.nextPaymentDueDate) : null;
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
@@ -234,6 +237,53 @@ export function DueDateCard({
       await onSync(card.plaidItem.itemId);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const startEditingLimit = () => {
+    setLimitInput(card.balanceLimit ? card.balanceLimit.toString() : '');
+    setEditingLimit(true);
+  };
+
+  const cancelEditingLimit = () => {
+    setEditingLimit(false);
+    setLimitInput('');
+  };
+
+  const saveLimit = async () => {
+    const limit = limitInput.trim() === '' ? null : parseFloat(limitInput.replace(/[,$]/g, ''));
+    
+    if (limit !== null && (isNaN(limit) || limit <= 0)) {
+      alert('Please enter a valid positive number for the credit limit');
+      return;
+    }
+
+    setUpdatingLimit(true);
+    try {
+      const response = await fetch('/api/user/credit-cards/update-limit', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          cardId: card.id, 
+          creditLimit: limit 
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Force page refresh to update the card data
+        window.location.reload();
+      } else {
+        console.error('Failed to update credit limit:', data.error);
+        alert(data.error || 'Failed to update credit limit');
+      }
+    } catch (error) {
+      console.error('Error updating credit limit:', error);
+      alert('Network error while updating credit limit');
+    } finally {
+      setUpdatingLimit(false);
+      setEditingLimit(false);
     }
   };
   
@@ -393,19 +443,67 @@ export function DueDateCard({
       )}
 
       <div className="mb-6">
-        <div className="flex justify-between text-sm text-gray-600 mb-1">
+        <div className="flex justify-between items-center text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
-          {hasValidLimit && utilization > 0 ? (
-            <span>{formatPercentage(utilization)}</span>
-          ) : hasValidLimit && utilization === 0 ? (
-            <span>0%</span>
-          ) : (
-            <span className="text-gray-500 italic">
-              {card.balanceLimit === null || card.balanceLimit === undefined ? 'Unknown Limit' : 
-               isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid Limit' : 'No Limit'}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {hasValidLimit && utilization > 0 ? (
+              <span>{formatPercentage(utilization)}</span>
+            ) : hasValidLimit && utilization === 0 ? (
+              <span>0%</span>
+            ) : (
+              <>
+                <span className="text-gray-500 italic">
+                  {card.balanceLimit === null || card.balanceLimit === undefined ? 'Unknown Limit' : 
+                   isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid Limit' : 'No Limit'}
+                </span>
+                {!editingLimit && (
+                  <button
+                    onClick={startEditingLimit}
+                    className="text-blue-500 hover:text-blue-700 p-1 rounded"
+                    title="Set credit limit manually"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
+        
+        {editingLimit && (
+          <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={limitInput}
+                onChange={(e) => setLimitInput(e.target.value)}
+                placeholder="Enter credit limit (e.g., 15000)"
+                className="flex-1 px-3 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={updatingLimit}
+              />
+              <button
+                onClick={saveLimit}
+                disabled={updatingLimit}
+                className="text-green-600 hover:text-green-800 p-1 disabled:opacity-50"
+                title="Save credit limit"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+              <button
+                onClick={cancelEditingLimit}
+                disabled={updatingLimit}
+                className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
+                title="Cancel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-blue-600">
+              💡 Enter your credit limit manually for Capital One, Amex, or other cards where limits aren't automatically detected.
+            </p>
+          </div>
+        )}
+
         {hasValidLimit && (
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
