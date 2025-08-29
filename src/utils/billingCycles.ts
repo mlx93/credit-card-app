@@ -166,10 +166,11 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     const historicalCycleStart = new Date(historicalCycleEnd);
     historicalCycleStart.setDate(historicalCycleStart.getDate() - cycleLength + 1);
     
-    // Skip cycles that start before the card open date
-    if (creditCard.openDate && historicalCycleStart < new Date(creditCard.openDate)) {
-      console.log('Skipping cycle that starts before card open date:', {
+    // Skip cycles only if they end before the card open date (no meaningful overlap)
+    if (creditCard.openDate && historicalCycleEnd < new Date(creditCard.openDate)) {
+      console.log('Skipping cycle that ends before card open date:', {
         cycleStart: historicalCycleStart.toDateString(),
+        cycleEnd: historicalCycleEnd.toDateString(),
         cardOpenDate: new Date(creditCard.openDate).toDateString()
       });
       // Move to the next historical cycle instead of breaking
@@ -178,14 +179,17 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
       continue;
     }
     
-    // Also skip if the cycle would end before the card open date
-    if (creditCard.openDate && historicalCycleEnd < new Date(creditCard.openDate)) {
-      console.log('Skipping cycle that ends before card open date:', {
+    // If cycle starts before open date but ends after, it's valid (partial cycle)
+    if (creditCard.openDate && historicalCycleStart < new Date(creditCard.openDate)) {
+      console.log('Creating partial cycle that overlaps with card opening:', {
+        cycleStart: historicalCycleStart.toDateString(),
         cycleEnd: historicalCycleEnd.toDateString(),
-        cardOpenDate: new Date(creditCard.openDate).toDateString()
+        cardOpenDate: new Date(creditCard.openDate).toDateString(),
+        note: 'Cycle starts before open but contains post-opening period'
       });
-      break; // No more valid cycles in the past
     }
+    
+    // This check is now handled above - removed duplicate logic
     
     const historicalDueDate = new Date(historicalCycleEnd);
     historicalDueDate.setDate(historicalDueDate.getDate() + 21);
