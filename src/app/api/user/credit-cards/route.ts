@@ -40,7 +40,14 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ creditCards });
+    const response = NextResponse.json({ creditCards });
+    
+    // Add no-cache headers to ensure fresh data
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Error fetching credit cards:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
