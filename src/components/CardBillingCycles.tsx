@@ -55,6 +55,7 @@ interface CardBillingCyclesProps {
   cycles: BillingCycle[];
   cards: CreditCardInfo[];
   cardOrder?: string[]; // Optional card order from parent (card IDs)
+  onOrderChange?: (order: string[]) => void; // Callback to sync order changes with parent
 }
 
 // Generate consistent colors for cards
@@ -469,7 +470,7 @@ function SortableCard({
   );
 }
 
-export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder }: CardBillingCyclesProps) {
+export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onOrderChange }: CardBillingCyclesProps) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [cardOrder, setCardOrder] = useState<string[]>([]);
 
@@ -554,7 +555,25 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder }: C
       setCardOrder((items) => {
         const oldIndex = items.indexOf(active.id as string);
         const newIndex = items.indexOf(over.id as string);
-        return arrayMove(items, oldIndex, newIndex);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        
+        // Convert card names back to card IDs and notify parent
+        if (onOrderChange) {
+          const cardIds = newOrder
+            .map(cardName => {
+              const card = cards.find(c => c.name === cardName);
+              return card ? card.id : null;
+            })
+            .filter((id): id is string => id !== null);
+          
+          console.log('CardBillingCycles: Notifying parent of order change', { 
+            newCardOrder: newOrder,
+            newCardIds: cardIds 
+          });
+          onOrderChange(cardIds);
+        }
+        
+        return newOrder;
       });
     }
   };
