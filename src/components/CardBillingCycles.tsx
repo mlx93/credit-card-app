@@ -705,12 +705,12 @@ function CardContent({
           {historical.length > 0 && (
             <button
               onClick={onToggleExpand}
-                    className="flex items-center text-sm text-gray-600 hover:text-gray-800"
-                  >
-                    {isExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}
-                    {historical.length} older cycle{historical.length !== 1 ? 's' : ''}
-                  </button>
-                )}
+              className="flex items-center text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
+            >
+              {isExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}
+              {historical.length} older cycle{historical.length !== 1 ? 's' : ''}
+            </button>
+          )}
               </div>
 
               <div className="space-y-3">

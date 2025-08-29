@@ -492,21 +492,35 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
     for (const card of item.accounts) {
       const cycles = await calculateBillingCycles(card.id);
       
+      // Filter out cycles that start before the card open date
+      let filteredCycles = cycles;
+      if (card.openDate) {
+        const cardOpenDate = new Date(card.openDate);
+        filteredCycles = cycles.filter(cycle => {
+          const cycleStart = new Date(cycle.startDate);
+          return cycleStart >= cardOpenDate;
+        });
+        
+        if (filteredCycles.length !== cycles.length) {
+          console.log(`🗓️ Card ${card.name}: Filtered billing cycles from ${cycles.length} to ${filteredCycles.length} based on open date (${cardOpenDate.toDateString()})`);
+        }
+      }
+      
       // Apply Capital One-specific cycle limiting
       const isCapitalOne = isCapitalOneCard(item.institutionName, card.name);
       
       if (isCapitalOne) {
         // For Capital One cards, limit to 4 most recent cycles (90 days = ~3-4 billing cycles)
-        const limitedCycles = cycles
+        const limitedCycles = filteredCycles
           .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
           .slice(0, 4);
         
-        console.log(`📍 Capital One card ${card.name}: Limited billing cycles from ${cycles.length} to ${limitedCycles.length} (90-day transaction limit)`);
+        console.log(`📍 Capital One card ${card.name}: Limited billing cycles from ${filteredCycles.length} to ${limitedCycles.length} (90-day transaction limit)`);
         
         allCycles.push(...limitedCycles);
       } else {
         // Standard cards: show all cycles (typically 12+ for 2 years of data)
-        allCycles.push(...cycles);
+        allCycles.push(...filteredCycles);
       }
     }
   }
