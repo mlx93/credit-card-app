@@ -54,6 +54,7 @@ function isCapitalOneCard(cardName?: string): boolean {
 interface CardBillingCyclesProps {
   cycles: BillingCycle[];
   cards: CreditCardInfo[];
+  cardOrder?: string[]; // Optional card order from parent (card IDs)
 }
 
 // Generate consistent colors for cards
@@ -468,7 +469,7 @@ function SortableCard({
   );
 }
 
-export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
+export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder }: CardBillingCyclesProps) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [cardOrder, setCardOrder] = useState<string[]>([]);
 
@@ -508,10 +509,23 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     return colorIndex;
   };
 
-  // Initialize card order when cycles change
+  // Initialize card order when cycles change or propCardOrder is provided
   useEffect(() => {
     const cardNames = Object.keys(cyclesByCard);
-    if (cardOrder.length === 0 && cardNames.length > 0) {
+    
+    if (propCardOrder && propCardOrder.length > 0) {
+      // Use the order from DueDateCards component - convert card IDs to card names
+      const orderedCardNames = propCardOrder
+        .map(cardId => {
+          const card = cards.find(c => c.id === cardId);
+          return card ? card.name : null;
+        })
+        .filter((name): name is string => name !== null && cardNames.includes(name));
+      
+      // Add any remaining cards not in the provided order
+      const remainingCards = cardNames.filter(name => !orderedCardNames.includes(name));
+      setCardOrder([...orderedCardNames, ...remainingCards]);
+    } else if (cardOrder.length === 0 && cardNames.length > 0) {
       setCardOrder(cardNames);
     } else if (cardOrder.length > 0) {
       // Add any new cards that aren't in the order
@@ -520,7 +534,7 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
         setCardOrder([...cardOrder, ...newCards]);
       }
     }
-  }, [cyclesByCard]);
+  }, [cyclesByCard, propCardOrder, cards]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -642,6 +656,10 @@ function CardContent({
   
   const allRecentCycles = recentCycles;
   const historical = historicalCycles;
+  
+  // For backward compatibility with existing code references
+  const recentClosedCycle = recentCycles.filter(c => c.statementBalance && c.statementBalance > 0);
+  const recentCurrentCycle = recentCycles.filter(c => !c.statementBalance || c.statementBalance <= 0);
 
   return (
     <div className={`rounded-lg border-2 ${cardColors[colorIndex]} ${cardBorderColors[colorIndex]} border-l-4`}>
