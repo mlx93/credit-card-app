@@ -83,19 +83,15 @@ export async function GET() {
       },
       orderBy: { startDate: 'desc' },
       take: 10,
-      select: {
-        id: true,
-        startDate: true,
-        endDate: true,
-        totalSpend: true,
+      include: {
         creditCard: {
           select: {
             name: true
           }
         },
-        _count: {
+        transactions: {
           select: {
-            transactions: true
+            id: true
           }
         }
       }
@@ -134,8 +130,8 @@ export async function GET() {
         cardsWithTransactions: creditCards.filter(c => c._count.transactions > 0).length,
         cardsWithoutTransactions: creditCards.filter(c => c._count.transactions === 0).length,
         totalUnlinkedTransactions: unlinkedTransactions.length,
-        cyclesWithTransactions: billingCycles.filter(c => c._count.transactions > 0).length,
-        cyclesWithoutTransactions: billingCycles.filter(c => c._count.transactions === 0).length
+        cyclesWithTransactions: billingCycles.filter(c => c.transactions.length > 0).length,
+        cyclesWithoutTransactions: billingCycles.filter(c => c.transactions.length === 0).length
       },
       potentialIssues: []
     };
@@ -206,8 +202,8 @@ export async function GET() {
           card: cycle.creditCard.name,
           period: `${new Date(cycle.startDate).toLocaleDateString()} - ${new Date(cycle.endDate).toLocaleDateString()}`,
           totalSpend: cycle.totalSpend,
-          transactionCount: cycle._count.transactions,
-          discrepancy: cycle.totalSpend > 0 && cycle._count.transactions === 0
+          transactionCount: cycle.transactions.length,
+          discrepancy: cycle.totalSpend > 0 && cycle.transactions.length === 0
         })),
         lastSyncTimes
       },
