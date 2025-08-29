@@ -140,13 +140,14 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
         currentBalance,
         mostRecentClosedBalance,
         openCycleSpend,
-        accountedFor,
-        remainingFromOlderCycles,
+        accountedFor: `${mostRecentClosedBalance} + ${openCycleSpend} = ${accountedFor}`,
+        remainingFromOlderCycles: `${currentBalance} - ${accountedFor} = ${remainingFromOlderCycles}`,
         allOlderCyclesPaid,
         mostRecentClosedCycleDate: mostRecentClosedCycle ? formatDate(mostRecentClosedCycle.endDate) : 'None',
         isThisCycleOlder: mostRecentClosedCycle ? 
           new Date(cycle.endDate) < new Date(mostRecentClosedCycle.endDate) : 
-          false
+          false,
+        willTakeIterativePath: !allOlderCyclesPaid
       });
       
       if (allOlderCyclesPaid) {
@@ -178,7 +179,11 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
         console.log('Iterative outstanding detection:', {
           startingUnpaid: remainingUnpaid,
           historicalCyclesCount: historicalCycles.length,
-          checkingCycle: formatDate(cycle.endDate)
+          checkingCycle: formatDate(cycle.endDate),
+          historicalCycleDates: historicalCycles.map(c => formatDate(c.endDate)),
+          mostRecentClosedCycleId: mostRecentClosedCycle?.id,
+          openCycleId: openCycle?.id,
+          thisCheckingCycleId: cycle.id
         });
         
         // Work through historical cycles from newest to oldest
