@@ -337,21 +337,25 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
                     WebkitBackdropFilter: 'blur(8px)',
                   }}
                 >
-                  <div className="text-center space-y-2">
-                    <p className="text-sm font-bold text-orange-700 uppercase tracking-wide">DUE</p>
-                    <div className="space-y-1">
-                      <p className="text-lg font-bold text-gray-900">
+                  <div className="space-y-1">
+                    {/* Line 1: DUE + Date */}
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-bold text-orange-700 uppercase tracking-wide">DUE</p>
+                      <p className="text-sm font-bold text-gray-900">
                         {cycle.dueDate ? formatDate(cycle.dueDate) : 'Date Missing'}
                       </p>
-                      <p className="text-xl font-black text-gray-900">{formatCurrency(cycle.statementBalance)}</p>
                     </div>
-                    {daysUntilDue !== null && (
-                      <p className="text-xs font-medium text-orange-600">
-                        {daysUntilDue > 0 ? `${daysUntilDue} days remaining` : 
-                         daysUntilDue === 0 ? 'DUE TODAY' : 
-                         `${Math.abs(daysUntilDue)} days overdue`}
-                      </p>
-                    )}
+                    {/* Line 2: Amount + Days Remaining */}
+                    <div className="flex justify-between items-center">
+                      <p className="text-xl font-black text-gray-900">{formatCurrency(cycle.statementBalance)}</p>
+                      {daysUntilDue !== null && (
+                        <p className="text-xs font-medium text-orange-600">
+                          {daysUntilDue > 0 ? `${daysUntilDue} days remaining` : 
+                           daysUntilDue === 0 ? 'DUE TODAY' : 
+                           `${Math.abs(daysUntilDue)} days overdue`}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : paymentStatus === 'outstanding' ? (
