@@ -346,10 +346,10 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
                       </p>
                     </div>
                     {/* Line 2: Amount + Days Remaining */}
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-4">
                       <p className="text-xl font-black text-gray-900">{formatCurrency(cycle.statementBalance)}</p>
                       {daysUntilDue !== null && (
-                        <p className="text-xs font-medium text-orange-600">
+                        <p className="text-xs font-medium text-orange-600 flex-shrink-0">
                           {daysUntilDue > 0 ? `${daysUntilDue} Days Left` : 
                            daysUntilDue === 0 ? 'DUE TODAY' : 
                            `${Math.abs(daysUntilDue)} days overdue`}
