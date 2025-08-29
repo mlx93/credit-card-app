@@ -150,6 +150,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       const syncResult = await syncResponse.json();
       console.log('Sync API success result:', syncResult);
       
+      // Check if any connections require reconnection
+      const needsReconnection = syncResult.results?.some((result: any) => result.requiresReconnection);
+      if (needsReconnection) {
+        console.log('⚠️ Some connections need to be reconnected');
+        alert('Some of your bank connections have expired and need to be reconnected. Please use the reconnect buttons on your cards or add them again with "Connect Credit Cards".');
+      }
+      
       console.log('Fetching user data after sync...');
       await fetchUserData();
       console.log('=== FRONTEND: Refresh process completed ===');
@@ -234,8 +241,33 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   };
 
+  // Check connection health on initial load
+  const checkConnectionHealth = async () => {
+    if (!isLoggedIn) return;
+
+    try {
+      const response = await fetch('/api/user/credit-cards');
+      if (response.ok) {
+        const { creditCards: cards } = await response.json();
+        const hasExpiredConnections = cards.some((card: any) => 
+          card.plaidItem && ['expired', 'error'].includes(card.plaidItem.status)
+        );
+
+        if (hasExpiredConnections) {
+          console.log('⚠️ Expired connections detected on page load');
+          // Could show a banner or notification here instead of alert
+          // For now, just log it - the warning triangles will show on cards
+        }
+      }
+    } catch (error) {
+      console.error('Error checking connection health:', error);
+    }
+  };
+
   useEffect(() => {
     fetchUserData();
+    // Check connection health after initial data load
+    setTimeout(checkConnectionHealth, 1000);
   }, [isLoggedIn]);
 
   // Set default order for mock cards when not logged in

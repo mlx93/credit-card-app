@@ -114,9 +114,11 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   closedCycleStart.setDate(closedCycleStart.getDate() - cycleLength + 1);
   
   console.log('=== BILLING CYCLE CREATION DEBUG for', creditCard.name, '===');
+  console.log('Card open date:', creditCard.openDate ? new Date(creditCard.openDate).toDateString() : 'Not set');
   console.log('Last statement date:', lastStatementDate);
   console.log('Next due date:', nextDueDate);
   console.log('Cycle length:', cycleLength);
+  console.log('Today:', now.toDateString());
   console.log('Total transactions for card:', creditCard.transactions?.length || 0);
   console.log('Sample transactions:', creditCard.transactions?.slice(0, 3).map(t => ({
     date: t.date,

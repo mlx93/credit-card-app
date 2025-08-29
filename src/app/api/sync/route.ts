@@ -95,17 +95,36 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error(`=== SYNC ERROR for ${item.institutionName} (${item.itemId}):`, error);
         
-        // Update connection status to error
+        // Check for specific Plaid connection errors
+        const errorCode = error.error_code || error?.response?.data?.error_code || 'SYNC_ERROR';
+        const errorType = error.error_type || error?.response?.data?.error_type;
+        const isConnectionError = ['ITEM_LOGIN_REQUIRED', 'ACCESS_NOT_GRANTED', 'INVALID_ACCESS_TOKEN'].includes(errorCode);
+        
+        console.log('Error analysis:', {
+          errorCode,
+          errorType,
+          isConnectionError,
+          statusCode: error?.response?.status
+        });
+        
+        // Update connection status based on error type
+        const newStatus = isConnectionError ? 'expired' : 'error';
+        
         await prisma.plaidItem.update({
           where: { itemId: item.itemId },
           data: {
-            status: 'error',
-            errorCode: error.error_code || 'SYNC_ERROR',
-            errorMessage: error.message || 'Unknown sync error'
+            status: newStatus,
+            errorCode: errorCode,
+            errorMessage: error.message || error?.response?.data?.error_message || 'Unknown sync error'
           }
         });
         
-        return { itemId: item.itemId, status: 'error', error: error.message };
+        return { 
+          itemId: item.itemId, 
+          status: 'error', 
+          error: error.message,
+          requiresReconnection: isConnectionError
+        };
       }
     });
 
