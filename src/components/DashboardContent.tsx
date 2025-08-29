@@ -234,16 +234,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   };
 
   // Function to handle reconnection flow with Plaid Link
-  const openReconnectionFlow = (updateLinkToken: string, institutionName: string, itemId: string) => {
-    return new Promise<void>((resolve, reject) => {
-      // Dynamically import and create Plaid Link for update
-      import('react-plaid-link').then(({ usePlaidLink }) => {
+  const openReconnectionFlow = async (updateLinkToken: string, institutionName: string, itemId: string) => {
+    return new Promise<void>(async (resolve, reject) => {
+      try {
         console.log(`🔗 Opening Plaid Link for ${institutionName} reconnection...`);
-        
-        // Create proper Plaid Link update flow
         console.log('🔗 Initializing Plaid Link update flow...');
         
-        // Use the react-plaid-link hook for proper update handling
+        // Dynamically import Plaid Link for the update flow
         const { usePlaidLink } = await import('react-plaid-link');
         
         // For now, open in new window with proper callback handling
@@ -334,7 +331,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           console.log('❌ User cancelled reconnection');
           resolve();
         }
-      }).catch(reject);
+      } catch (error) {
+        console.error('Error in reconnection flow:', error);
+        reject(error);
+      }
     });
   };
 
