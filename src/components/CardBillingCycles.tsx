@@ -81,6 +81,16 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
   let paymentStatus: 'paid' | 'outstanding' | 'current' | 'due' = 'current';
   let paymentAnalysis = '';
   
+  console.log('DEBUG: Analyzing cycle', {
+    cycleId: cycle.id,
+    cardName: cycle.creditCardName || card?.name,
+    cycleEndDate: formatDate(cycle.endDate),
+    statementBalance: cycle.statementBalance,
+    dueDate: cycle.dueDate ? formatDate(cycle.dueDate) : 'No due date',
+    hasCard: !!card,
+    allCyclesCount: allCycles?.length || 0
+  });
+  
   // Only analyze cycles with statement balances when we have full data
   if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
     const currentBalance = Math.abs(card.balanceCurrent || 0);
@@ -170,6 +180,24 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
       paymentAnalysis,
       cycleEndDate: formatDate(cycle.endDate)
     });
+  } else {
+    console.log('DEBUG: Cycle did not qualify for payment analysis', {
+      cycleId: cycle.id,
+      cardName: cycle.creditCardName || card?.name,
+      cycleEndDate: formatDate(cycle.endDate),
+      hasStatementBalance: !!(cycle.statementBalance && cycle.statementBalance > 0),
+      hasCard: !!card,
+      hasAllCycles: !!(allCycles && allCycles.length > 0),
+      defaultStatus: paymentStatus
+    });
+    
+    // For cycles without statement balances or incomplete data, determine status differently
+    if (cycle.statementBalance && cycle.statementBalance > 0 && new Date(cycle.endDate) < new Date()) {
+      // This is a historical cycle with statement balance but missing other data - likely paid
+      paymentStatus = 'paid';
+      paymentAnalysis = 'Historical cycle with statement balance - likely paid';
+      console.log('DEBUG: Setting historical cycle to paid');
+    }
   }
   
   // Hide due date info if total spend and statement balance are both $0
@@ -203,7 +231,9 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
                 <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-4 border-yellow-400 rounded-xl p-4 -m-3 shadow-lg">
                   <div className="text-center">
                     <p className="font-black text-2xl text-yellow-900 tracking-wide">DUE BY</p>
-                    <p className="font-black text-3xl text-yellow-900 mt-1 mb-2">{formatDate(cycle.dueDate!)}</p>
+                    <p className="font-black text-3xl text-yellow-900 mt-1 mb-2">
+                      {cycle.dueDate ? formatDate(cycle.dueDate) : 'Date Missing'}
+                    </p>
                     <div className="bg-white rounded-lg p-2 border-2 border-yellow-300">
                       <p className="font-black text-3xl text-yellow-900">{formatCurrency(cycle.statementBalance)}</p>
                     </div>
