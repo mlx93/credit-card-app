@@ -771,8 +771,33 @@ class PlaidServiceImpl implements PlaidService {
           where: { transactionId: transaction.transaction_id },
         });
 
+        // For Capital One credit cards, handle transaction sign properly
+        // Plaid convention: positive = charges, negative = payments
+        // But for display purposes, we might want to show payments as positive
+        let adjustedAmount = transaction.amount;
+        
+        // Check if this is a Capital One payment (negative amount on credit card)
+        if (creditCard && transaction.amount < 0) {
+          const isCapitalOneCard = this.isCapitalOne(plaidItem.institutionName, creditCard.name);
+          
+          // For debugging - log Capital One payment detection
+          if (isCapitalOneCard) {
+            console.log('Capital One payment detected:', {
+              transactionName: transaction.name,
+              originalAmount: transaction.amount,
+              cardName: creditCard.name,
+              institution: plaidItem.institutionName,
+              isPaymentTransaction: transaction.amount < 0
+            });
+          }
+          
+          // Keep the original Plaid sign convention for now
+          // The UI can decide whether to display payments as positive or negative
+          adjustedAmount = transaction.amount;
+        }
+
         const transactionData = {
-          amount: transaction.amount,
+          amount: adjustedAmount,
           isoCurrencyCode: transaction.iso_currency_code,
           date: new Date(transaction.date),
           authorizedDate: transaction.authorized_date 

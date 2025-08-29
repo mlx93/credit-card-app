@@ -12,6 +12,27 @@ function isCapitalOneCard(institutionName?: string, cardName?: string): boolean 
   return institutionMatch || cardMatch;
 }
 
+// Helper function to identify payment transactions based on transaction name
+function isPaymentTransaction(transactionName: string): boolean {
+  const lowerName = transactionName.toLowerCase();
+  
+  // Common payment indicators across different banks
+  const paymentIndicators = [
+    'pymt',           // Capital One payments
+    'payment',        // Amex and other banks
+    'autopay',        // Automatic payments
+    'online payment', // Online payments
+    'mobile payment', // Mobile app payments
+    'phone payment',  // Phone payments
+    'bank payment',   // Bank transfers
+    'ach payment',    // ACH payments
+    'electronic payment', // Electronic payments
+    'web payment',    // Web payments
+  ];
+  
+  return paymentIndicators.some(indicator => lowerName.includes(indicator));
+}
+
 export interface BillingCycleData {
   id: string;
   creditCardId: string;
@@ -189,7 +210,20 @@ async function createOrUpdateCycle(
     t.date >= cycleStart && t.date <= effectiveEndDate
   );
 
-  let totalSpend = cycleTransactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+  // Properly calculate spend: include charges and refunds, but exclude payments
+  let totalSpend = cycleTransactions.reduce((sum: number, t: any) => {
+    // Check if this is a payment transaction based on the name
+    if (isPaymentTransaction(t.name)) {
+      // Skip payment transactions regardless of sign
+      console.log(`Excluding payment from spend calculation: ${t.name} (${t.amount})`);
+      return sum;
+    }
+    
+    // Include all non-payment transactions:
+    // - Positive amounts = charges/purchases
+    // - Negative amounts = refunds/returns (should be included to reduce spend)
+    return sum + t.amount;
+  }, 0);
   
   // Debug transaction details
   console.log(`=== TRANSACTION DEBUG for ${creditCard.name} cycle ${cycleStart.toDateString()} to ${effectiveEndDate.toDateString()} ===`);
@@ -213,7 +247,13 @@ async function createOrUpdateCycle(
     
     // Count only authorized (non-pending) transactions for comparison
     const authorizedTransactions = cycleTransactions.filter((t: any) => t.authorizedDate);
-    const authorizedSpend = authorizedTransactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+    const authorizedSpend = authorizedTransactions.reduce((sum: number, t: any) => {
+      // Exclude payment transactions, include charges and refunds
+      if (isPaymentTransaction(t.name)) {
+        return sum; // Skip payments
+      }
+      return sum + t.amount; // Include charges (positive) and refunds (negative)
+    }, 0);
     
     console.log('Current cycle spend calculation for', creditCard.name, {
       currentBalance,
@@ -412,7 +452,13 @@ function generateEstimatedCycles(creditCard: any, cycles: BillingCycleData[]): B
       t.date >= cycleStart && t.date <= cycleEnd
     ) || [];
 
-    const totalSpend = cycleTransactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+    const totalSpend = cycleTransactions.reduce((sum: number, t: any) => {
+      // Exclude payment transactions, include charges and refunds
+      if (isPaymentTransaction(t.name)) {
+        return sum; // Skip payments
+      }
+      return sum + t.amount; // Include charges (positive) and refunds (negative)
+    }, 0);
 
     cycles.push({
       id: `estimated-${creditCard.id}-${currentMonth.getTime()}`,

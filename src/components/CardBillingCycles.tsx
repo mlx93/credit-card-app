@@ -721,8 +721,8 @@ function CardContent({
               </div>
 
               <div className="space-y-3">
-                {/* Show recent closed cycle with statement balance first */}
-                {recentClosedCycle.map(cycle => (
+                {/* Show recent current cycle first */}
+                {recentCurrentCycle.map(cycle => (
                   <BillingCycleItem 
                     key={cycle.id} 
                     cycle={cycle}
@@ -732,8 +732,8 @@ function CardContent({
                   />
                 ))}
                 
-                {/* Show recent current cycle */}
-                {recentCurrentCycle.map(cycle => (
+                {/* Show recent closed cycle with statement balance second */}
+                {recentClosedCycle.map(cycle => (
                   <BillingCycleItem 
                     key={cycle.id} 
                     cycle={cycle}
