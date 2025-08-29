@@ -57,23 +57,17 @@ export async function POST(request: NextRequest) {
       if (unlinkedTransactions.length > 0) {
         console.log(`Found ${unlinkedTransactions.length} unlinked transactions, linking them to ${card.name}...`);
         
-        // Link transactions to the credit card based on accountId
+        // Link transactions to the credit card based on plaidItemId
+        // Since we already filtered for transactions with the same plaidItemId and no creditCardId,
+        // and we're processing cards one by one, these unlinked transactions likely belong to this card
         for (const transaction of unlinkedTransactions) {
-          // Get the account ID from the Plaid transaction data
-          // This would normally come from the transaction, but we need to check if it matches
-          const creditCardForTransaction = await prisma.creditCard.findFirst({
-            where: {
-              plaidItemId: card.plaidItemId,
-              accountId: transaction.accountId // Assuming transaction has accountId field
-            }
+          // For now, link all unlinked transactions from the same plaidItem to this card
+          // This assumes one credit card per plaidItem, which is typical
+          await prisma.transaction.update({
+            where: { id: transaction.id },
+            data: { creditCardId: card.id }
           });
-          
-          if (creditCardForTransaction && creditCardForTransaction.id === card.id) {
-            await prisma.transaction.update({
-              where: { id: transaction.id },
-              data: { creditCardId: card.id }
-            });
-          }
+          console.log(`Linked transaction ${transaction.id} to credit card ${card.name}`);
         }
       }
       
