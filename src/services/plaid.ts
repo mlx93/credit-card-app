@@ -233,12 +233,29 @@ class PlaidServiceImpl implements PlaidService {
   }
 
   async getLiabilities(accessToken: string): Promise<any> {
-    const request: LiabilitiesGetRequest = {
-      access_token: accessToken,
-    };
+    try {
+      const request: LiabilitiesGetRequest = {
+        access_token: accessToken,
+      };
 
-    const response = await plaidClient.liabilitiesGet(request);
-    return response.data;
+      console.log('Calling liabilitiesGet...');
+      const response = await plaidClient.liabilitiesGet(request);
+      console.log('✅ liabilitiesGet succeeded, found', response.data.liabilities?.credit?.length || 0, 'credit accounts');
+      return response.data;
+    } catch (error) {
+      console.error('❌ liabilitiesGet failed:', error);
+      console.error('Error details:', {
+        error_code: error.error_code,
+        error_type: error.error_type,
+        display_message: error.display_message
+      });
+      
+      // Return empty structure instead of throwing
+      return { 
+        accounts: [],
+        liabilities: { credit: [] }
+      };
+    }
   }
 
   async getBalances(accessToken: string): Promise<any> {
@@ -254,11 +271,32 @@ class PlaidServiceImpl implements PlaidService {
         }
       };
 
+      console.log('Calling accountsBalanceGet with request:', JSON.stringify(request, null, 2));
       const response = await plaidClient.accountsBalanceGet(request);
+      console.log('✅ accountsBalanceGet succeeded, returned', response.data.accounts.length, 'accounts');
       return response.data;
     } catch (error) {
-      console.error('Error fetching balances:', error);
-      return { accounts: [] }; // Return empty accounts on error
+      console.error('❌ accountsBalanceGet failed:', error);
+      console.error('Error details:', {
+        error_code: error.error_code,
+        error_type: error.error_type,
+        display_message: error.display_message
+      });
+      
+      // Try without the min_last_updated_datetime option for Capital One
+      try {
+        console.log('Retrying accountsBalanceGet without min_last_updated_datetime...');
+        const fallbackRequest: AccountsBalanceGetRequest = {
+          access_token: accessToken
+        };
+        
+        const fallbackResponse = await plaidClient.accountsBalanceGet(fallbackRequest);
+        console.log('✅ accountsBalanceGet fallback succeeded, returned', fallbackResponse.data.accounts.length, 'accounts');
+        return fallbackResponse.data;
+      } catch (fallbackError) {
+        console.error('❌ accountsBalanceGet fallback also failed:', fallbackError);
+        return { accounts: [] }; // Return empty accounts on error
+      }
     }
   }
 
@@ -268,10 +306,17 @@ class PlaidServiceImpl implements PlaidService {
         access_token: accessToken,
       };
 
+      console.log('Calling accountsGet...');
       const response = await plaidClient.accountsGet(request);
+      console.log('✅ accountsGet succeeded, returned', response.data.accounts.length, 'accounts');
       return response.data;
     } catch (error) {
-      console.error('Error fetching accounts:', error);
+      console.error('❌ accountsGet failed:', error);
+      console.error('Error details:', {
+        error_code: error.error_code,
+        error_type: error.error_type,
+        display_message: error.display_message
+      });
       return { accounts: [] }; // Return empty accounts on error
     }
   }
@@ -295,9 +340,18 @@ class PlaidServiceImpl implements PlaidService {
   }
 
   async syncAccounts(accessToken: string, itemId: string): Promise<void> {
+    console.log(`🔄 Starting syncAccounts for itemId: ${itemId}`);
+    
     const liabilitiesData = await this.getLiabilities(accessToken);
     const balancesData = await this.getBalances(accessToken);
     const accountsData = await this.getAccounts(accessToken);
+
+    console.log('📊 Plaid API call results:', {
+      liabilitiesAccounts: liabilitiesData?.accounts?.length || 0,
+      liabilitiesCredit: liabilitiesData?.liabilities?.credit?.length || 0,
+      balancesAccounts: balancesData?.accounts?.length || 0,
+      accountsData: accountsData?.accounts?.length || 0
+    });
 
     const plaidItem = await prisma.plaidItem.findUnique({
       where: { itemId },
@@ -306,6 +360,9 @@ class PlaidServiceImpl implements PlaidService {
     if (!plaidItem) {
       throw new Error('Plaid item not found');
     }
+    
+    console.log(`🏦 Processing accounts for ${plaidItem.institutionName}`);
+    const isCapitalOneInstitution = this.isCapitalOne(plaidItem.institutionName);
 
     for (const account of liabilitiesData.accounts) {
       if (account.subtype === 'credit card') {
