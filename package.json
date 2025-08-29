@@ -12,7 +12,12 @@
     "db:migrate": "prisma migrate dev",
     "security:audit": "npm audit --audit-level=moderate",
     "security:fix": "npm audit fix",
-    "security:check": "npm audit && npm outdated"
+    "security:check": "npm audit && npm outdated",
+    "debug:audit": "node scripts/debug-tools.js data-audit",
+    "debug:rebuild": "node scripts/debug-tools.js regenerate-cycles",
+    "debug:fix": "node scripts/debug-tools.js fix-cycles",
+    "debug:capital-one": "node scripts/debug-tools.js capital-one-sync",
+    "debug:repair": "node scripts/debug-tools.js data-repair"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

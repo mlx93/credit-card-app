@@ -261,50 +261,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                   <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
                   <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
                 </button>
-                <button 
-                  onClick={async () => {
-                    console.log('Regenerate Cycles button clicked - starting...');
-                    try {
-                      const response = await fetch('/api/debug/regenerate-cycles', { method: 'POST' });
-                      const result = await response.json();
-                      
-                      if (response.ok) {
-                        console.log('Regenerate Cycles SUCCESS:', result);
-                        await fetchUserData();
-                        console.log('Historical cycles should be restored');
-                      } else {
-                        console.error('Regenerate Cycles FAILED:', response.status, result);
-                      }
-                    } catch (error) {
-                      console.error('Regenerate Cycles ERROR:', error);
-                    }
-                  }}
-                  className="bg-purple-100 hover:bg-purple-200 text-purple-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
-                >
-                  Rebuild Cycles
-                </button>
-                <button 
-                  onClick={async () => {
-                    console.log('Capital One Debug Sync button clicked - starting...');
-                    try {
-                      const response = await fetch('/api/debug/capital-one-sync', { method: 'POST' });
-                      const result = await response.json();
-                      
-                      if (response.ok) {
-                        console.log('Capital One Debug SUCCESS:', result);
-                        await fetchUserData();
-                        console.log('Check console for detailed Capital One sync process');
-                      } else {
-                        console.error('Capital One Debug FAILED:', response.status, result);
-                      }
-                    } catch (error) {
-                      console.error('Capital One Debug ERROR:', error);
-                    }
-                  }}
-                  className="bg-red-100 hover:bg-red-200 text-red-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
-                >
-                  Debug Capital One
-                </button>
               </>
             ) : (
               <div className="text-center py-2">
