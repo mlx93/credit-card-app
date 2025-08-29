@@ -269,19 +269,28 @@ export function DueDateCard({
                     ✅ Paid Off
                   </div>
                 ) : card.nextPaymentDueDate ? (
-                  <div className="text-right">
-                    <p className="text-xs font-medium text-gray-900">Due {formatDate(card.nextPaymentDueDate)}</p>
-                    {daysUntilDue !== null && (
-                      <p className={`text-xs ${
-                        isOverdue 
-                          ? 'text-red-600' 
-                          : isDueSoon 
-                            ? 'text-yellow-600' 
-                            : 'text-green-600'
-                      }`}>
-                        {Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'left'}
-                      </p>
-                    )}
+                  <div 
+                    className="relative px-3 py-2 rounded-xl border border-blue-200 bg-gradient-to-b from-blue-50 to-blue-100/50 shadow-sm"
+                    style={{
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)',
+                    }}
+                  >
+                    <div className="text-right space-y-0.5">
+                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">DUE</p>
+                      <p className="text-sm font-semibold text-gray-900">{formatDate(card.nextPaymentDueDate)}</p>
+                      {daysUntilDue !== null && (
+                        <p className={`text-xs font-medium ${
+                          isOverdue 
+                            ? 'text-red-600' 
+                            : isDueSoon 
+                              ? 'text-orange-600' 
+                              : 'text-blue-600'
+                        }`}>
+                          {Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'left'}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ) : null}
               </div>
