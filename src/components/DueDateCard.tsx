@@ -262,14 +262,14 @@ export function DueDateCard({
                 )}
               </div>
               
-              {/* Centered Status/Due Info */}
-              <div className="flex items-center justify-center flex-1">
+              {/* Right-aligned Status/Due Info */}
+              <div className="flex items-center ml-auto">
                 {isPaidOff ? (
                   <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
                     ✅ Paid Off
                   </div>
                 ) : card.nextPaymentDueDate ? (
-                  <div className="text-center">
+                  <div className="text-right">
                     <p className="text-xs font-medium text-gray-900">Due {formatDate(card.nextPaymentDueDate)}</p>
                     {daysUntilDue !== null && (
                       <p className={`text-xs ${
