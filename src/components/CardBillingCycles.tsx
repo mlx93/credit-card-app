@@ -82,7 +82,7 @@ const cardBorderColors = [
   'border-l-red-500'
 ];
 
-// BillingCycleItem Component
+// BillingCycleItem Component - Updated with compactMode support
 const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], compactMode = false }: { cycle: BillingCycle, card?: CreditCardInfo, isHistorical?: boolean, allCycles?: BillingCycle[], compactMode?: boolean }) => {
   const daysUntilDue = cycle.dueDate ? getDaysUntil(cycle.dueDate) : null;
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
@@ -531,6 +531,8 @@ function SortableCard({
 }
 
 export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onOrderChange, compactMode = false }: CardBillingCyclesProps) {
+  // Debug validation
+  console.log('CardBillingCycles rendered with compactMode:', compactMode);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [cardOrder, setCardOrder] = useState<string[]>([]);
 
