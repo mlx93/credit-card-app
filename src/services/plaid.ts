@@ -113,28 +113,57 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`=== GET TRANSACTIONS DEBUG ===`);
       console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
       
-      // Use date chunking to get full transaction history
-      // Use 1-month chunks to be compatible with all institutions (including Capital One)
+      // Check if this is Capital One by testing the access token first
+      let isCapitalOne = false;
+      try {
+        const testResponse = await plaidClient.accountsGet({ access_token: accessToken });
+        isCapitalOne = testResponse.data.accounts.some((acc: any) => 
+          acc.name?.toLowerCase().includes('capital one') || 
+          acc.name?.toLowerCase().includes('quicksilver') ||
+          acc.name?.toLowerCase().includes('venture') ||
+          acc.name?.toLowerCase().includes('savor') ||
+          acc.name?.toLowerCase().includes('spark')
+        );
+      } catch (error) {
+        console.warn('Could not determine institution type:', error);
+      }
+
+      // Capital One-specific handling: limit to 90 days max
+      if (isCapitalOne) {
+        const maxDaysBack = 90;
+        const capitalOneStartDate = new Date();
+        capitalOneStartDate.setDate(capitalOneStartDate.getDate() - maxDaysBack);
+        
+        // Use the later date (either requested start or Capital One limit)
+        if (startDate < capitalOneStartDate) {
+          console.log(`🔄 Capital One detected: Limiting start date from ${startDate.toISOString().split('T')[0]} to ${capitalOneStartDate.toISOString().split('T')[0]} (90-day limit)`);
+          startDate = capitalOneStartDate;
+        }
+      }
+      
+      // Use optimized chunking strategy
       const allTransactions: any[] = [];
-      const chunkMonths = 1;
+      const chunkSize = isCapitalOne ? 90 : 30; // Use 90-day chunks for Capital One, 30-day for others
       
       let currentStart = new Date(startDate);
       
       while (currentStart < endDate) {
         const currentEnd = new Date(currentStart);
-        currentEnd.setMonth(currentEnd.getMonth() + chunkMonths);
+        currentEnd.setDate(currentEnd.getDate() + chunkSize);
         
         // Don't go past the requested end date
         if (currentEnd > endDate) {
           currentEnd.setTime(endDate.getTime());
         }
         
-        console.log(`Fetching chunk: ${currentStart.toISOString().split('T')[0]} to ${currentEnd.toISOString().split('T')[0]}`);
+        console.log(`Fetching ${isCapitalOne ? 'Capital One' : 'standard'} chunk: ${currentStart.toISOString().split('T')[0]} to ${currentEnd.toISOString().split('T')[0]}`);
         
         const request: TransactionsGetRequest = {
           access_token: accessToken,
           start_date: currentStart.toISOString().split('T')[0],
-          end_date: currentEnd.toISOString().split('T')[0]
+          end_date: currentEnd.toISOString().split('T')[0],
+          count: 500, // Request max transactions per call
+          offset: 0
         };
 
         const response = await plaidClient.transactionsGet(request);
@@ -142,23 +171,39 @@ class PlaidServiceImpl implements PlaidService {
         
         console.log(`Chunk result: ${chunkTransactions.length} transactions (total available in period: ${response.data.total_transactions})`);
         
+        // For Capital One, if we get fewer transactions than expected, that's normal due to 90-day limit
         if (chunkTransactions.length < response.data.total_transactions) {
-          console.warn(`⚠️ Only got ${chunkTransactions.length} of ${response.data.total_transactions} transactions in this 3-month chunk. Some data may still be missing.`);
+          if (isCapitalOne) {
+            console.log(`ℹ️ Capital One returned ${chunkTransactions.length} of ${response.data.total_transactions} transactions (normal due to 90-day limit)`);
+          } else {
+            console.warn(`⚠️ Only got ${chunkTransactions.length} of ${response.data.total_transactions} transactions in this chunk. Some data may be missing.`);
+          }
         }
         
         allTransactions.push(...chunkTransactions);
+        
+        // For Capital One, break after first successful call since they limit to 90 days total
+        if (isCapitalOne) {
+          console.log('🏁 Capital One: Single chunk completed due to 90-day limitation');
+          break;
+        }
         
         // Move to next chunk
         currentStart = new Date(currentEnd);
         currentStart.setDate(currentStart.getDate() + 1);
       }
 
-      console.log(`✅ Successfully fetched ${allTransactions.length} transactions across all chunks`);
+      console.log(`✅ Successfully fetched ${allTransactions.length} transactions ${isCapitalOne ? '(Capital One 90-day limit applied)' : 'across all chunks'}`);
       
       if (allTransactions.length > 0) {
         const dates = allTransactions.map(t => t.date).sort();
         console.log('Final transaction date range:', dates[0], 'to', dates[dates.length - 1]);
-        console.log('Months of data retrieved:', Math.round((new Date(dates[dates.length - 1]).getTime() - new Date(dates[0]).getTime()) / (1000 * 60 * 60 * 24 * 30)));
+        const actualDays = Math.round((new Date(dates[dates.length - 1]).getTime() - new Date(dates[0]).getTime()) / (1000 * 60 * 60 * 24));
+        console.log('Days of data retrieved:', actualDays);
+        
+        if (isCapitalOne && actualDays < 85) {
+          console.warn(`⚠️ Capital One returned only ${actualDays} days of data (expected ~90 days)`);
+        }
       }
       
       console.log('Sample transactions:', allTransactions.slice(0, 3).map(t => ({
@@ -277,62 +322,91 @@ class PlaidServiceImpl implements PlaidService {
           where: { accountId: account.account_id },
         });
 
-        // Try multiple sources for credit limit - prioritize liability data for Capital One
+        // Enhanced credit limit extraction with better Capital One support
         let creditLimit = null;
         
-        // For Capital One, try liability sources first since balances endpoint often fails
-        const isCapitalOne = account.name?.toLowerCase().includes('capital one') || 
+        // Improved Capital One detection - check institution name and account names
+        const isCapitalOne = plaidItem.institutionName?.toLowerCase().includes('capital one') ||
+                           account.name?.toLowerCase().includes('capital one') || 
                            account.name?.toLowerCase().includes('quicksilver') ||
-                           account.name?.toLowerCase().includes('venture');
+                           account.name?.toLowerCase().includes('venture') ||
+                           account.name?.toLowerCase().includes('savor') ||
+                           account.name?.toLowerCase().includes('spark');
+        
+        console.log(`Processing ${account.name} - Capital One detected: ${isCapitalOne}`);
         
         if (isCapitalOne && liability) {
-          console.log('Capital One detected, trying liability sources first...');
+          console.log('Capital One detected, using enhanced liability-first approach...');
           
-          // Try liability limit_current field first
+          // Priority 1: Try liability limit fields (most reliable for Capital One)
           if (liability.limit_current && liability.limit_current > 0) {
             creditLimit = liability.limit_current;
-            console.log('Using liability.limit_current:', creditLimit);
+            console.log('✅ Using liability.limit_current:', creditLimit);
           }
-          
-          // Try liability.limit field
           else if (liability.limit && liability.limit > 0) {
             creditLimit = liability.limit;
-            console.log('Using liability.limit:', creditLimit);
+            console.log('✅ Using liability.limit:', creditLimit);
           }
           
-          // Try balances within liability
+          // Priority 2: Check APR data (Capital One often provides limits here)
+          else if (liability.aprs && liability.aprs.length > 0) {
+            // Find purchase APR which typically has the full credit limit
+            const purchaseApr = liability.aprs.find((apr: any) => 
+              apr.apr_type === 'purchase_apr' && apr.balance_subject_to_apr && apr.balance_subject_to_apr > 0
+            );
+            if (purchaseApr) {
+              creditLimit = purchaseApr.balance_subject_to_apr;
+              console.log('✅ Using purchase APR balance_subject_to_apr:', creditLimit);
+            } else {
+              // Fallback to any APR with balance info
+              const anyAprWithBalance = liability.aprs.find((apr: any) => 
+                apr.balance_subject_to_apr && apr.balance_subject_to_apr > 0
+              );
+              if (anyAprWithBalance) {
+                creditLimit = anyAprWithBalance.balance_subject_to_apr;
+                console.log('✅ Using any APR balance_subject_to_apr:', creditLimit);
+              }
+            }
+          }
+          
+          // Priority 3: Try liability balances (less reliable but worth trying)
           else if (liability.balances?.limit && liability.balances.limit > 0) {
             creditLimit = liability.balances.limit;
-            console.log('Using liability.balances.limit:', creditLimit);
-          }
-          
-          // Try APR balance_subject_to_apr as last resort
-          else if (liability.aprs && liability.aprs.length > 0) {
-            const aprLimit = liability.aprs.find((apr: any) => apr.balance_subject_to_apr && apr.balance_subject_to_apr > 0)?.balance_subject_to_apr;
-            if (aprLimit) {
-              creditLimit = aprLimit;
-              console.log('Using APR balance_subject_to_apr:', creditLimit);
-            }
+            console.log('✅ Using liability.balances.limit:', creditLimit);
           }
         }
         
-        // Fallback to standard balance sources for non-Capital One or if liability failed
+        // Standard approach for non-Capital One or fallback for Capital One
         if (!creditLimit || creditLimit <= 0) {
+          console.log('Trying standard balance approaches...');
+          
+          // Try direct limit fields
           creditLimit = balanceAccount?.balances?.limit ?? accountsAccount?.balances?.limit ?? account.balances.limit;
           
-          // Try balances.available + balances.current (total credit line)
-          if ((!creditLimit || creditLimit <= 0)) {
-            // Try balance account first, then accounts account, then liability account
+          if (creditLimit && creditLimit > 0) {
+            console.log('✅ Using standard balance limit:', creditLimit);
+          }
+          
+          // Calculate from available + current balance (total credit line)
+          else {
             const balanceSource = balanceAccount?.balances || accountsAccount?.balances || account.balances;
             if (balanceSource) {
               const available = balanceSource.available;
               const current = Math.abs(balanceSource.current ?? 0);
               if (available && available > 0) {
                 creditLimit = available + current;
-                console.log('Using calculated limit (available + current):', creditLimit);
+                console.log('✅ Using calculated limit (available + current):', creditLimit);
               }
             }
           }
+        }
+        
+        // Final validation - ensure we have a reasonable credit limit
+        if (!creditLimit || creditLimit <= 0 || !isFinite(creditLimit)) {
+          console.warn(`⚠️ No valid credit limit found for ${account.name}. Setting to null.`);
+          creditLimit = null;
+        } else {
+          console.log(`✅ Final credit limit for ${account.name}: $${creditLimit}`);
         }
 
         // Debug logging for credit limits

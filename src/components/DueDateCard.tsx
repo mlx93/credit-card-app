@@ -251,19 +251,40 @@ export function DueDateCard({
           )}
           <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-gray-900">{card.name}</h3>
-              {isPaidOff && (
-                <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-                  ✅ Paid Off
-                </div>
-              )}
-              {hasConnectionIssue && (
-                <WifiOff className="h-4 w-4 text-red-500" title="Connection issue" />
-              )}
-              {isStale && !hasConnectionIssue && (
-                <AlertTriangle className="h-4 w-4 text-yellow-500" title="Data may be outdated" />
-              )}
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-gray-900">{card.name}</h3>
+                {hasConnectionIssue && (
+                  <WifiOff className="h-4 w-4 text-red-500" title="Connection issue" />
+                )}
+                {isStale && !hasConnectionIssue && (
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" title="Data may be outdated" />
+                )}
+              </div>
+              
+              {/* Centered Status/Due Info */}
+              <div className="flex items-center justify-center flex-1">
+                {isPaidOff ? (
+                  <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
+                    ✅ Paid Off
+                  </div>
+                ) : card.nextPaymentDueDate ? (
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-gray-900">Due {formatDate(card.nextPaymentDueDate)}</p>
+                    {daysUntilDue !== null && (
+                      <p className={`text-xs ${
+                        isOverdue 
+                          ? 'text-red-600' 
+                          : isDueSoon 
+                            ? 'text-yellow-600' 
+                            : 'text-green-600'
+                      }`}>
+                        {Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'left'}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
             <p className="text-sm text-gray-600">•••• {card.mask}</p>
             {card.plaidItem && (
@@ -391,38 +412,9 @@ export function DueDateCard({
               style={{ width: `${Math.min(utilization, 100)}%` }}
             ></div>
           </div>
-        ) : (
-          <div className="text-center py-2 text-sm text-gray-500 italic">
-            {card.balanceLimit === null || card.balanceLimit === undefined ? 'Limit information not available' : 
-             isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid limit data' : 'Unlimited credit'}
-          </div>
         )}
       </div>
 
-      {/* Due Date */}
-      {!isPaidOff && card.nextPaymentDueDate ? (
-        <div className="flex flex-col items-start">
-          <span className="text-sm text-gray-600">Due:</span>
-          <div className="text-left">
-            <p className="font-medium text-gray-900 text-sm">{formatDate(card.nextPaymentDueDate)}</p>
-            {daysUntilDue !== null && (
-              <p className={`text-xs ${
-                isOverdue 
-                  ? 'text-red-600' 
-                  : isDueSoon 
-                    ? 'text-yellow-600' 
-                    : 'text-green-600'
-              }`}>
-                {Math.abs(daysUntilDue)} days {isOverdue ? 'overdue' : 'left'}
-              </p>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="text-center text-sm text-gray-500">
-          No payment due date available
-        </div>
-      )}
     </div>
   );
 }
