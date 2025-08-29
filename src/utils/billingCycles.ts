@@ -170,7 +170,19 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
         cycleStart: historicalCycleStart.toDateString(),
         cardOpenDate: new Date(creditCard.openDate).toDateString()
       });
-      break;
+      // Move to the next historical cycle instead of breaking
+      historicalCycleEnd = new Date(historicalCycleStart);
+      historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
+      continue;
+    }
+    
+    // Also skip if the cycle would end before the card open date
+    if (creditCard.openDate && historicalCycleEnd < new Date(creditCard.openDate)) {
+      console.log('Skipping cycle that ends before card open date:', {
+        cycleEnd: historicalCycleEnd.toDateString(),
+        cardOpenDate: new Date(creditCard.openDate).toDateString()
+      });
+      break; // No more valid cycles in the past
     }
     
     const historicalDueDate = new Date(historicalCycleEnd);
@@ -492,17 +504,29 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
     for (const card of item.accounts) {
       const cycles = await calculateBillingCycles(card.id);
       
-      // Filter out cycles that start before the card open date
+      // Filter out cycles that start OR end before the card open date
       let filteredCycles = cycles;
       if (card.openDate) {
         const cardOpenDate = new Date(card.openDate);
         filteredCycles = cycles.filter(cycle => {
           const cycleStart = new Date(cycle.startDate);
-          return cycleStart >= cardOpenDate;
+          const cycleEnd = new Date(cycle.endDate);
+          // A cycle is valid if it starts on or after the card open date
+          // AND if it doesn't end before the card open date (handles edge cases)
+          return cycleStart >= cardOpenDate && cycleEnd >= cardOpenDate;
         });
         
         if (filteredCycles.length !== cycles.length) {
           console.log(`🗓️ Card ${card.name}: Filtered billing cycles from ${cycles.length} to ${filteredCycles.length} based on open date (${cardOpenDate.toDateString()})`);
+          const removedCycles = cycles.filter(cycle => {
+            const cycleStart = new Date(cycle.startDate);
+            const cycleEnd = new Date(cycle.endDate);
+            return cycleStart < cardOpenDate || cycleEnd < cardOpenDate;
+          });
+          console.log(`Removed cycles:`, removedCycles.map(cycle => ({
+            start: new Date(cycle.startDate).toDateString(),
+            end: new Date(cycle.endDate).toDateString()
+          })));
         }
       }
       
