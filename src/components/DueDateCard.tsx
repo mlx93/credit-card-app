@@ -311,9 +311,37 @@ export function DueDateCard({
 
       const data = await response.json();
       
-      if (response.ok) {
-        // Force page refresh to update the card data
-        window.location.reload();
+      if (response.ok && data.success) {
+        console.log('✅ Credit limit updated successfully:', data.message);
+        
+        // Update the card data locally to avoid page reload
+        if (data.card) {
+          // Create updated card object with new limit
+          const updatedCard = { ...card, balanceLimit: data.card.balanceLimit };
+          
+          // If parent component provides an update callback, use it
+          // Otherwise fall back to page reload for now
+          if (typeof window !== 'undefined') {
+            // Store the update in sessionStorage so parent can pick it up
+            sessionStorage.setItem(`creditLimit_${card.id}`, JSON.stringify({
+              cardId: card.id,
+              newLimit: data.card.balanceLimit,
+              timestamp: Date.now()
+            }));
+            
+            // Trigger a custom event that the parent can listen to
+            window.dispatchEvent(new CustomEvent('creditLimitUpdated', {
+              detail: { cardId: card.id, newLimit: data.card.balanceLimit }
+            }));
+          }
+        }
+        
+        setEditingLimit(false);
+        setLimitInput('');
+        
+        // Show success message
+        alert(data.message || 'Credit limit updated successfully');
+        
       } else {
         console.error('Failed to update credit limit:', data.error);
         alert(data.error || 'Failed to update credit limit');
