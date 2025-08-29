@@ -29,6 +29,15 @@ export interface PlaidService {
 }
 
 class PlaidServiceImpl implements PlaidService {
+  private isCapitalOne(institutionName?: string, accountName?: string): boolean {
+    const capitalOneIndicators = ['capital one', 'quicksilver', 'venture', 'savor', 'spark'];
+    const institutionMatch = institutionName?.toLowerCase().includes('capital one') || false;
+    const accountMatch = capitalOneIndicators.some(indicator => 
+      accountName?.toLowerCase().includes(indicator)
+    ) || false;
+    
+    return institutionMatch || accountMatch;
+  }
   async createLinkToken(userId: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
     
@@ -118,11 +127,7 @@ class PlaidServiceImpl implements PlaidService {
       try {
         const testResponse = await plaidClient.accountsGet({ access_token: accessToken });
         isCapitalOne = testResponse.data.accounts.some((acc: any) => 
-          acc.name?.toLowerCase().includes('capital one') || 
-          acc.name?.toLowerCase().includes('quicksilver') ||
-          acc.name?.toLowerCase().includes('venture') ||
-          acc.name?.toLowerCase().includes('savor') ||
-          acc.name?.toLowerCase().includes('spark')
+          this.isCapitalOne(undefined, acc.name)
         );
       } catch (error) {
         console.warn('Could not determine institution type:', error);
@@ -325,13 +330,8 @@ class PlaidServiceImpl implements PlaidService {
         // Enhanced credit limit extraction with better Capital One support
         let creditLimit = null;
         
-        // Improved Capital One detection - check institution name and account names
-        const isCapitalOne = plaidItem.institutionName?.toLowerCase().includes('capital one') ||
-                           account.name?.toLowerCase().includes('capital one') || 
-                           account.name?.toLowerCase().includes('quicksilver') ||
-                           account.name?.toLowerCase().includes('venture') ||
-                           account.name?.toLowerCase().includes('savor') ||
-                           account.name?.toLowerCase().includes('spark');
+        // Improved Capital One detection using helper method
+        const isCapitalOne = this.isCapitalOne(plaidItem.institutionName, account.name);
         
         console.log(`Processing ${account.name} - Capital One detected: ${isCapitalOne}`);
         
@@ -542,16 +542,39 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`Found Plaid item for ${plaidItem.institutionName} (${itemId})`);
       console.log('✅ Using already decrypted access token from sync route');
       
+      // Determine if this is Capital One and adjust date range accordingly
+      let isCapitalOneItem = false;
+      try {
+        const testResponse = await plaidClient.accountsGet({ access_token: accessToken });
+        isCapitalOneItem = testResponse.data.accounts.some((acc: any) => 
+          this.isCapitalOne(undefined, acc.name)
+        ) || this.isCapitalOne(plaidItem.institutionName);
+      } catch (error) {
+        console.warn('Could not determine institution type, checking institution name...');
+        isCapitalOneItem = this.isCapitalOne(plaidItem.institutionName);
+      }
+
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 24); // Extended to 24 months to match Link configuration
+      
+      if (isCapitalOneItem) {
+        // Capital One: Only 90 days of history available
+        startDate.setDate(startDate.getDate() - 90);
+        console.log('📍 Capital One detected: Using 90-day transaction window');
+      } else {
+        // Other institutions: 24 months to match Link configuration
+        startDate.setMonth(startDate.getMonth() - 24);
+        console.log('📍 Standard institution: Using 24-month transaction window');
+      }
 
       console.log(`=== TRANSACTION DATE RANGE DEBUG ===`);
+      console.log(`Institution: ${plaidItem.institutionName}`);
+      console.log(`Is Capital One: ${isCapitalOneItem}`);
       console.log(`Current date: ${new Date().toISOString()}`);
       console.log(`Calculated start date: ${startDate.toISOString()}`);  
       console.log(`Calculated end date: ${endDate.toISOString()}`);
       console.log(`Requesting range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
-      console.log(`Expected months back: ${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))}`);
+      console.log(`Expected ${isCapitalOneItem ? 'days' : 'months'} back: ${isCapitalOneItem ? 90 : Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))}`);
       console.log(`=== END DATE RANGE DEBUG ===`);
 
       const transactions = await this.getTransactions(
