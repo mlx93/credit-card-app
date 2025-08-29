@@ -37,7 +37,8 @@ class PlaidServiceImpl implements PlaidService {
         client_user_id: userId,
       },
       client_name: "Credit Card Tracker",
-      products: ['liabilities', 'transactions', 'statements'],
+      products: ['liabilities', 'transactions'],
+      optional_products: ['statements'],
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
@@ -53,8 +54,16 @@ class PlaidServiceImpl implements PlaidService {
       const response = await plaidClient.linkTokenCreate(request);
       console.log('Link token created successfully');
       return response.data.link_token;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create link token:', error);
+      console.error('Plaid API Error Details:', {
+        error_type: error?.response?.data?.error_type,
+        error_code: error?.response?.data?.error_code,
+        error_message: error?.response?.data?.error_message,
+        display_message: error?.response?.data?.display_message,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
       throw error;
     }
   }
@@ -589,7 +598,8 @@ class PlaidServiceImpl implements PlaidService {
         client_user_id: userId,
       },
       client_name: "Credit Card Tracker",
-      products: ['liabilities', 'transactions', 'statements'],
+      products: ['liabilities', 'transactions'],
+      optional_products: ['statements'],
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
