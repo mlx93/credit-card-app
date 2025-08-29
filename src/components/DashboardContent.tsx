@@ -263,12 +263,20 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 </button>
                 <button 
                   onClick={async () => {
-                    const response = await fetch('/api/debug/fix-cycles', { method: 'POST' });
-                    if (response.ok) {
-                      console.log('Billing cycles fixed!');
-                      await fetchUserData();
-                    } else {
-                      console.error('Failed to fix cycles');
+                    console.log('Fix Cycles button clicked - starting...');
+                    try {
+                      const response = await fetch('/api/debug/fix-cycles', { method: 'POST' });
+                      const result = await response.json();
+                      
+                      if (response.ok) {
+                        console.log('Fix Cycles SUCCESS:', result);
+                        await fetchUserData();
+                        console.log('Data refreshed - check openCycleSpend in next cycle render');
+                      } else {
+                        console.error('Fix Cycles FAILED:', response.status, result);
+                      }
+                    } catch (error) {
+                      console.error('Fix Cycles ERROR:', error);
                     }
                   }}
                   className="bg-orange-100 hover:bg-orange-200 text-orange-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
