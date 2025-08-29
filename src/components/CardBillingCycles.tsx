@@ -467,14 +467,15 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
     setExpandedCards(newExpanded);
   };
 
-  const getCardColorIndex = (cardName: string) => {
-    // More robust hash function to avoid collisions
+  const getCardColorIndex = (cardName: string, cardId?: string) => {
+    // More robust hash function to avoid collisions - include card ID for uniqueness
+    const hashString = cardId ? `${cardName}-${cardId}` : cardName;
     let hash = 0;
-    for (let i = 0; i < cardName.length; i++) {
-      hash = ((hash << 5) - hash + cardName.charCodeAt(i)) & 0xffffffff;
+    for (let i = 0; i < hashString.length; i++) {
+      hash = ((hash << 5) - hash + hashString.charCodeAt(i)) & 0xffffffff;
     }
     const colorIndex = Math.abs(hash) % cardColors.length;
-    console.log(`Card color assignment: "${cardName}" -> index ${colorIndex} (${cardColors[colorIndex]})`);
+    console.log(`Card color assignment: "${cardName}" (ID: ${cardId}) -> index ${colorIndex} (${cardColors[colorIndex]})`);
     return colorIndex;
   };
 
@@ -535,8 +536,8 @@ export function CardBillingCycles({ cycles, cards }: CardBillingCyclesProps) {
       >
         <div className="space-y-6">
           {orderedCards.map(({ cardName, cardCycles }) => {
-            const colorIndex = getCardColorIndex(cardName);
             const card = cards.find(c => c.name === cardName);
+            const colorIndex = getCardColorIndex(cardName, card?.id);
             const isExpanded = expandedCards.has(cardName);
 
             return (

@@ -142,14 +142,15 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync }: DueDateCa
     }
   };
 
-  const getCardColorIndex = (cardName: string) => {
-    // More robust hash function to avoid collisions
+  const getCardColorIndex = (cardName: string, cardId?: string) => {
+    // More robust hash function to avoid collisions - include card ID for uniqueness
+    const hashString = cardId ? `${cardName}-${cardId}` : cardName;
     let hash = 0;
-    for (let i = 0; i < cardName.length; i++) {
-      hash = ((hash << 5) - hash + cardName.charCodeAt(i)) & 0xffffffff;
+    for (let i = 0; i < hashString.length; i++) {
+      hash = ((hash << 5) - hash + hashString.charCodeAt(i)) & 0xffffffff;
     }
     const colorIndex = Math.abs(hash) % cardColors.length;
-    console.log(`DueDate card color assignment: "${cardName}" -> index ${colorIndex} (${cardColors[colorIndex]})`);
+    console.log(`DueDate card color assignment: "${cardName}" (ID: ${cardId}) -> index ${colorIndex} (${cardColors[colorIndex]})`);
     return colorIndex;
   };
 
@@ -170,7 +171,7 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync }: DueDateCa
       >
         <div className="space-y-4">
           {orderedCards.map((card) => {
-            const colorIndex = getCardColorIndex(card.name);
+            const colorIndex = getCardColorIndex(card.name, card.id);
             return (
               <SortableDueDateCard
                 key={card.id}
@@ -252,6 +253,11 @@ export function DueDateCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-gray-900">{card.name}</h3>
+              {isPaidOff && (
+                <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                  ✅ Paid Off
+                </div>
+              )}
               {hasConnectionIssue && (
                 <WifiOff className="h-4 w-4 text-red-500" title="Connection issue" />
               )}
@@ -393,14 +399,8 @@ export function DueDateCard({
         )}
       </div>
 
-      {/* Due Date or Paid Off Status */}
-      {isPaidOff ? (
-        <div className="flex justify-center items-center text-sm">
-          <div className="bg-green-100 text-green-800 px-3 py-2 rounded-full font-medium">
-            ✅ Card has been paid off!
-          </div>
-        </div>
-      ) : card.nextPaymentDueDate ? (
+      {/* Due Date */}
+      {!isPaidOff && card.nextPaymentDueDate ? (
         <div className="flex flex-col items-start">
           <span className="text-sm text-gray-600">Due:</span>
           <div className="text-left">
