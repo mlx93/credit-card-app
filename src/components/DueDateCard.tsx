@@ -101,23 +101,35 @@ interface DueDateCardsProps {
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
   onSync?: (itemId: string) => void;
+  onOrderChange?: (cardOrder: string[]) => void;
+  initialCardOrder?: string[];
 }
 
-export function DueDateCards({ cards, onReconnect, onRemove, onSync }: DueDateCardsProps) {
-  const [cardOrder, setCardOrder] = useState<string[]>([]);
+export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChange, initialCardOrder }: DueDateCardsProps) {
+  const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
 
   // Initialize card order when cards change
   useEffect(() => {
     const cardIds = cards.map(card => card.id);
-    if (cardOrder.length === 0 && cardIds.length > 0) {
+    if (initialCardOrder && initialCardOrder.length > 0) {
+      // Use initial order from parent, but filter to only existing cards
+      const validOrder = initialCardOrder.filter(id => cardIds.includes(id));
+      const newCards = cardIds.filter(id => !validOrder.includes(id));
+      const fullOrder = [...validOrder, ...newCards];
+      setCardOrder(fullOrder);
+      onOrderChange?.(fullOrder);
+    } else if (cardOrder.length === 0 && cardIds.length > 0) {
       setCardOrder(cardIds);
+      onOrderChange?.(cardIds);
     } else if (cardOrder.length > 0) {
       const newCards = cardIds.filter(id => !cardOrder.includes(id));
       if (newCards.length > 0) {
-        setCardOrder([...cardOrder, ...newCards]);
+        const newOrder = [...cardOrder, ...newCards];
+        setCardOrder(newOrder);
+        onOrderChange?.(newOrder);
       }
     }
-  }, [cards]);
+  }, [cards, initialCardOrder]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -137,7 +149,9 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync }: DueDateCa
       setCardOrder((items) => {
         const oldIndex = items.indexOf(active.id as string);
         const newIndex = items.indexOf(over.id as string);
-        return arrayMove(items, oldIndex, newIndex);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        onOrderChange?.(newOrder);
+        return newOrder;
       });
     }
   };
