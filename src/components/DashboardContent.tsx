@@ -99,9 +99,27 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
       
       const [creditCardsRes, billingCyclesRes, transactionsRes] = await Promise.all([
-        fetch('/api/user/credit-cards'),
-        fetch('/api/user/billing-cycles'),
-        fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`),
+        fetch('/api/user/credit-cards', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch('/api/user/billing-cycles', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
       ]);
 
       if (creditCardsRes.ok) {
@@ -278,7 +296,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     if (!isLoggedIn) return;
 
     try {
-      const response = await fetch('/api/user/credit-cards');
+      const response = await fetch('/api/user/credit-cards', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       if (response.ok) {
         const { creditCards: cards } = await response.json();
         const expiredConnections = cards.filter((card: any) => 
