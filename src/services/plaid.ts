@@ -336,7 +336,7 @@ class PlaidServiceImpl implements PlaidService {
         console.log(`Processing ${account.name} - Capital One detected: ${isCapitalOne}`);
         
         if (isCapitalOne && liability) {
-          console.log('Capital One detected, using enhanced liability-first approach...');
+          console.log('Capital One detected, using enhanced liability-first approach with comprehensive fallbacks...');
           console.log('Available liability fields:', Object.keys(liability));
           
           // Priority 1: Try liability limit fields (most reliable for Capital One)
