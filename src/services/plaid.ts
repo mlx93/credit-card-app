@@ -51,7 +51,7 @@ class PlaidServiceImpl implements PlaidService {
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
       transactions: {
-        days_requested: 730, // Request 24 months of transaction history
+        days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)
       },
     };
 
@@ -699,7 +699,7 @@ class PlaidServiceImpl implements PlaidService {
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
       transactions: {
-        days_requested: 730, // Request 24 months of transaction history
+        days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)
       },
       update: {
         account_selection_enabled: true,

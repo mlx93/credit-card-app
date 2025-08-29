@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
           { name: { contains: 'Capital One', mode: 'insensitive' } },
           { name: { contains: 'Quicksilver', mode: 'insensitive' } },
           { name: { contains: 'Venture', mode: 'insensitive' } },
+          { name: { contains: 'Savor', mode: 'insensitive' } },
+          { name: { contains: 'Spark', mode: 'insensitive' } },
+          { plaidItem: { institutionName: { contains: 'Capital One', mode: 'insensitive' } } },
         ]
       },
       include: {
