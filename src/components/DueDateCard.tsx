@@ -259,7 +259,7 @@ export function DueDateCard({
   const isStale = lastSyncDaysAgo !== null && lastSyncDaysAgo > 14; // Consider stale if no sync in 14+ days (was 7 days)
   
   // Debug logging for staleness detection
-  if (card.name.includes('Bank of America')) {
+  if (card.name.includes('Bank of America') || card.name.includes('Customized Cash Rewards')) {
     console.log('Bank of America staleness check:', {
       cardName: card.name,
       lastSyncAt: card.plaidItem?.lastSyncAt,
