@@ -122,16 +122,35 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   console.log('Total cycles created:', cycles.length);
   console.log('=== END BILLING CYCLE DEBUG ===');
   
-  // Create historical cycles going back 12 months
+  // Create historical cycles going back 12 months, but not before card open date
   let historicalCycleEnd = new Date(closedCycleStart);
   historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
   
   const oneYearAgo = new Date();
   oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
   
-  while (historicalCycleEnd >= oneYearAgo) {
+  // Don't create cycles before card open date
+  const cardOpenDate = creditCard.openDate ? new Date(creditCard.openDate) : oneYearAgo;
+  const earliestCycleDate = cardOpenDate > oneYearAgo ? cardOpenDate : oneYearAgo;
+  
+  console.log('Historical cycle date limits:', {
+    oneYearAgo: oneYearAgo.toDateString(),
+    cardOpenDate: cardOpenDate.toDateString(),
+    earliestCycleDate: earliestCycleDate.toDateString()
+  });
+  
+  while (historicalCycleEnd >= earliestCycleDate) {
     const historicalCycleStart = new Date(historicalCycleEnd);
     historicalCycleStart.setDate(historicalCycleStart.getDate() - cycleLength + 1);
+    
+    // Skip cycles that start before the card open date
+    if (creditCard.openDate && historicalCycleStart < new Date(creditCard.openDate)) {
+      console.log('Skipping cycle that starts before card open date:', {
+        cycleStart: historicalCycleStart.toDateString(),
+        cardOpenDate: new Date(creditCard.openDate).toDateString()
+      });
+      break;
+    }
     
     const historicalDueDate = new Date(historicalCycleEnd);
     historicalDueDate.setDate(historicalDueDate.getDate() + 21);

@@ -620,6 +620,13 @@ class PlaidServiceImpl implements PlaidService {
           nextPaymentDueDate: liability?.next_payment_due_date 
             ? new Date(liability.next_payment_due_date) 
             : null,
+          openDate: liability?.origination_date
+            ? new Date(liability.origination_date)
+            : null,
+          annualFee: liability?.annual_fee || null,
+          annualFeeDueDate: liability?.annual_fee_due_date
+            ? new Date(liability.annual_fee_due_date)
+            : null,
         };
 
         if (existingCard) {

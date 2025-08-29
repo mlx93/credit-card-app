@@ -608,17 +608,40 @@ function CardContent({
   allCycles: BillingCycle[];
   dragHandleProps?: any;
 }) {
-  const closedCycles = cardCycles.filter(c => c.statementBalance && c.statementBalance > 0);
-  const currentCycles = cardCycles.filter(c => !c.statementBalance || c.statementBalance <= 0);
+  // Sort cycles by end date (newest first) to properly identify recent cycles
+  const sortedCycles = [...cardCycles].sort((a, b) => 
+    new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
+  );
   
-  // Show the most recent closed cycle and current cycle in main section
-  const recentClosedCycle = closedCycles.slice(0, 1);
-  const recentCurrentCycle = currentCycles.slice(0, 1);
-  const allRecentCycles = [...recentClosedCycle, ...recentCurrentCycle];
+  const today = new Date();
   
-  // Historical cycles = all remaining cycles that aren't shown in main section
-  const shownCycleIds = new Set(allRecentCycles.map(c => c.id));
-  const historical = cardCycles.filter(c => !shownCycleIds.has(c.id));
+  // Find the most recent cycle (could be current or recently closed)
+  let recentCycles = [];
+  let historicalCycles = [];
+  
+  if (sortedCycles.length > 0) {
+    // Always show the most recent cycle in the main section
+    recentCycles.push(sortedCycles[0]);
+    
+    // Check if we have a current ongoing cycle (different from most recent closed)
+    const currentCycle = sortedCycles.find(c => {
+      const start = new Date(c.startDate);
+      const end = new Date(c.endDate);
+      return today >= start && today <= end;
+    });
+    
+    // If current cycle is different from most recent, show both
+    if (currentCycle && currentCycle.id !== sortedCycles[0].id) {
+      recentCycles.push(currentCycle);
+    }
+    
+    // All other cycles are historical
+    const shownCycleIds = new Set(recentCycles.map(c => c.id));
+    historicalCycles = sortedCycles.filter(c => !shownCycleIds.has(c.id));
+  }
+  
+  const allRecentCycles = recentCycles;
+  const historical = historicalCycles;
 
   return (
     <div className={`rounded-lg border-2 ${cardColors[colorIndex]} ${cardBorderColors[colorIndex]} border-l-4`}>
