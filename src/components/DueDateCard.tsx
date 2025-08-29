@@ -108,28 +108,47 @@ interface DueDateCardsProps {
 export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChange, initialCardOrder }: DueDateCardsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
 
-  // Initialize card order when cards change
+  // Initialize card order when cards change (but not when user is dragging)
   useEffect(() => {
     const cardIds = cards.map(card => card.id);
-    if (initialCardOrder && initialCardOrder.length > 0) {
-      // Use initial order from parent, but filter to only existing cards
-      const validOrder = initialCardOrder.filter(id => cardIds.includes(id));
+    
+    // Only initialize if we don't have a current order, or if cards have actually changed
+    const currentCardIds = cardOrder.filter(id => cardIds.includes(id));
+    const hasNewCards = cardIds.some(id => !cardOrder.includes(id));
+    const hasRemovedCards = cardOrder.some(id => !cardIds.includes(id));
+    
+    if (cardOrder.length === 0) {
+      // First initialization
+      if (initialCardOrder && initialCardOrder.length > 0) {
+        const validOrder = initialCardOrder.filter(id => cardIds.includes(id));
+        const newCards = cardIds.filter(id => !validOrder.includes(id));
+        const fullOrder = [...validOrder, ...newCards];
+        setCardOrder(fullOrder);
+        onOrderChange?.(fullOrder);
+      } else {
+        setCardOrder(cardIds);
+        onOrderChange?.(cardIds);
+      }
+    } else if (hasNewCards || hasRemovedCards) {
+      // Only update if cards have actually been added/removed
+      const validOrder = cardOrder.filter(id => cardIds.includes(id));
       const newCards = cardIds.filter(id => !validOrder.includes(id));
       const fullOrder = [...validOrder, ...newCards];
       setCardOrder(fullOrder);
       onOrderChange?.(fullOrder);
-    } else if (cardOrder.length === 0 && cardIds.length > 0) {
-      setCardOrder(cardIds);
-      onOrderChange?.(cardIds);
-    } else if (cardOrder.length > 0) {
-      const newCards = cardIds.filter(id => !cardOrder.includes(id));
-      if (newCards.length > 0) {
-        const newOrder = [...cardOrder, ...newCards];
-        setCardOrder(newOrder);
-        onOrderChange?.(newOrder);
-      }
     }
-  }, [cards, initialCardOrder]);
+  }, [cards]); // Remove initialCardOrder from dependencies to prevent conflicts
+
+  // Handle initialCardOrder changes separately (only when it's first provided)
+  useEffect(() => {
+    if (initialCardOrder && initialCardOrder.length > 0 && cardOrder.length === 0) {
+      const cardIds = cards.map(card => card.id);
+      const validOrder = initialCardOrder.filter(id => cardIds.includes(id));
+      const newCards = cardIds.filter(id => !validOrder.includes(id));
+      const fullOrder = [...validOrder, ...newCards];
+      setCardOrder(fullOrder);
+    }
+  }, [initialCardOrder, cards]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -145,11 +164,16 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChan
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
+    console.log('🔄 Drag ended:', { activeId: active.id, overId: over?.id });
+
     if (over && active.id !== over.id) {
       setCardOrder((items) => {
         const oldIndex = items.indexOf(active.id as string);
         const newIndex = items.indexOf(over.id as string);
         const newOrder = arrayMove(items, oldIndex, newIndex);
+        
+        console.log('📋 New card order:', newOrder);
+        console.log('🔗 Calling onOrderChange with:', newOrder);
         onOrderChange?.(newOrder);
         return newOrder;
       });
