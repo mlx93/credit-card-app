@@ -223,6 +223,7 @@ export function DueDateCard({
   dragHandleProps 
 }: DueDateCardProps & { dragHandleProps?: any }) {
   const [syncing, setSyncing] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [editingLimit, setEditingLimit] = useState(false);
   const [limitInput, setLimitInput] = useState('');
   const [updatingLimit, setUpdatingLimit] = useState(false);
@@ -277,6 +278,16 @@ export function DueDateCard({
       await onSync(card.plaidItem.itemId);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleReconnect = async () => {
+    if (!card.plaidItem || !onReconnect) return;
+    setReconnecting(true);
+    try {
+      await onReconnect(card.plaidItem.itemId);
+    } finally {
+      setReconnecting(false);
     }
   };
 
@@ -457,11 +468,16 @@ export function DueDateCard({
               
               {hasConnectionIssue && onReconnect && (
                 <button
-                  onClick={() => onReconnect(card.plaidItem!.itemId)}
-                  className="p-1 rounded hover:bg-blue-100 text-blue-500 hover:text-blue-700"
-                  title="Reconnect account"
+                  onClick={handleReconnect}
+                  disabled={reconnecting}
+                  className="p-1 rounded hover:bg-blue-100 text-blue-500 hover:text-blue-700 disabled:opacity-50 transition-opacity"
+                  title={reconnecting ? "Creating reconnection link..." : "Reconnect account"}
                 >
-                  <ExternalLink className="h-4 w-4" />
+                  {reconnecting ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4" />
+                  )}
                 </button>
               )}
               
