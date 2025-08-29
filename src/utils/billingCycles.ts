@@ -306,6 +306,7 @@ async function createOrUpdateCycle(
         dueDate: dueDate,
         statementBalance: statementBalance,
         minimumPayment: minimumPayment,
+        totalSpend: totalSpend,
       },
     });
   } else {
@@ -328,6 +329,7 @@ async function createOrUpdateCycle(
         data: {
           statementBalance: statementBalance,
           minimumPayment: minimumPayment,
+          totalSpend: totalSpend,
         },
       });
     }
