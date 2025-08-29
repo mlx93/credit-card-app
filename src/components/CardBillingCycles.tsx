@@ -86,9 +86,22 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
   if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
     const currentBalance = Math.abs(card.balanceCurrent || 0);
     
-    // Step 1: Find current open cycle and most recent closed cycle
-    const openCycle = allCycles.find(c => !c.statementBalance || c.statementBalance === 0);
+    // Step 1: Find current open cycle (the one that includes today's date)
+    const today = new Date();
+    const openCycle = allCycles.find(c => {
+      const cycleStart = new Date(c.startDate);
+      const cycleEnd = new Date(c.endDate);
+      return today >= cycleStart && today <= cycleEnd;
+    });
     const openCycleSpend = openCycle?.totalSpend || 0;
+    
+    console.log('Open cycle detection:', {
+      today: today.toDateString(),
+      foundOpenCycle: !!openCycle,
+      openCycleDate: openCycle ? `${formatDate(openCycle.startDate)} - ${formatDate(openCycle.endDate)}` : 'None',
+      openCycleSpend,
+      openCycleStatementBalance: openCycle?.statementBalance
+    });
     
     // Find ALL closed cycles (with statement balance), sorted by end date
     const allClosedCycles = allCycles.filter(c => 
