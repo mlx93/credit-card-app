@@ -497,7 +497,7 @@ export function DueDateCard({
 
       {/* Balance Information - Show statement balance when there's a due date OR when balances differ */}
       {card.lastStatementBalance && (card.nextPaymentDueDate || card.lastStatementBalance !== card.balanceCurrent) ? (
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="grid grid-cols-3 gap-4 mb-3">
           <div>
             <p className="text-sm text-gray-600">Statement Balance</p>
             <p className="font-semibold text-base text-blue-600">
@@ -513,7 +513,7 @@ export function DueDateCard({
             <p className="text-xs text-gray-500">Includes new charges</p>
           </div>
           {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
-            <div>
+            <div className="text-right">
               <p className="text-sm text-gray-600">Minimum Payment</p>
               <p className="font-semibold text-base text-gray-900">
                 {formatCurrency(card.minimumPaymentAmount)}
@@ -522,7 +522,7 @@ export function DueDateCard({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="grid grid-cols-2 gap-4 mb-3">
           <div>
             <p className="text-sm text-gray-600">Balance</p>
             <p className="font-semibold text-base text-gray-900">
@@ -530,7 +530,7 @@ export function DueDateCard({
             </p>
           </div>
           {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
-            <div>
+            <div className="text-right">
               <p className="text-sm text-gray-600">Minimum Payment</p>
               <p className="font-semibold text-base text-gray-900">
                 {formatCurrency(card.minimumPaymentAmount)}

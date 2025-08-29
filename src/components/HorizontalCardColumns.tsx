@@ -152,7 +152,7 @@ function SortableCardColumn({
               <div className="p-4">
                 {/* Section Header */}
                 <div className="flex items-center mb-4">
-                  <div className="w-1 h-4 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-3"></div>
+                  <div className={`w-1 h-4 bg-gradient-to-b ${getBillingCycleGradient(colorIndex)} rounded-full mr-3`}></div>
                   <h3 className="text-sm font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
                     Recent Billing Cycles
                   </h3>
@@ -201,7 +201,7 @@ export function HorizontalCardColumns({
     })
   );
 
-  // Initialize card order
+  // Initialize card order and expand all cards by default
   useEffect(() => {
     const cardIds = cards.map(card => card.id);
     
@@ -216,6 +216,9 @@ export function HorizontalCardColumns({
         setCardOrder(cardIds);
         onOrderChange?.(cardIds);
       }
+      
+      // Expand all cards by default
+      setExpandedCards(new Set(cardIds));
     }
   }, [cards, initialCardOrder, cardOrder.length, onOrderChange]);
 
@@ -264,6 +267,20 @@ export function HorizontalCardColumns({
       hash = hash & hash;
     }
     return Math.abs(hash) % 8;
+  };
+
+  const getBillingCycleGradient = (colorIndex: number): string => {
+    const gradients = [
+      'from-blue-300 to-blue-500',      // blue
+      'from-green-300 to-green-500',    // green
+      'from-purple-300 to-purple-500',  // purple
+      'from-orange-300 to-orange-500',  // orange
+      'from-pink-300 to-pink-500',      // pink
+      'from-indigo-300 to-indigo-500',  // indigo
+      'from-teal-300 to-teal-500',      // teal
+      'from-red-300 to-red-500'         // red
+    ];
+    return gradients[colorIndex % gradients.length];
   };
 
   if (cards.length === 0) {
