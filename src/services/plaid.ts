@@ -383,6 +383,13 @@ class PlaidServiceImpl implements PlaidService {
           where: { accountId: account.account_id },
         });
 
+        // Get earliest transaction for transaction-based open date fallback
+        const earliestTransactions = existingCard ? await prisma.transaction.findMany({
+          where: { creditCardId: existingCard.id },
+          orderBy: { date: 'asc' },
+          take: 1
+        }) : [];
+
         // Enhanced credit limit extraction with better Capital One support
         let creditLimit = null;
         
@@ -718,16 +725,6 @@ class PlaidServiceImpl implements PlaidService {
             
             // Priority 5: Transaction-based fallback (most reliable)
             console.log(`⚠️ No origination date available, using transaction-based fallback`);
-            
-            // Get earliest transaction for this account to estimate open date
-            const earliestTransactions = await prisma.transaction.findMany({
-              where: { 
-                creditCardId: existingCard?.id 
-              },
-              orderBy: { date: 'asc' },
-              take: 1
-            });
-            
             const now = new Date();
             let fallbackDate = new Date();
             
