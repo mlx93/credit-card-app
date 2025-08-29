@@ -489,7 +489,8 @@ function SortableCard({
   colorIndex, 
   isExpanded, 
   onToggleExpand,
-  allCycles
+  allCycles,
+  compactMode = false
 }: {
   cardName: string;
   cardCycles: BillingCycle[];
@@ -498,6 +499,7 @@ function SortableCard({
   isExpanded: boolean;
   onToggleExpand: () => void;
   allCycles: BillingCycle[];
+  compactMode?: boolean;
 }) {
   const {
     attributes,
@@ -525,6 +527,7 @@ function SortableCard({
         onToggleExpand={onToggleExpand}
         allCycles={allCycles}
         dragHandleProps={{ ...attributes, ...listeners }}
+        compactMode={compactMode}
       />
     </div>
   );
@@ -667,6 +670,7 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
                 isExpanded={isExpanded}
                 onToggleExpand={() => toggleCardExpansion(cardName)}
                 allCycles={cycles}
+                compactMode={compactMode}
               />
             );
           })}
@@ -685,7 +689,8 @@ function CardContent({
   isExpanded,
   onToggleExpand,
   allCycles,
-  dragHandleProps
+  dragHandleProps,
+  compactMode = false
 }: {
   cardName: string;
   cardCycles: BillingCycle[];
@@ -695,6 +700,7 @@ function CardContent({
   onToggleExpand: () => void;
   allCycles: BillingCycle[];
   dragHandleProps?: any;
+  compactMode?: boolean;
 }) {
   // Sort cycles by end date (newest first) to properly identify recent cycles
   const sortedCycles = [...cardCycles].sort((a, b) => 
