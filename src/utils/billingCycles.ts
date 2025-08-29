@@ -508,26 +508,59 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
       let filteredCycles = cycles;
       if (card.openDate) {
         const cardOpenDate = new Date(card.openDate);
+        console.log(`🗓️ FILTERING CYCLES FOR ${card.name}:`);
+        console.log(`   Card open date: ${cardOpenDate.toDateString()} (${cardOpenDate.toISOString()})`);
+        console.log(`   Total cycles before filtering: ${cycles.length}`);
+        
+        const beforeFiltering = cycles.map(cycle => ({
+          start: new Date(cycle.startDate).toDateString(),
+          startISO: cycle.startDate.toISOString(),
+          end: new Date(cycle.endDate).toDateString(),
+          endISO: cycle.endDate.toISOString(),
+          valid: new Date(cycle.startDate) >= cardOpenDate && new Date(cycle.endDate) >= cardOpenDate
+        }));
+        
+        console.log(`   Cycle validation details:`, beforeFiltering);
+        
         filteredCycles = cycles.filter(cycle => {
           const cycleStart = new Date(cycle.startDate);
           const cycleEnd = new Date(cycle.endDate);
-          // A cycle is valid if it starts on or after the card open date
-          // AND if it doesn't end before the card open date (handles edge cases)
-          return cycleStart >= cardOpenDate && cycleEnd >= cardOpenDate;
+          const isValid = cycleStart >= cardOpenDate && cycleEnd >= cardOpenDate;
+          
+          if (!isValid) {
+            console.log(`   ❌ FILTERING OUT: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()} (starts before: ${cycleStart < cardOpenDate}, ends before: ${cycleEnd < cardOpenDate})`);
+          } else {
+            console.log(`   ✅ KEEPING: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()}`);
+          }
+          
+          return isValid;
         });
         
+        console.log(`🗓️ Card ${card.name}: Filtered billing cycles from ${cycles.length} to ${filteredCycles.length} based on open date (${cardOpenDate.toDateString()})`);
+        
         if (filteredCycles.length !== cycles.length) {
-          console.log(`🗓️ Card ${card.name}: Filtered billing cycles from ${cycles.length} to ${filteredCycles.length} based on open date (${cardOpenDate.toDateString()})`);
           const removedCycles = cycles.filter(cycle => {
             const cycleStart = new Date(cycle.startDate);
             const cycleEnd = new Date(cycle.endDate);
             return cycleStart < cardOpenDate || cycleEnd < cardOpenDate;
           });
-          console.log(`Removed cycles:`, removedCycles.map(cycle => ({
+          console.log(`   Removed ${removedCycles.length} cycles:`, removedCycles.map(cycle => ({
             start: new Date(cycle.startDate).toDateString(),
-            end: new Date(cycle.endDate).toDateString()
+            end: new Date(cycle.endDate).toDateString(),
+            reason: (() => {
+              const start = new Date(cycle.startDate);
+              const end = new Date(cycle.endDate);
+              if (start < cardOpenDate && end < cardOpenDate) return 'both dates before open';
+              if (start < cardOpenDate) return 'start date before open';
+              if (end < cardOpenDate) return 'end date before open';
+              return 'unknown';
+            })()
           })));
+        } else {
+          console.log(`   No cycles needed to be filtered out`);
         }
+      } else {
+        console.log(`🗓️ Card ${card.name}: No open date set, not filtering cycles`);
       }
       
       // Apply Capital One-specific cycle limiting
