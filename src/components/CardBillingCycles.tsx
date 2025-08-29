@@ -145,18 +145,57 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
           paymentAnalysis = `Current or future cycle`;
         }
       } else {
-        // There's outstanding balance from older cycles
-        // But we can't determine which specific cycle is unpaid without payment history
-        // So we'll conservatively mark older cycles as paid unless we have specific evidence
-        if (cycle.statementBalance && cycle.statementBalance > 0 && 
-            new Date(cycle.endDate) < new Date(mostRecentClosedCycle?.endDate || new Date())) {
-          // For now, assume historical cycles are paid
-          // In reality, we'd need payment history to know for sure
-          paymentStatus = 'paid';
-          paymentAnalysis = `Historical cycle - assumed paid`;
-        } else {
-          paymentStatus = 'current';
-          paymentAnalysis = `Current cycle`;
+        // There's outstanding balance from older cycles - determine which cycles are outstanding
+        // Start with the remaining balance and work through cycles from newest to oldest
+        const historicalCycles = allCycles.filter(c => 
+          c.statementBalance && c.statementBalance > 0 && 
+          c.id !== mostRecentClosedCycle?.id && // Exclude most recent closed cycle
+          c.id !== openCycle?.id && // Exclude open cycle
+          new Date(c.endDate) < new Date(mostRecentClosedCycle?.endDate || new Date()) // Only older cycles
+        ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()); // Newest to oldest
+        
+        let remainingUnpaid = remainingFromOlderCycles; // Start with the outstanding amount
+        let foundThisCycle = false;
+        
+        console.log('Iterative outstanding detection:', {
+          startingUnpaid: remainingUnpaid,
+          historicalCyclesCount: historicalCycles.length,
+          checkingCycle: formatDate(cycle.endDate)
+        });
+        
+        // Work through historical cycles from newest to oldest
+        for (const historicalCycle of historicalCycles) {
+          if (historicalCycle.id === cycle.id) {
+            foundThisCycle = true;
+            if (remainingUnpaid > 0) {
+              // There's still unpaid balance when we reach this cycle - it's outstanding
+              const unpaidAmount = Math.min(remainingUnpaid, historicalCycle.statementBalance || 0);
+              paymentStatus = 'outstanding';
+              paymentAnalysis = `Outstanding - ${formatCurrency(unpaidAmount)} of ${formatCurrency(historicalCycle.statementBalance || 0)} unpaid`;
+            } else {
+              // No remaining unpaid balance - this cycle is paid
+              paymentStatus = 'paid';
+              paymentAnalysis = `Paid - covered by account balance`;
+            }
+            break;
+          }
+          
+          // Subtract this cycle's balance from remaining unpaid amount
+          remainingUnpaid -= historicalCycle.statementBalance || 0;
+          console.log(`After ${formatDate(historicalCycle.endDate)}: remaining unpaid = ${remainingUnpaid}`);
+        }
+        
+        // If this cycle wasn't found in historical cycles, determine status
+        if (!foundThisCycle) {
+          if (cycle.statementBalance && cycle.statementBalance > 0 && 
+              new Date(cycle.endDate) < new Date(mostRecentClosedCycle?.endDate || new Date())) {
+            // This is a historical cycle - assume paid if we didn't find it in the iteration
+            paymentStatus = 'paid';
+            paymentAnalysis = `Historical cycle - not in outstanding calculation`;
+          } else {
+            paymentStatus = 'current';
+            paymentAnalysis = `Current cycle`;
+          }
         }
       }
     }
