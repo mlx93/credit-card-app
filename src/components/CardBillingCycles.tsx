@@ -56,6 +56,7 @@ interface CardBillingCyclesProps {
   cards: CreditCardInfo[];
   cardOrder?: string[]; // Optional card order from parent (card IDs)
   onOrderChange?: (order: string[]) => void; // Callback to sync order changes with parent
+  compactMode?: boolean; // For horizontal card columns display
 }
 
 // Generate consistent colors for cards
@@ -487,7 +488,7 @@ function SortableCard({
   );
 }
 
-export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onOrderChange }: CardBillingCyclesProps) {
+export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onOrderChange, compactMode = false }: CardBillingCyclesProps) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [cardOrder, setCardOrder] = useState<string[]>([]);
 

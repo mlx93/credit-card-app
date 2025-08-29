@@ -195,19 +195,70 @@ export async function POST(request: NextRequest) {
     // Regenerate billing cycles after successful sync
     console.log('=== REGENERATING BILLING CYCLES ===');
     try {
-      const regenResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/billing-cycles/regenerate`, {
-        method: 'POST'
-      });
+      const { calculateBillingCycles } = await import('@/utils/billingCycles');
       
-      if (regenResponse.ok) {
-        const regenData = await regenResponse.json();
-        console.log('✅ Billing cycles regenerated successfully after sync');
-        console.log('Regeneration results:', regenData);
-      } else {
-        console.warn('⚠️ Billing cycle regeneration failed after sync');
-        const errorText = await regenResponse.text();
-        console.error('Regeneration error:', errorText);
+      // Get all credit cards for this user
+      const userCreditCards = await prisma.creditCard.findMany({
+        where: {
+          plaidItem: {
+            userId: session.user.id
+          }
+        },
+        include: {
+          plaidItem: true
+        }
+      });
+
+      console.log(`Found ${userCreditCards.length} credit cards for user billing cycle regeneration`);
+
+      // Delete existing billing cycles to force regeneration
+      console.log('Deleting existing billing cycles...');
+      const deleteResult = await prisma.billingCycle.deleteMany({
+        where: {
+          creditCard: {
+            plaidItem: {
+              userId: session.user.id
+            }
+          }
+        }
+      });
+      console.log(`Deleted ${deleteResult.count} existing billing cycles`);
+
+      // Regenerate billing cycles for each credit card
+      const regenResults = [];
+      for (const card of userCreditCards) {
+        console.log(`Regenerating cycles for ${card.name}...`);
+        
+        // First, ensure transactions are properly linked
+        const unlinkedTransactions = await prisma.transaction.findMany({
+          where: {
+            plaidItemId: card.plaidItemId,
+            creditCardId: null
+          }
+        });
+        
+        if (unlinkedTransactions.length > 0) {
+          console.log(`Found ${unlinkedTransactions.length} unlinked transactions, linking them to ${card.name}...`);
+          
+          for (const transaction of unlinkedTransactions) {
+            await prisma.transaction.update({
+              where: { id: transaction.id },
+              data: { creditCardId: card.id }
+            });
+          }
+        }
+        
+        const cycles = await calculateBillingCycles(card.id);
+        console.log(`Generated ${cycles.length} cycles for ${card.name}`);
+        
+        regenResults.push({
+          cardName: card.name,
+          cyclesGenerated: cycles.length
+        });
       }
+      
+      console.log('✅ Billing cycles regenerated successfully after sync');
+      console.log('Regeneration results:', regenResults);
     } catch (regenError) {
       console.error('Error regenerating billing cycles after sync:', regenError);
       // Don't fail the sync if billing cycle regeneration fails
