@@ -181,6 +181,24 @@ export async function POST(request: NextRequest) {
     const results = await Promise.all(syncPromises);
     
     console.log('All sync promises completed. Results:', results);
+    
+    // Regenerate billing cycles after successful sync
+    console.log('Regenerating billing cycles after sync...');
+    try {
+      const regenResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/billing-cycles/regenerate`, {
+        method: 'POST'
+      });
+      
+      if (regenResponse.ok) {
+        console.log('✅ Billing cycles regenerated successfully after sync');
+      } else {
+        console.warn('⚠️ Billing cycle regeneration failed after sync');
+      }
+    } catch (regenError) {
+      console.error('Error regenerating billing cycles after sync:', regenError);
+      // Don't fail the sync if billing cycle regeneration fails
+    }
+    
     console.log('=== SYNC ROUTE COMPLETED SUCCESSFULLY ===');
     
     return NextResponse.json({ 
