@@ -19,6 +19,25 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
 
+  // Create consistent default card ordering based on due dates and card names
+  const getDefaultCardOrder = (cards: any[]): string[] => {
+    return cards
+      .slice() // Create a copy to avoid mutating original array
+      .sort((a, b) => {
+        // Primary sort: by next payment due date (earliest first)
+        const aDate = a.nextPaymentDueDate ? new Date(a.nextPaymentDueDate) : new Date('2099-12-31');
+        const bDate = b.nextPaymentDueDate ? new Date(b.nextPaymentDueDate) : new Date('2099-12-31');
+        
+        if (aDate.getTime() !== bDate.getTime()) {
+          return aDate.getTime() - bDate.getTime();
+        }
+        
+        // Secondary sort: by card name (alphabetical)
+        return a.name.localeCompare(b.name);
+      })
+      .map(card => card.id);
+  };
+
   const mockCards = [
     {
       id: '1',
@@ -75,6 +94,17 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       if (creditCardsRes.ok) {
         const { creditCards: cards } = await creditCardsRes.json();
         setCreditCards(cards);
+        
+        // Set default shared card order if it hasn't been set yet (first load)
+        if (sharedCardOrder.length === 0 && cards.length > 0) {
+          const defaultOrder = getDefaultCardOrder(cards);
+          setSharedCardOrder(defaultOrder);
+          console.log('Setting default card order:', {
+            cardCount: cards.length,
+            defaultOrder,
+            cardNames: defaultOrder.map(id => cards.find(c => c.id === id)?.name)
+          });
+        }
       }
 
       if (billingCyclesRes.ok) {
@@ -194,6 +224,19 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
   useEffect(() => {
     fetchUserData();
+  }, [isLoggedIn]);
+
+  // Set default order for mock cards when not logged in
+  useEffect(() => {
+    if (!isLoggedIn && sharedCardOrder.length === 0 && mockCards.length > 0) {
+      const defaultOrder = getDefaultCardOrder(mockCards);
+      setSharedCardOrder(defaultOrder);
+      console.log('Setting default mock card order:', {
+        cardCount: mockCards.length,
+        defaultOrder,
+        cardNames: defaultOrder.map(id => mockCards.find(c => c.id === id)?.name)
+      });
+    }
   }, [isLoggedIn]);
 
   const displayCards = isLoggedIn ? creditCards : mockCards;
