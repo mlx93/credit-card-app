@@ -1,6 +1,17 @@
 import { prisma } from '@/lib/db';
 import { addMonths, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
 
+// Helper function to detect Capital One cards
+function isCapitalOneCard(institutionName?: string, cardName?: string): boolean {
+  const capitalOneIndicators = ['capital one', 'quicksilver', 'venture', 'savor', 'spark'];
+  const institutionMatch = institutionName?.toLowerCase().includes('capital one') || false;
+  const cardMatch = capitalOneIndicators.some(indicator => 
+    cardName?.toLowerCase().includes(indicator)
+  ) || false;
+  
+  return institutionMatch || cardMatch;
+}
+
 export interface BillingCycleData {
   id: string;
   creditCardId: string;
@@ -414,7 +425,23 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
   for (const item of plaidItems) {
     for (const card of item.accounts) {
       const cycles = await calculateBillingCycles(card.id);
-      allCycles.push(...cycles);
+      
+      // Apply Capital One-specific cycle limiting
+      const isCapitalOne = isCapitalOneCard(item.institutionName, card.name);
+      
+      if (isCapitalOne) {
+        // For Capital One cards, limit to 4 most recent cycles (90 days = ~3-4 billing cycles)
+        const limitedCycles = cycles
+          .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
+          .slice(0, 4);
+        
+        console.log(`📍 Capital One card ${card.name}: Limited billing cycles from ${cycles.length} to ${limitedCycles.length} (90-day transaction limit)`);
+        
+        allCycles.push(...limitedCycles);
+      } else {
+        // Standard cards: show all cycles (typically 12+ for 2 years of data)
+        allCycles.push(...cycles);
+      }
     }
   }
 
