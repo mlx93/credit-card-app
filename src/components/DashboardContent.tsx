@@ -15,6 +15,7 @@ interface DashboardContentProps {
 export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [creditCards, setCreditCards] = useState<any[]>([]);
   const [billingCycles, setBillingCycles] = useState<any[]>([]);
+  const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
@@ -86,9 +87,15 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     try {
       setLoading(true);
       
-      const [creditCardsRes, billingCyclesRes] = await Promise.all([
+      // Get current month date range
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      
+      const [creditCardsRes, billingCyclesRes, transactionsRes] = await Promise.all([
         fetch('/api/user/credit-cards'),
         fetch('/api/user/billing-cycles'),
+        fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`),
       ]);
 
       if (creditCardsRes.ok) {
@@ -110,6 +117,11 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       if (billingCyclesRes.ok) {
         const { billingCycles: cycles } = await billingCyclesRes.json();
         setBillingCycles(cycles);
+      }
+
+      if (transactionsRes.ok) {
+        const { transactions } = await transactionsRes.json();
+        setCurrentMonthTransactions(transactions);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -244,20 +256,17 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   
   // Calculate actual current month spending from transactions
   const totalSpendThisMonth = (() => {
-    if (!isLoggedIn) return displayCycles.reduce((sum, cycle) => sum + cycle.totalSpend, 0);
+    if (!isLoggedIn) {
+      // For mock data, show sum of all cycle spending
+      return displayCycles.reduce((sum, cycle) => sum + cycle.totalSpend, 0);
+    }
     
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    
-    // Find current month cycle (cycle that includes current date)
-    const currentCycle = displayCycles.find(cycle => {
-      const cycleStart = new Date(cycle.startDate);
-      const cycleEnd = new Date(cycle.endDate);
-      const now = new Date();
-      return now >= cycleStart && now <= cycleEnd;
-    });
-    
-    return currentCycle ? currentCycle.totalSpend : 0;
+    // For real data, sum all transaction amounts from current month
+    // Transaction amounts are positive for purchases/spending
+    return currentMonthTransactions.reduce((sum, transaction) => {
+      // Only include positive amounts (spending), exclude payments/credits
+      return transaction.amount > 0 ? sum + transaction.amount : sum;
+    }, 0);
   })();
   const totalBalance = displayCards.reduce((sum, card) => 
     sum + Math.abs(card.balanceCurrent || 0), 0
