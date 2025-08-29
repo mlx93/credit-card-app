@@ -629,24 +629,32 @@ function CardContent({
   
   const today = new Date();
   
-  // Find the most recent cycle (could be current or recently closed)
+  // Find current ongoing cycle and most recently closed cycle
   let recentCycles = [];
   let historicalCycles = [];
   
   if (sortedCycles.length > 0) {
-    // Always show the most recent cycle in the main section
-    recentCycles.push(sortedCycles[0]);
-    
-    // Check if we have a current ongoing cycle (different from most recent closed)
+    // Find current ongoing cycle (cycle that includes today)
     const currentCycle = sortedCycles.find(c => {
       const start = new Date(c.startDate);
       const end = new Date(c.endDate);
       return today >= start && today <= end;
     });
     
-    // If current cycle is different from most recent, show both
-    if (currentCycle && currentCycle.id !== sortedCycles[0].id) {
+    // Find most recently closed cycle (has statement balance and ended before today)
+    const mostRecentClosedCycle = sortedCycles.find(c => {
+      const end = new Date(c.endDate);
+      return c.statementBalance && c.statementBalance > 0 && end < today;
+    });
+    
+    // Show current cycle first (if it exists)
+    if (currentCycle) {
       recentCycles.push(currentCycle);
+    }
+    
+    // Show most recently closed cycle (if it exists and is different from current)
+    if (mostRecentClosedCycle && (!currentCycle || mostRecentClosedCycle.id !== currentCycle.id)) {
+      recentCycles.push(mostRecentClosedCycle);
     }
     
     // All other cycles are historical
