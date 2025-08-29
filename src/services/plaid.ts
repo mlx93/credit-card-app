@@ -166,9 +166,7 @@ class PlaidServiceImpl implements PlaidService {
         const request: TransactionsGetRequest = {
           access_token: accessToken,
           start_date: currentStart.toISOString().split('T')[0],
-          end_date: currentEnd.toISOString().split('T')[0],
-          count: 500, // Request max transactions per call
-          offset: 0
+          end_date: currentEnd.toISOString().split('T')[0]
         };
 
         const response = await plaidClient.transactionsGet(request);
@@ -639,19 +637,8 @@ class PlaidServiceImpl implements PlaidService {
           });
         }
 
-        // Sync historical statements now that we have PRODUCT_STATEMENTS consent
-        console.log(`=== STATEMENT SYNC START for ${account.name} ===`);
-        try {
-          const statements = await this.getStatements(accessToken, account.account_id);
-          console.log(`Found ${statements.length} statements for ${account.name}`);
-          
-          for (const statement of statements) {
-            await this.storeHistoricalStatement(statement, account.account_id, plaidItem.id);
-          }
-          console.log(`=== STATEMENT SYNC COMPLETED for ${account.name} ===`);
-        } catch (error) {
-          console.error(`=== STATEMENT SYNC ERROR for ${account.name}:`, error);
-        }
+        // Skip statement sync - no PRODUCT_STATEMENTS consent
+        console.log(`Skipping statement sync for ${account.name} - no PRODUCT_STATEMENTS consent`);
 
         if (liability?.aprs) {
           await prisma.aPR.deleteMany({
