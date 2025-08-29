@@ -337,7 +337,7 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
                     WebkitBackdropFilter: 'blur(8px)',
                   }}
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {/* Line 1: DUE + Date */}
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-bold text-orange-700 uppercase tracking-wide">DUE</p>

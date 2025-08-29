@@ -236,82 +236,76 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-6">
-        <div className="flex justify-between items-start gap-6 mb-6">
-          {/* Left side: Title + Metrics */}
-          <div className="flex-1">
-            {/* Title section */}
-            <div className="mb-4">
-              <h1 className="text-3xl font-bold text-gray-900 mb-1">Credit Card Dashboard</h1>
-              <p className="text-gray-600 text-sm">
-                {isLoggedIn 
-                  ? 'Track your spending, due dates, and credit utilization' 
-                  : 'Sign in to connect your credit cards and see real data'
-                }
-              </p>
-            </div>
-            
-            {/* Header Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <TrendingUp className="h-6 w-6 text-green-600 mr-3" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-600">This Month's Spend</p>
-                    <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalSpendThisMonth)}</p>
-                  </div>
-                </div>
+        {/* Header with title and Quick Actions side by side */}
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">Credit Card Dashboard</h1>
+            <p className="text-gray-600 text-sm">
+              {isLoggedIn 
+                ? 'Track your spending, due dates, and credit utilization' 
+                : 'Sign in to connect your credit cards and see real data'
+              }
+            </p>
+          </div>
+          
+          {/* Quick Actions - horizontal on same line as title */}
+          <div className="flex items-center space-x-3">
+            {isLoggedIn ? (
+              <>
+                <PlaidLink onSuccess={fetchUserData} />
+                <button 
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-2 text-sm whitespace-nowrap"
+                >
+                  <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+                  <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
+                </button>
+              </>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-gray-600 text-xs">Sign in to connect cards</p>
               </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <DollarSign className="h-6 w-6 text-blue-600 mr-3" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-600">Total Balance</p>
-                    <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalBalance)}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <CreditCard className="h-6 w-6 text-purple-600 mr-3" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-600">Active Cards</p>
-                    <p className="text-lg font-semibold text-gray-900">{displayCards.length}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <Calendar className="h-6 w-6 text-orange-600 mr-3" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-600">Avg Utilization</p>
-                    <p className="text-lg font-semibold text-gray-900">{averageUtilization.toFixed(1)}%</p>
-                  </div>
-                </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Full-width Header Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center">
+              <TrendingUp className="h-6 w-6 text-green-600 mr-3" />
+              <div>
+                <p className="text-xs font-medium text-gray-600">This Month's Spend</p>
+                <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalSpendThisMonth)}</p>
               </div>
             </div>
           </div>
-          
-          {/* Quick Actions - spans full height */}
-          <div className="bg-white p-4 rounded-lg shadow-sm min-w-[220px] flex-shrink-0 h-full">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h3>
-            <div className="space-y-2">
-              {isLoggedIn ? (
-                <>
-                  <PlaidLink onSuccess={fetchUserData} />
-                  <button 
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="w-full bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm"
-                  >
-                    <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
-                    <span>{refreshing ? 'Refreshing...' : 'Refresh All Data'}</span>
-                  </button>
-                </>
-              ) : (
-                <div className="text-center py-2">
-                  <p className="text-gray-600 mb-2 text-xs">Sign in to connect cards</p>
-                </div>
-              )}
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center">
+              <DollarSign className="h-6 w-6 text-blue-600 mr-3" />
+              <div>
+                <p className="text-xs font-medium text-gray-600">Total Balance</p>
+                <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalBalance)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center">
+              <CreditCard className="h-6 w-6 text-purple-600 mr-3" />
+              <div>
+                <p className="text-xs font-medium text-gray-600">Active Cards</p>
+                <p className="text-lg font-semibold text-gray-900">{displayCards.length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center">
+              <Calendar className="h-6 w-6 text-orange-600 mr-3" />
+              <div>
+                <p className="text-xs font-medium text-gray-600">Avg Utilization</p>
+                <p className="text-lg font-semibold text-gray-900">{averageUtilization.toFixed(1)}%</p>
+              </div>
             </div>
           </div>
         </div>

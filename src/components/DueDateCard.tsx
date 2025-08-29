@@ -46,15 +46,16 @@ interface DueDateCardProps {
   onSync?: (itemId: string) => void;
 }
 
+// Darker shades for Due Date cards to distinguish from Billing Cycles
 const cardColors = [
-  'bg-blue-50 border-blue-200 border-l-blue-500',
-  'bg-green-50 border-green-200 border-l-green-500',
-  'bg-purple-50 border-purple-200 border-l-purple-500',
-  'bg-orange-50 border-orange-200 border-l-orange-500',
-  'bg-pink-50 border-pink-200 border-l-pink-500',
-  'bg-indigo-50 border-indigo-200 border-l-indigo-500',
-  'bg-teal-50 border-teal-200 border-l-teal-500',
-  'bg-red-50 border-red-200 border-l-red-500'
+  'bg-blue-100 border-blue-300 border-l-blue-600',
+  'bg-green-100 border-green-300 border-l-green-600',
+  'bg-purple-100 border-purple-300 border-l-purple-600',
+  'bg-orange-100 border-orange-300 border-l-orange-600',
+  'bg-pink-100 border-pink-300 border-l-pink-600',
+  'bg-indigo-100 border-indigo-300 border-l-indigo-600',
+  'bg-teal-100 border-teal-300 border-l-teal-600',
+  'bg-red-100 border-red-300 border-l-red-600'
 ];
 
 // Sortable Due Date Card Component
@@ -232,7 +233,7 @@ export function DueDateCard({
   };
   
   return (
-    <div className={`p-6 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
+    <div className={`p-4 rounded-lg shadow-sm border-2 border-l-4 ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center">
           {dragHandleProps && (
