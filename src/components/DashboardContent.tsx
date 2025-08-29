@@ -7,6 +7,7 @@ import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard, DueDateCards } from '@/components/DueDateCard';
 import { PlaidLink } from '@/components/PlaidLink';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
+import { PlaidUpdateLink } from '@/components/PlaidUpdateLink';
 
 interface DashboardContentProps {
   isLoggedIn: boolean;
@@ -19,6 +20,11 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
+  const [updateFlow, setUpdateFlow] = useState<{
+    linkToken: string;
+    institutionName: string;
+    itemId: string;
+  } | null>(null);
 
   // Create consistent default card ordering based on due dates and card names
   const getDefaultCardOrder = (cards: any[]): string[] => {
@@ -221,8 +227,12 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       if (data.success && data.link_token) {
         console.log(`✅ Update link token created for ${data.institution_name}`);
         
-        // Create a temporary PlaidLink for reconnection
-        await openReconnectionFlow(data.link_token, data.institution_name, itemId);
+        // Use the proper Plaid Link update component
+        setUpdateFlow({
+          linkToken: data.link_token,
+          institutionName: data.institution_name,
+          itemId: itemId
+        });
       } else {
         console.error('Failed to create reconnection link:', data.error);
         alert('Failed to create reconnection link. Please try again or contact support.');
@@ -233,110 +243,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   };
 
-  // Function to handle reconnection flow with Plaid Link
-  const openReconnectionFlow = async (updateLinkToken: string, institutionName: string, itemId: string) => {
-    return new Promise<void>(async (resolve, reject) => {
-      try {
-        console.log(`🔗 Opening Plaid Link for ${institutionName} reconnection...`);
-        console.log('🔗 Initializing Plaid Link update flow...');
-        
-        // Dynamically import Plaid Link for the update flow
-        const { usePlaidLink } = await import('react-plaid-link');
-        
-        // For now, open in new window with proper callback handling
-        const proceed = window.confirm(
-          `Your ${institutionName} connection has expired and needs to be reconnected.\n\n` +
-          `Click OK to open the secure reconnection flow.`
-        );
-        
-        if (proceed) {
-          console.log(`🚀 Opening Plaid Link update for ${institutionName}...`);
-          
-          // Open the Plaid Link update URL
-          const updateUrl = `https://link.plaid.com/update?link_token=${updateLinkToken}`;
-          
-          const updateWindow = window.open(
-            updateUrl,
-            'plaid-update',
-            'width=600,height=700,scrollbars=yes,resizable=yes'
-          );
-          
-          if (!updateWindow) {
-            alert('Please allow popups for this site to enable reconnection.');
-            reject(new Error('Popup blocked'));
-            return;
-          }
-          
-          console.log('📱 Plaid update window opened, waiting for completion...');
-          
-          // Monitor for completion
-          const checkComplete = setInterval(async () => {
-            try {
-              if (updateWindow.closed) {
-                clearInterval(checkComplete);
-                console.log('🔄 Update window closed, verifying connection...');
-                
-                // Wait a moment for Plaid to process, then test the connection
-                setTimeout(async () => {
-                  console.log('🧪 Testing connection after update...');
-                  
-                  try {
-                    // Test if the connection now works by trying a simple API call
-                    const testResponse = await fetch('/api/debug/plaid-status');
-                    const testData = await testResponse.json();
-                    
-                    // Check if this specific item now has fewer errors
-                    const updatedItem = testData.items?.find((item: any) => 
-                      item.itemId === itemId || item.institutionName === institutionName
-                    );
-                    
-                    if (updatedItem && updatedItem.status === 'active') {
-                      console.log(`✅ ${institutionName} reconnection successful!`);
-                      
-                      // Trigger a full refresh to get fresh data
-                      await handleRefresh();
-                      
-                      alert(`✅ ${institutionName} has been successfully reconnected!`);
-                    } else {
-                      console.log(`⚠️ ${institutionName} may still have connection issues`);
-                      
-                      // Still refresh to check
-                      await handleRefresh();
-                    }
-                    
-                    resolve();
-                  } catch (testError) {
-                    console.error('Error testing connection after update:', testError);
-                    // Still refresh and resolve
-                    await handleRefresh();
-                    resolve();
-                  }
-                }, 3000); // Give Plaid 3 seconds to process
-              }
-            } catch (error) {
-              console.error('Error checking update completion:', error);
-            }
-          }, 1000);
-          
-          // Timeout after 10 minutes
-          setTimeout(() => {
-            clearInterval(checkComplete);
-            if (!updateWindow.closed) {
-              updateWindow.close();
-              console.log('🕐 Reconnection timed out after 10 minutes');
-            }
-            resolve(); // Don't reject on timeout, just resolve
-          }, 600000);
-        } else {
-          console.log('❌ User cancelled reconnection');
-          resolve();
-        }
-      } catch (error) {
-        console.error('Error in reconnection flow:', error);
-        reject(error);
-      }
-    });
-  };
 
   const handleCardRemove = async (itemId: string) => {
     const confirmed = window.confirm(
@@ -602,6 +508,25 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         message="Refreshing Your Data"
         subMessage="Syncing credit cards and transactions..."
       />
+      
+      {/* Plaid Update Flow */}
+      {updateFlow && (
+        <PlaidUpdateLink
+          linkToken={updateFlow.linkToken}
+          institutionName={updateFlow.institutionName}
+          itemId={updateFlow.itemId}
+          onSuccess={() => {
+            console.log(`🎉 Successfully updated ${updateFlow.institutionName} connection`);
+            setUpdateFlow(null);
+            // Refresh data after successful update
+            handleRefresh();
+          }}
+          onExit={() => {
+            console.log(`🚪 Exited ${updateFlow.institutionName} update flow`);
+            setUpdateFlow(null);
+          }}
+        />
+      )}
     </div>
   );
 }
