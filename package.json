@@ -17,7 +17,10 @@
     "debug:rebuild": "node scripts/debug-tools.js regenerate-cycles",
     "debug:fix": "node scripts/debug-tools.js fix-cycles",
     "debug:capital-one": "node scripts/debug-tools.js capital-one-sync",
-    "debug:repair": "node scripts/debug-tools.js data-repair"
+    "debug:repair": "node scripts/debug-tools.js data-repair",
+    "debug:stats": "node scripts/debug-tools.js user-stats",
+    "stats": "node get-production-stats.js",
+    "stats:save": "node get-production-stats.js && echo 'Stats saved to user-stats-history.json'"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

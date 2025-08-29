@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const http = require('http');
+const https = require('https');
 
 const BASE_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
@@ -8,17 +9,21 @@ async function makeRequest(endpoint) {
   return new Promise((resolve, reject) => {
     const url = new URL(`/api/debug/${endpoint}`, BASE_URL);
     
+    // Use GET for user-stats, POST for others
+    const method = endpoint === 'user-stats' ? 'GET' : 'POST';
+    
     const options = {
       hostname: url.hostname,
       port: url.port || (url.protocol === 'https:' ? 443 : 3000),
       path: url.pathname,
-      method: 'POST',
+      method: method,
       headers: {
         'Content-Type': 'application/json'
       }
     };
 
-    const req = http.request(options, (res) => {
+    const requestLib = url.protocol === 'https:' ? https : http;
+    const req = requestLib.request(options, (res) => {
       let data = '';
       
       res.on('data', (chunk) => {
@@ -66,7 +71,8 @@ const availableCommands = [
   'capital-one-sync', 
   'fix-cycles',
   'data-audit',
-  'data-repair'
+  'data-repair',
+  'user-stats'
 ];
 
 if (!command || !availableCommands.includes(command)) {

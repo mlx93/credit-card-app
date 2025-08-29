@@ -1,0 +1,91 @@
+{
+  "lastUpdated": "2025-08-29T16:20:46.842Z",
+  "snapshots": [
+    {
+      "timestamp": "2025-08-29T16:20:46.842Z",
+      "metrics": {
+        "totalUsers": 3,
+        "usersWhoLoggedIn": 3,
+        "activeSessions": 7,
+        "usersWithPlaidItems": 2,
+        "loginRate": 100,
+        "engagementRate": 66.7,
+        "totalSessions": 7,
+        "expiredSessions": 0,
+        "avgSessionsPerUser": 2.3
+      },
+      "users": [
+        {
+          "email": "mattblank11@gmail.com",
+          "joinDate": "8/28/2025",
+          "status": "✅ Logged in",
+          "bankConnections": 1
+        },
+        {
+          "email": "sethkramer12@gmail.com",
+          "joinDate": "8/28/2025",
+          "status": "✅ Logged in",
+          "bankConnections": 0
+        },
+        {
+          "email": "mylesethan93@gmail.com",
+          "joinDate": "8/27/2025",
+          "status": "✅ Logged in",
+          "bankConnections": 3
+        }
+      ],
+      "summary": {
+        "description": "Small but focused user base",
+        "highlights": [
+          "100% of registered users have logged in",
+          "66.7% of users have connected bank accounts",
+          "7 users currently have active sessions",
+          "2.3 average sessions per user"
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-08-29T06:33:59.285Z",
+      "metrics": {
+        "totalUsers": 3,
+        "usersWhoLoggedIn": 3,
+        "loginRate": 100,
+        "activeSessions": 7,
+        "usersWithPlaidItems": 2,
+        "engagementRate": 66.7,
+        "totalSessions": 7,
+        "expiredSessions": 0,
+        "avgSessionsPerUser": 2.3
+      },
+      "users": [
+        {
+          "email": "mattblank11@gmail.com",
+          "joinDate": "8/28/2025",
+          "status": "✅ Logged in",
+          "bankConnections": 1
+        },
+        {
+          "email": "sethkramer12@gmail.com",
+          "joinDate": "8/28/2025",
+          "status": "✅ Logged in",
+          "bankConnections": 0
+        },
+        {
+          "email": "mylesethan93@gmail.com",
+          "joinDate": "8/27/2025",
+          "status": "✅ Logged in",
+          "bankConnections": 3
+        }
+      ],
+      "summary": {
+        "description": "Small but highly engaged user base",
+        "highlights": [
+          "100% of registered users have logged in",
+          "66.7% of users have connected bank accounts",
+          "All users currently have active sessions",
+          "2.3 average sessions per user"
+        ]
+      }
+    }
+  ]
+}
