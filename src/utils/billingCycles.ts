@@ -534,7 +534,7 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
           startISO: cycle.startDate.toISOString(),
           end: new Date(cycle.endDate).toDateString(),
           endISO: cycle.endDate.toISOString(),
-          valid: new Date(cycle.startDate) >= cardOpenDate && new Date(cycle.endDate) >= cardOpenDate
+          valid: new Date(cycle.endDate) >= cardOpenDate
         }));
         
         console.log(`   Cycle validation details:`, beforeFiltering);
@@ -542,12 +542,14 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
         filteredCycles = cycles.filter(cycle => {
           const cycleStart = new Date(cycle.startDate);
           const cycleEnd = new Date(cycle.endDate);
-          const isValid = cycleStart >= cardOpenDate && cycleEnd >= cardOpenDate;
+          // A cycle is valid if it ends after the card open date (overlaps with card opening)
+          // This allows partial cycles where the start is before open date but end is after
+          const isValid = cycleEnd >= cardOpenDate;
           
           if (!isValid) {
-            console.log(`   ❌ FILTERING OUT: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()} (starts before: ${cycleStart < cardOpenDate}, ends before: ${cycleEnd < cardOpenDate})`);
+            console.log(`   ❌ FILTERING OUT: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()} (cycle ends before card opened: ${cycleEnd < cardOpenDate})`);
           } else {
-            console.log(`   ✅ KEEPING: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()}`);
+            console.log(`   ✅ KEEPING: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()} (cycle overlaps with card opening)`);
           }
           
           return isValid;
