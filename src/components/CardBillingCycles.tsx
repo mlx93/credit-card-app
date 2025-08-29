@@ -534,8 +534,6 @@ function SortableCard({
 }
 
 export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onOrderChange, compactMode = false }: CardBillingCyclesProps) {
-  // Debug validation
-  console.log('CardBillingCycles rendered with compactMode:', compactMode);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [cardOrder, setCardOrder] = useState<string[]>([]);
 
@@ -762,8 +760,8 @@ function CardContent({
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-gray-900">{cardName}</h3>
                 {isCapitalOneCard(cardName) && (
-                  <span className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-full font-medium">
-                    90-day limit
+                  <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-md font-medium">
+                    90d
                   </span>
                 )}
               </div>
