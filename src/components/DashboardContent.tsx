@@ -152,9 +152,27 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       
       // Check if any connections require reconnection
       const needsReconnection = syncResult.results?.some((result: any) => result.requiresReconnection);
+      const autoReconnectAvailable = syncResult.results?.some((result: any) => result.canAutoReconnect);
+      
       if (needsReconnection) {
         console.log('⚠️ Some connections need to be reconnected');
-        alert('Some of your bank connections have expired and need to be reconnected. Please use the reconnect buttons on your cards or add them again with "Connect Credit Cards".');
+        
+        if (autoReconnectAvailable) {
+          console.log('🔄 Auto-reconnection available, triggering reconnect flow...');
+          // Auto-trigger reconnection for expired cards
+          const expiredResults = syncResult.results?.filter((result: any) => result.requiresReconnection) || [];
+          
+          for (const expiredResult of expiredResults) {
+            console.log(`Auto-reconnecting ${expiredResult.itemId}...`);
+            try {
+              await handleCardReconnect(expiredResult.itemId);
+            } catch (error) {
+              console.error(`Auto-reconnection failed for ${expiredResult.itemId}:`, error);
+            }
+          }
+        } else {
+          alert('Some of your bank connections have expired and need to be reconnected. Please use the reconnect buttons on your cards or add them again with "Connect Credit Cards".');
+        }
       }
       
       console.log('Fetching user data after sync...');
@@ -241,7 +259,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   };
 
-  // Check connection health on initial load
+  // Check connection health on initial load and auto-fix if possible
   const checkConnectionHealth = async () => {
     if (!isLoggedIn) return;
 
@@ -249,14 +267,21 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       const response = await fetch('/api/user/credit-cards');
       if (response.ok) {
         const { creditCards: cards } = await response.json();
-        const hasExpiredConnections = cards.some((card: any) => 
+        const expiredConnections = cards.filter((card: any) => 
           card.plaidItem && ['expired', 'error'].includes(card.plaidItem.status)
         );
 
-        if (hasExpiredConnections) {
-          console.log('⚠️ Expired connections detected on page load');
-          // Could show a banner or notification here instead of alert
-          // For now, just log it - the warning triangles will show on cards
+        if (expiredConnections.length > 0) {
+          console.log(`⚠️ ${expiredConnections.length} expired connections detected on page load`);
+          
+          // Auto-trigger refresh to try to reconnect expired connections
+          console.log('🔄 Auto-triggering refresh to reconnect expired connections...');
+          
+          // Wait a moment for the page to fully load, then trigger refresh
+          setTimeout(async () => {
+            console.log('🔄 Starting auto-refresh for expired connections...');
+            await handleRefresh();
+          }, 2000); // 2 second delay to let page load complete
         }
       }
     } catch (error) {

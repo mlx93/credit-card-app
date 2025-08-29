@@ -98,14 +98,63 @@ export async function POST(request: NextRequest) {
         // Check for specific Plaid connection errors
         const errorCode = error.error_code || error?.response?.data?.error_code || 'SYNC_ERROR';
         const errorType = error.error_type || error?.response?.data?.error_type;
-        const isConnectionError = ['ITEM_LOGIN_REQUIRED', 'ACCESS_NOT_GRANTED', 'INVALID_ACCESS_TOKEN'].includes(errorCode);
+        const statusCode = error?.response?.status || 0;
         
-        console.log('Error analysis:', {
+        // Enhanced error detection - include 400 status codes and more error types
+        const isConnectionError = (
+          ['ITEM_LOGIN_REQUIRED', 'ACCESS_NOT_GRANTED', 'INVALID_ACCESS_TOKEN', 'ITEM_NOT_FOUND'].includes(errorCode) ||
+          statusCode === 400 ||
+          error.message?.includes('400') ||
+          error.message?.toLowerCase().includes('invalid') ||
+          error.message?.toLowerCase().includes('expired')
+        );
+        
+        console.log('Enhanced error analysis:', {
           errorCode,
           errorType,
+          statusCode,
           isConnectionError,
-          statusCode: error?.response?.status
+          errorMessage: error.message,
+          shouldReconnect: isConnectionError
         });
+        
+        // If it's a connection error, try auto-reconnection ONCE
+        if (isConnectionError && !item.errorCode) { // Only try if this isn't a repeated failure
+          console.log(`🔄 Auto-reconnecting ${item.institutionName} due to connection error...`);
+          
+          try {
+            // Import plaidService for reconnection
+            const { plaidService } = await import('@/services/plaid');
+            
+            // Create update link token and mark for manual reconnection
+            // We can't fully auto-reconnect without user interaction, but we can prepare
+            await plaidService.createUpdateLinkToken(item.userId, item.itemId);
+            
+            console.log(`✅ Update link token created for ${item.institutionName}`);
+            
+            // Mark as requiring reconnection but provide the means to do it
+            await prisma.plaidItem.update({
+              where: { itemId: item.itemId },
+              data: {
+                status: 'expired',
+                errorCode: errorCode,
+                errorMessage: 'Connection expired - reconnection required'
+              }
+            });
+            
+            return { 
+              itemId: item.itemId, 
+              status: 'error', 
+              error: 'Connection expired',
+              requiresReconnection: true,
+              canAutoReconnect: true
+            };
+            
+          } catch (reconnectError) {
+            console.error(`Failed to prepare reconnection for ${item.institutionName}:`, reconnectError);
+            // Fall through to regular error handling
+          }
+        }
         
         // Update connection status based on error type
         const newStatus = isConnectionError ? 'expired' : 'error';
