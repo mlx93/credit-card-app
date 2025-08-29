@@ -126,7 +126,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     historicalDueDate.setDate(historicalDueDate.getDate() + 21);
     
     // Historical cycles that have ended should be treated as having statement balances
-    // This will allow them to show "Paid" status in the frontend
+    // With PRODUCT_STATEMENTS consent, we can get actual historical statement data
     const isCompletedCycle = historicalCycleEnd < now;
     console.log('Creating historical cycle:', {
       cycleStart: historicalCycleStart.toDateString(),

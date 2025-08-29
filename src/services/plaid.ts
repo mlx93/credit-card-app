@@ -37,7 +37,7 @@ class PlaidServiceImpl implements PlaidService {
         client_user_id: userId,
       },
       client_name: "Credit Card Tracker",
-      products: ['liabilities', 'transactions'],
+      products: ['liabilities', 'transactions', 'statements'],
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
@@ -399,8 +399,19 @@ class PlaidServiceImpl implements PlaidService {
           });
         }
 
-        // Skip historical statement sync - requires PRODUCT_STATEMENTS consent
-        console.log(`=== STATEMENT SYNC SKIPPED for ${account.name} (no PRODUCT_STATEMENTS consent) ===`);
+        // Sync historical statements now that we have PRODUCT_STATEMENTS consent
+        console.log(`=== STATEMENT SYNC START for ${account.name} ===`);
+        try {
+          const statements = await this.getStatements(accessToken, account.account_id);
+          console.log(`Found ${statements.length} statements for ${account.name}`);
+          
+          for (const statement of statements) {
+            await this.storeHistoricalStatement(statement, account.account_id, plaidItem.id);
+          }
+          console.log(`=== STATEMENT SYNC COMPLETED for ${account.name} ===`);
+        } catch (error) {
+          console.error(`=== STATEMENT SYNC ERROR for ${account.name}:`, error);
+        }
 
         if (liability?.aprs) {
           await prisma.aPR.deleteMany({
@@ -571,7 +582,7 @@ class PlaidServiceImpl implements PlaidService {
         client_user_id: userId,
       },
       client_name: "Credit Card Tracker",
-      products: ['liabilities', 'transactions'],
+      products: ['liabilities', 'transactions', 'statements'],
       country_codes: ['US'],
       language: 'en',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
