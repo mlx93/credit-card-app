@@ -36,9 +36,9 @@ export async function POST() {
         billingCycles: {
           orderBy: { startDate: 'asc' },
           include: {
-            _count: {
+            transactions: {
               select: {
-                transactions: true
+                id: true
               }
             }
           }
@@ -66,11 +66,11 @@ export async function POST() {
     // Analyze existing cycles to see which ones have transaction data
     console.log('=== EXISTING CYCLES ANALYSIS ===');
     const cyclesWithTransactions = boaCard.billingCycles
-      .filter(cycle => cycle._count.transactions > 0)
+      .filter(cycle => cycle.transactions.length > 0)
       .map(cycle => ({
         startDate: cycle.startDate.toDateString(),
         endDate: cycle.endDate.toDateString(),
-        transactionCount: cycle._count.transactions,
+        transactionCount: cycle.transactions.length,
         totalSpend: cycle.totalSpend
       }));
 
@@ -78,7 +78,7 @@ export async function POST() {
 
     // Find the earliest cycle that has transactions (this should be preserved)
     const earliestCycleWithTransactions = boaCard.billingCycles
-      .filter(cycle => cycle._count.transactions > 0)
+      .filter(cycle => cycle.transactions.length > 0)
       .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0];
 
     if (!earliestCycleWithTransactions) {
@@ -88,7 +88,7 @@ export async function POST() {
     console.log('Earliest cycle with transactions:', {
       startDate: earliestCycleWithTransactions.startDate.toDateString(),
       endDate: earliestCycleWithTransactions.endDate.toDateString(),
-      transactionCount: earliestCycleWithTransactions._count.transactions,
+      transactionCount: earliestCycleWithTransactions.transactions.length,
       totalSpend: earliestCycleWithTransactions.totalSpend
     });
 
