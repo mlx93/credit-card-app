@@ -82,7 +82,6 @@ export async function GET() {
         }
       },
       orderBy: { startDate: 'desc' },
-      take: 10,
       include: {
         creditCard: {
           select: {
@@ -182,7 +181,7 @@ export async function GET() {
           name: t.name,
           amount: t.amount
         })),
-        recentBillingCycles: billingCycles.slice(0, 5).map(cycle => ({
+        allBillingCycles: billingCycles.map(cycle => ({
           card: cycle.creditCard.name,
           period: `${new Date(cycle.startDate).toLocaleDateString()} - ${new Date(cycle.endDate).toLocaleDateString()}`,
           totalSpend: cycle.totalSpend,
