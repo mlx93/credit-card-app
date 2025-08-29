@@ -263,26 +263,25 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 </button>
                 <button 
                   onClick={async () => {
-                    console.log('Full Sync button clicked - starting...');
+                    console.log('Regenerate Cycles button clicked - starting...');
                     try {
-                      // First do a full sync to get all transactions
-                      const syncResponse = await fetch('/api/sync', { method: 'POST' });
-                      console.log('Full sync response:', syncResponse.status);
+                      const response = await fetch('/api/debug/regenerate-cycles', { method: 'POST' });
+                      const result = await response.json();
                       
-                      if (syncResponse.ok) {
-                        // Then refresh the data
+                      if (response.ok) {
+                        console.log('Regenerate Cycles SUCCESS:', result);
                         await fetchUserData();
-                        console.log('Full sync completed - historical data should be restored');
+                        console.log('Historical cycles should be restored');
                       } else {
-                        console.error('Full sync FAILED:', syncResponse.status);
+                        console.error('Regenerate Cycles FAILED:', response.status, result);
                       }
                     } catch (error) {
-                      console.error('Full sync ERROR:', error);
+                      console.error('Regenerate Cycles ERROR:', error);
                     }
                   }}
-                  className="bg-green-100 hover:bg-green-200 text-green-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
+                  className="bg-purple-100 hover:bg-purple-200 text-purple-900 font-medium py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap"
                 >
-                  Full Sync
+                  Rebuild Cycles
                 </button>
               </>
             ) : (
