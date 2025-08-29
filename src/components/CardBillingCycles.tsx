@@ -101,7 +101,31 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [] }:
       const cycleEnd = new Date(c.endDate);
       return today >= cycleStart && today <= cycleEnd;
     });
-    const openCycleSpend = openCycle?.totalSpend || 0;
+    
+    // Use the same balance-based calculation as billingCycles.ts for current cycle spend
+    // This ensures we get the same $383 value that's displayed in the UI
+    let openCycleSpend = 0;
+    if (openCycle && new Date(openCycle.endDate) > today) {
+      // Current cycle: committed charges = current balance - last statement balance
+      // We need to find the most recent closed cycle to get the last statement balance
+      const closedCycles = allCycles.filter(c => 
+        c.statementBalance && c.statementBalance > 0
+      ).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+      
+      const mostRecentClosedCycle = closedCycles[0];
+      const lastStatementBalance = Math.abs(mostRecentClosedCycle?.statementBalance || 0);
+      openCycleSpend = Math.max(0, currentBalance - lastStatementBalance);
+      
+      console.log('Current cycle spend calculation:', {
+        currentBalance,
+        lastStatementBalance,
+        openCycleSpend: `${currentBalance} - ${lastStatementBalance} = ${openCycleSpend}`,
+        mostRecentClosedCycleEnd: mostRecentClosedCycle ? new Date(mostRecentClosedCycle.endDate).toDateString() : 'None'
+      });
+    } else {
+      // For completed cycles, use the stored totalSpend
+      openCycleSpend = openCycle?.totalSpend || 0;
+    }
     
     console.log('Open cycle detection:', {
       today: today.toDateString(),
