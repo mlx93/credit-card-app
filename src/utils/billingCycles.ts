@@ -200,23 +200,32 @@ async function createOrUpdateCycle(
     }
   }
   
-  // For closed cycles, prefer transaction-based spend but validate against statement balance
-  if (hasStatementBalance && creditCard.lastStatementBalance) {
+  // For closed cycles, only use the actual statement balance for the EXACT statement cycle
+  // For all other historical cycles, use transaction-based totals
+  const lastStatementDate = creditCard.lastStatementIssueDate ? new Date(creditCard.lastStatementIssueDate) : null;
+  const isExactStatementCycle = lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime();
+  
+  if (hasStatementBalance && creditCard.lastStatementBalance && isExactStatementCycle) {
+    // Only for the exact statement cycle, use the actual statement balance
     const statementAmount = Math.abs(creditCard.lastStatementBalance);
-    const difference = Math.abs(totalSpend - statementAmount);
     
-    console.log('Closed cycle spend validation for', creditCard.name, {
+    console.log('Statement cycle validation for', creditCard.name, {
+      cycleEnd: cycleEnd.toDateString(),
+      statementDate: lastStatementDate?.toDateString(),
       transactionSpend: totalSpend,
       statementBalance: statementAmount,
-      difference,
       transactionCount: cycleTransactions.length
     });
     
-    // If we have transactions, use transaction total. If no transactions or big discrepancy, use statement balance
-    if (cycleTransactions.length === 0 || difference > statementAmount * 0.1) { // 10% tolerance
-      console.log('Using statement balance due to', cycleTransactions.length === 0 ? 'no transactions' : 'large discrepancy');
-      totalSpend = statementAmount;
-    }
+    // For the statement cycle, prefer the actual statement balance
+    totalSpend = statementAmount;
+  } else if (hasStatementBalance) {
+    // For all other historical cycles, keep the transaction-based total
+    console.log('Historical cycle using transaction total for', creditCard.name, {
+      cycleEnd: cycleEnd.toDateString(),
+      transactionBasedTotal: totalSpend,
+      transactionCount: cycleTransactions.length
+    });
   }
 
   // Debug logging for current cycles
@@ -266,13 +275,15 @@ async function createOrUpdateCycle(
       console.log('✅ Using actual statement balance for statement cycle:', {
         cycleEnd: cycleEnd.toDateString(),
         statementDate: lastStatementDate.toDateString(),
-        statementBalance
+        statementBalance,
+        transactionTotal: totalSpend
       });
     } else {
-      // This is a historical completed cycle - use calculated spend as statement balance
-      statementBalance = totalSpend > 0 ? totalSpend : null;
-      minimumPayment = totalSpend > 0 ? Math.max(25, totalSpend * 0.02) : null; // Estimate 2% minimum payment
-      console.log('📊 Using calculated spend as statement balance for historical cycle:', {
+      // This is a historical completed cycle - ALWAYS use calculated spend from transactions
+      // Don't use the last statement balance for historical cycles
+      statementBalance = totalSpend > 0 ? totalSpend : 0; // Use 0 instead of null for empty cycles
+      minimumPayment = totalSpend > 0 ? Math.max(25, totalSpend * 0.02) : 0; // Estimate 2% minimum payment
+      console.log('📊 Using transaction-based total for historical cycle:', {
         cycleEnd: cycleEnd.toDateString(),
         totalSpend,
         statementBalance,
@@ -298,15 +309,18 @@ async function createOrUpdateCycle(
       },
     });
   } else {
-    // Update existing cycle if it needs statement balance
-    const needsUpdate = (hasStatementBalance && !existingCycle.statementBalance && statementBalance);
+    // Always update existing cycles to ensure transaction-based totals are current
+    // This is important when we have new transaction data
+    const needsUpdate = true; // Always update to reflect current transaction totals
     
     if (needsUpdate) {
-      console.log('Updating existing cycle with statement balance:', {
+      console.log('Updating existing cycle with current data:', {
         cycleId: existingCycle.id,
         cycleEnd: cycleEnd.toDateString(),
         oldStatementBalance: existingCycle.statementBalance,
-        newStatementBalance: statementBalance
+        newStatementBalance: statementBalance,
+        totalSpend: totalSpend,
+        transactionCount: cycleTransactions?.length || 0
       });
       
       existingCycle = await prisma.billingCycle.update({
