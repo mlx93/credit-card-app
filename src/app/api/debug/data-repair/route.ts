@@ -3,6 +3,27 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
+// Helper function to identify payment transactions based on transaction name
+function isPaymentTransaction(transactionName: string): boolean {
+  const lowerName = transactionName.toLowerCase();
+  
+  // Common payment indicators across different banks
+  const paymentIndicators = [
+    'pymt',           // Capital One payments
+    'payment',        // Amex and other banks
+    'autopay',        // Automatic payments
+    'online payment', // Online payments
+    'mobile payment', // Mobile app payments
+    'phone payment',  // Phone payments
+    'bank payment',   // Bank transfers
+    'ach payment',    // ACH payments
+    'electronic payment', // Electronic payments
+    'web payment',    // Web payments
+  ];
+  
+  return paymentIndicators.some(indicator => lowerName.includes(indicator));
+}
+
 export async function POST() {
   try {
     console.log('🔧 DATA REPAIR ENDPOINT CALLED');
@@ -58,7 +79,13 @@ export async function POST() {
           t.date >= cycleStart && t.date <= effectiveEndDate
         );
         
-        const transactionBasedSpend = cycleTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const transactionBasedSpend = cycleTransactions.reduce((sum, t) => {
+          // Exclude payment transactions, include charges and refunds
+          if (isPaymentTransaction(t.name)) {
+            return sum; // Skip payments
+          }
+          return sum + t.amount; // Include charges (positive) and refunds (negative)
+        }, 0);
         
         // Calculate correct spend value
         let correctSpend = transactionBasedSpend;
