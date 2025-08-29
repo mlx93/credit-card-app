@@ -182,17 +182,31 @@ export async function POST(request: NextRequest) {
     
     console.log('All sync promises completed. Results:', results);
     
+    // Log detailed sync results
+    console.log('=== DETAILED SYNC RESULTS ===');
+    for (const result of results) {
+      if (result.status === 'success') {
+        console.log(`✅ ${result.itemId}: Successfully synced`);
+      } else {
+        console.log(`❌ ${result.itemId}: ${result.error}`);
+      }
+    }
+    
     // Regenerate billing cycles after successful sync
-    console.log('Regenerating billing cycles after sync...');
+    console.log('=== REGENERATING BILLING CYCLES ===');
     try {
       const regenResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/billing-cycles/regenerate`, {
         method: 'POST'
       });
       
       if (regenResponse.ok) {
+        const regenData = await regenResponse.json();
         console.log('✅ Billing cycles regenerated successfully after sync');
+        console.log('Regeneration results:', regenData);
       } else {
         console.warn('⚠️ Billing cycle regeneration failed after sync');
+        const errorText = await regenResponse.text();
+        console.error('Regeneration error:', errorText);
       }
     } catch (regenError) {
       console.error('Error regenerating billing cycles after sync:', regenError);
@@ -200,10 +214,18 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('=== SYNC ROUTE COMPLETED SUCCESSFULLY ===');
+    console.log(`Total items synced: ${results.length}`);
+    console.log(`Successful syncs: ${results.filter(r => r.status === 'success').length}`);
+    console.log(`Failed syncs: ${results.filter(r => r.status === 'error').length}`);
     
     return NextResponse.json({ 
       message: 'Sync completed',
-      results 
+      results,
+      summary: {
+        total: results.length,
+        success: results.filter(r => r.status === 'success').length,
+        errors: results.filter(r => r.status === 'error').length
+      }
     });
   } catch (error) {
     console.error('=== SYNC ROUTE ERROR ===');
