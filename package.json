@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "npm run security:audit && prisma generate && prisma db push && next build",
+    "build": "npm run security:audit && prisma generate && next build",
+    "build:with-db": "npm run security:audit && prisma generate && prisma db push && next build",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
