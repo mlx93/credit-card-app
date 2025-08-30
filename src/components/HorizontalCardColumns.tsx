@@ -35,7 +35,7 @@ interface BillingCycle {
   dueDate?: string;
   totalSpend: number;
   paymentStatus?: string;
-  lastStatementBalance?: number;
+  statementBalance?: number;
 }
 
 interface HorizontalCardColumnsProps {
@@ -236,7 +236,7 @@ export function HorizontalCardColumns({
         // Check if card has recently closed cycle (with statement balance)
         const hasRecentClosedCycle = cardCycles.some(cycle => {
           const end = new Date(cycle.endDate);
-          const hasStatement = cycle.lastStatementBalance && cycle.lastStatementBalance > 0;
+          const hasStatement = cycle.statementBalance && cycle.statementBalance > 0;
           const endedBeforeToday = end < today;
           return hasStatement && endedBeforeToday;
         });
