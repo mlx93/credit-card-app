@@ -749,10 +749,6 @@ function CardContent({
   let historicalCycles = [];
   
   if (sortedCycles.length > 0) {
-    // Minimal debug logging for specific cards
-    if (cardName.toLowerCase().includes('customized') || cardName.toLowerCase().includes('platinum')) {
-      console.log(`🔍 ${cardName}: ${sortedCycles.length} total cycles`);
-    }
     
     // Find current ongoing cycle (cycle that includes today)
     const currentCycle = sortedCycles.find(c => {
@@ -789,10 +785,6 @@ function CardContent({
     const shownCycleIds = new Set(recentCycles.map(c => c.id));
     historicalCycles = sortedCycles.filter(c => !shownCycleIds.has(c.id));
     
-    // Show historical cycle count for debugging
-    if (cardName.toLowerCase().includes('customized') || cardName.toLowerCase().includes('platinum')) {
-      console.log(`📊 ${cardName}: ${historicalCycles.length} historical cycles`);
-    }
   }
   
   const allRecentCycles = recentCycles;
