@@ -625,12 +625,34 @@ function CardContent({
   
   if (sortedCycles.length > 0) {
     
+    // Debug for Amex card specifically
+    if (cardName.includes('Platinum')) {
+      console.log('🔍 AMEX FRONTEND CLASSIFICATION:', {
+        cardName,
+        totalCycles: sortedCycles.length,
+        today: today.toDateString(),
+        allCycles: sortedCycles.map(c => ({
+          start: new Date(c.startDate).toDateString(),
+          end: new Date(c.endDate).toDateString(),
+          hasStatement: !!(c.statementBalance && c.statementBalance > 0),
+          endedBeforeToday: new Date(c.endDate) < today,
+          includesHEOday: today >= new Date(c.startDate) && today <= new Date(c.endDate)
+        }))
+      });
+    }
+    
     // Find current ongoing cycle (cycle that includes today)
     const currentCycle = sortedCycles.find(c => {
       const start = new Date(c.startDate);
       const end = new Date(c.endDate);
       const includesHEOday = today >= start && today <= end;
       
+      if (cardName.includes('Platinum') && includesHEOday) {
+        console.log('✅ AMEX CURRENT CYCLE:', {
+          start: start.toDateString(),
+          end: end.toDateString()
+        });
+      }
       
       return includesHEOday;
     });
@@ -642,6 +664,12 @@ function CardContent({
       const endedBeforeToday = end < today;
       const qualifies = hasStatement && endedBeforeToday;
       
+      if (cardName.includes('Platinum') && qualifies) {
+        console.log('✅ AMEX MOST RECENT CLOSED:', {
+          end: end.toDateString(),
+          statementBalance: c.statementBalance
+        });
+      }
       
       return qualifies;
     });
@@ -659,6 +687,26 @@ function CardContent({
     // All other cycles are historical
     const shownCycleIds = new Set(recentCycles.map(c => c.id));
     historicalCycles = sortedCycles.filter(c => !shownCycleIds.has(c.id));
+    
+    // Debug final classification for Amex
+    if (cardName.includes('Platinum')) {
+      console.log('🎯 AMEX FINAL CLASSIFICATION:', {
+        currentCycleId: currentCycle?.id,
+        mostRecentClosedId: mostRecentClosedCycle?.id,
+        recentCyclesCount: recentCycles.length,
+        historicalCyclesCount: historicalCycles.length,
+        recentCycles: recentCycles.map(c => ({
+          start: new Date(c.startDate).toDateString(),
+          end: new Date(c.endDate).toDateString(),
+          hasStatement: !!(c.statementBalance && c.statementBalance > 0)
+        })),
+        historicalCycles: historicalCycles.map(c => ({
+          start: new Date(c.startDate).toDateString(),
+          end: new Date(c.endDate).toDateString(),
+          hasStatement: !!(c.statementBalance && c.statementBalance > 0)
+        }))
+      });
+    }
     
   }
   
@@ -701,7 +749,7 @@ function CardContent({
                 });
                 onToggleExpand();
               }}
-              className="flex items-center text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 -mb-px"
+              className="flex items-center text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 mb-2"
             >
               {isExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}
               {historical.length} older cycle{historical.length !== 1 ? 's' : ''}
