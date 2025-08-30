@@ -90,7 +90,7 @@ function SortableCardColumn({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex-shrink-0 w-96 ${isDragging ? 'z-50' : ''}`}
+      className={`flex-shrink-0 w-[420px] ${isDragging ? 'z-50' : ''}`}
     >
       {/* iOS-Inspired Card Column */}
       <div className="relative">
@@ -203,7 +203,7 @@ export function HorizontalCardColumns({
     })
   );
 
-  // Initialize card order and expand all cards by default
+  // Initialize card order and expand cards with current/recent cycles by default
   useEffect(() => {
     const cardIds = cards.map(card => card.id);
     
@@ -219,10 +219,37 @@ export function HorizontalCardColumns({
         onOrderChange?.(cardIds);
       }
       
-      // Expand all cards by default
-      setExpandedCards(new Set(cardIds));
+      // Auto-expand cards with current or recently closed cycles
+      const cardsToExpand = new Set<string>();
+      const today = new Date();
+      
+      cardIds.forEach(cardId => {
+        const cardCycles = getCardCycles(cardId);
+        
+        // Check if card has current ongoing cycle
+        const hasCurrentCycle = cardCycles.some(cycle => {
+          const start = new Date(cycle.startDate);
+          const end = new Date(cycle.endDate);
+          return today >= start && today <= end;
+        });
+        
+        // Check if card has recently closed cycle (with statement balance)
+        const hasRecentClosedCycle = cardCycles.some(cycle => {
+          const end = new Date(cycle.endDate);
+          const hasStatement = cycle.lastStatementBalance && cycle.lastStatementBalance > 0;
+          const endedBeforeToday = end < today;
+          return hasStatement && endedBeforeToday;
+        });
+        
+        // Expand cards that have current cycles or recently closed cycles
+        if (hasCurrentCycle || hasRecentClosedCycle) {
+          cardsToExpand.add(cardId);
+        }
+      });
+      
+      setExpandedCards(cardsToExpand);
     }
-  }, [cards, initialCardOrder, cardOrder.length, onOrderChange]);
+  }, [cards, initialCardOrder, cardOrder.length, onOrderChange, cycles]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -298,7 +325,7 @@ export function HorizontalCardColumns({
       {/* Premium gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-purple-50/30 to-pink-50/50 rounded-3xl"></div>
       
-      <div className="relative p-4">
+      <div className="relative p-6">
         <DndContext 
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -308,7 +335,7 @@ export function HorizontalCardColumns({
             items={cardOrder}
             strategy={horizontalListSortingStrategy}
           >
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-premium min-h-[300px]">
+            <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-premium min-h-[300px]">
               {orderedCards.map((card, index) => {
                 const colorIndex = getCardColorIndex(card.name, card.id);
                 return (

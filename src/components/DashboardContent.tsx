@@ -434,10 +434,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-6">
-        {/* Header with title and Quick Actions side by side */}
-        <div className="flex justify-between items-start mb-4">
-          <div>
+      <div className="max-w-none mx-auto px-8 py-6">
+        {/* Header with title and Quick Actions */}
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start mb-4">
+          <div className="mb-4 lg:mb-0">
             <h1 className="text-3xl font-bold text-gray-900 mb-1">Credit Card Dashboard</h1>
             <p className="text-gray-600 text-sm">
               {isLoggedIn 
@@ -447,7 +447,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             </p>
           </div>
           
-          {/* Quick Actions - horizontal on same line as title */}
+          {/* Quick Actions - moved to left side for better visibility */}
           <div className="flex items-center space-x-3">
             {isLoggedIn ? (
               <>
@@ -477,8 +477,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           </div>
         </div>
         
-        {/* Full-width Header Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Header Metrics - utilizing more horizontal space */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-6 max-w-6xl">
           <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
               <TrendingUp className="h-7 w-7 text-green-600 mr-3" />

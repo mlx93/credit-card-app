@@ -604,6 +604,43 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
     }
   }, [cyclesByCard, cards]); // Removed propCardOrder dependency to prevent re-syncing
 
+  // Auto-expand cards with current or recently closed cycles
+  useEffect(() => {
+    const cardsToExpand = new Set<string>();
+    const today = new Date();
+    
+    Object.keys(cyclesByCard).forEach(cardName => {
+      const cardCycles = cyclesByCard[cardName];
+      const sortedCycles = [...cardCycles].sort((a, b) => 
+        new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
+      );
+      
+      // Check if card has current ongoing cycle
+      const hasCurrentCycle = sortedCycles.some(c => {
+        const start = new Date(c.startDate);
+        const end = new Date(c.endDate);
+        return today >= start && today <= end;
+      });
+      
+      // Check if card has recently closed cycle (with statement balance)
+      const hasRecentClosedCycle = sortedCycles.some(c => {
+        const end = new Date(c.endDate);
+        const hasStatement = c.statementBalance && c.statementBalance > 0;
+        const endedBeforeToday = end < today;
+        return hasStatement && endedBeforeToday;
+      });
+      
+      // Expand cards that have current cycles or recently closed cycles
+      if (hasCurrentCycle || hasRecentClosedCycle) {
+        cardsToExpand.add(cardName);
+      }
+    });
+    
+    if (cardsToExpand.size > 0) {
+      setExpandedCards(cardsToExpand);
+    }
+  }, [cyclesByCard]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
