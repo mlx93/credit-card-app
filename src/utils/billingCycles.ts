@@ -61,8 +61,6 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     throw new Error('Credit card not found');
   }
 
-  // Minimal transaction debug
-  console.log(`🔄 Calculating cycles for ${creditCard.name} (${creditCard.transactions?.length || 0} transactions)`);
 
   const cycles: BillingCycleData[] = [];
   
@@ -494,9 +492,6 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
       let filteredCycles = cycles;
       if (card.openDate) {
         const cardOpenDate = new Date(card.openDate);
-        console.log(`🗓️ FILTERING CYCLES FOR ${card.name}:`);
-        console.log(`   Card open date: ${cardOpenDate.toDateString()} (${cardOpenDate.toISOString()})`);
-        console.log(`   Total cycles before filtering: ${cycles.length}`);
         
         const beforeFiltering = cycles.map(cycle => ({
           start: new Date(cycle.startDate).toDateString(),
@@ -506,7 +501,6 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
           valid: new Date(cycle.endDate) >= cardOpenDate
         }));
         
-        console.log(`   Cycle validation details:`, beforeFiltering);
         
         filteredCycles = cycles.filter(cycle => {
           const cycleStart = new Date(cycle.startDate);
@@ -515,11 +509,6 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
           // This allows partial cycles where the start is before open date but end is after
           const isValid = cycleEnd >= cardOpenDate;
           
-          if (!isValid) {
-            console.log(`   ❌ FILTERING OUT: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()} (cycle ends before card opened: ${cycleEnd < cardOpenDate})`);
-          } else {
-            console.log(`   ✅ KEEPING: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()} (cycle overlaps with card opening)`);
-          }
           
           return isValid;
         });
