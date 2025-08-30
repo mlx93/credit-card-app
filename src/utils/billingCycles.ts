@@ -61,6 +61,39 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     throw new Error('Credit card not found');
   }
 
+  // Debug transaction association
+  console.log(`=== BILLING CYCLE TRANSACTION DEBUG for ${creditCard.name} ===`);
+  console.log(`Credit card ID: ${creditCard.id}`);
+  console.log(`Credit card accountId: ${creditCard.accountId}`);
+  console.log(`Transactions linked to this credit card: ${creditCard.transactions?.length || 0}`);
+  
+  // Check for transactions in database that might not be linked
+  const allTransactionsForItem = await prisma.transaction.findMany({
+    where: { plaidItemId: creditCard.plaidItemId },
+    select: {
+      id: true,
+      transactionId: true,
+      creditCardId: true,
+      name: true,
+      amount: true,
+      date: true
+    },
+    orderBy: { date: 'desc' },
+    take: 5
+  });
+  
+  console.log(`Total transactions for this Plaid item: ${allTransactionsForItem.length}`);
+  console.log('Sample transactions for this item:', allTransactionsForItem.map(t => ({
+    id: t.id,
+    transactionId: t.transactionId,
+    creditCardId: t.creditCardId,
+    linkedToThisCard: t.creditCardId === creditCard.id,
+    name: t.name,
+    amount: t.amount,
+    date: t.date
+  })));
+  
+  console.log(`=== END BILLING CYCLE TRANSACTION DEBUG ===`);
 
   const cycles: BillingCycleData[] = [];
   
@@ -492,6 +525,9 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
       let filteredCycles = cycles;
       if (card.openDate) {
         const cardOpenDate = new Date(card.openDate);
+        console.log(`🗓️ FILTERING CYCLES FOR ${card.name}:`);
+        console.log(`   Card open date: ${cardOpenDate.toDateString()} (${cardOpenDate.toISOString()})`);
+        console.log(`   Total cycles before filtering: ${cycles.length}`);
         
         const beforeFiltering = cycles.map(cycle => ({
           start: new Date(cycle.startDate).toDateString(),
@@ -501,14 +537,18 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
           valid: new Date(cycle.endDate) >= cardOpenDate
         }));
         
+        console.log(`   Cycle validation details:`, beforeFiltering);
         
         filteredCycles = cycles.filter(cycle => {
           const cycleStart = new Date(cycle.startDate);
           const cycleEnd = new Date(cycle.endDate);
-          // A cycle is valid if it ends after the card open date (overlaps with card opening)
-          // This allows partial cycles where the start is before open date but end is after
           const isValid = cycleEnd >= cardOpenDate;
           
+          if (!isValid) {
+            console.log(`   ❌ FILTERING OUT: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()} (starts before: ${cycleStart < cardOpenDate}, ends before: ${cycleEnd < cardOpenDate})`);
+          } else {
+            console.log(`   ✅ KEEPING: ${cycleStart.toDateString()} to ${cycleEnd.toDateString()}`);
+          }
           
           return isValid;
         });
