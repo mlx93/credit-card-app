@@ -454,12 +454,16 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
   });
 
   const toggleCardExpansion = (cardName: string) => {
+    console.log('toggleCardExpansion called with:', { cardName, currentExpandedCards: Array.from(expandedCards) });
     const newExpanded = new Set(expandedCards);
     if (newExpanded.has(cardName)) {
+      console.log('Removing from expanded:', cardName);
       newExpanded.delete(cardName);
     } else {
+      console.log('Adding to expanded:', cardName);
       newExpanded.add(cardName);
     }
+    console.log('New expanded cards:', Array.from(newExpanded));
     setExpandedCards(newExpanded);
   };
 
@@ -562,6 +566,7 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
             const card = cards.find(c => c.name === cardName);
             const colorIndex = getCardColorIndex(cardName, card?.id);
             const isExpanded = expandedCards.has(cardName);
+            console.log('Rendering card:', { cardName, isExpanded, expandedCardsArray: Array.from(expandedCards) });
 
             return (
               <SortableCard
