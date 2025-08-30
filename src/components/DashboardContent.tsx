@@ -455,7 +455,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                   <button 
                     onClick={handleRefresh}
                     disabled={refreshing}
-                    className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-3 rounded-lg border border-gray-300 hover:border-gray-400 transition-all flex items-center justify-start space-x-2 text-xs whitespace-nowrap relative overflow-hidden group"
+                    className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 pl-2 pr-3 rounded-lg border border-gray-300 hover:border-gray-400 transition-all flex items-center justify-start space-x-2 text-xs whitespace-nowrap relative overflow-hidden group"
                   >
                     <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
                     <span>{refreshing ? refreshStep || 'Refreshing...' : 'Refresh All'}</span>
