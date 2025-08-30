@@ -684,7 +684,15 @@ function CardContent({
           </div>
           {historical.length > 0 && (
             <button
-              onClick={onToggleExpand}
+              onClick={() => {
+                console.log(`🔘 Historical cycles button clicked for ${cardName}:`, {
+                  cardName,
+                  isExpanded,
+                  historicalCount: historical.length,
+                  onToggleExpand: typeof onToggleExpand
+                });
+                onToggleExpand();
+              }}
               className="flex items-center text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
             >
               {isExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}

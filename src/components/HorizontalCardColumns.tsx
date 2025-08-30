@@ -224,13 +224,35 @@ export function HorizontalCardColumns({
       const today = new Date();
       
       cardIds.forEach(cardId => {
+        const card = cards.find(c => c.id === cardId);
         const cardCycles = getCardCycles(cardId);
+        
+        console.log(`🔍 Card expansion check for ${card?.name}:`, {
+          cardId,
+          cycleCount: cardCycles.length,
+          cycles: cardCycles.map(c => ({
+            start: c.startDate,
+            end: c.endDate,
+            hasStatement: !!(c.statementBalance && c.statementBalance > 0),
+            statementBalance: c.statementBalance
+          }))
+        });
         
         // Check if card has current ongoing cycle
         const hasCurrentCycle = cardCycles.some(cycle => {
           const start = new Date(cycle.startDate);
           const end = new Date(cycle.endDate);
-          return today >= start && today <= end;
+          const isCurrent = today >= start && today <= end;
+          
+          if (isCurrent) {
+            console.log(`✅ Found current cycle for ${card?.name}:`, {
+              start: start.toDateString(),
+              end: end.toDateString(),
+              today: today.toDateString()
+            });
+          }
+          
+          return isCurrent;
         });
         
         // Check if card has recently closed cycle (with statement balance)
@@ -238,7 +260,23 @@ export function HorizontalCardColumns({
           const end = new Date(cycle.endDate);
           const hasStatement = cycle.statementBalance && cycle.statementBalance > 0;
           const endedBeforeToday = end < today;
-          return hasStatement && endedBeforeToday;
+          const isRecentClosed = hasStatement && endedBeforeToday;
+          
+          if (isRecentClosed) {
+            console.log(`✅ Found recent closed cycle for ${card?.name}:`, {
+              end: end.toDateString(),
+              statementBalance: cycle.statementBalance,
+              today: today.toDateString()
+            });
+          }
+          
+          return isRecentClosed;
+        });
+        
+        console.log(`Card expansion decision for ${card?.name}:`, {
+          hasCurrentCycle,
+          hasRecentClosedCycle,
+          willExpand: hasCurrentCycle || hasRecentClosedCycle
         });
         
         // Expand cards that have current cycles or recently closed cycles
