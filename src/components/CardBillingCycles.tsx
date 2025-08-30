@@ -454,16 +454,12 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
   });
 
   const toggleCardExpansion = (cardName: string) => {
-    console.log('toggleCardExpansion called with:', { cardName, currentExpandedCards: Array.from(expandedCards) });
     const newExpanded = new Set(expandedCards);
     if (newExpanded.has(cardName)) {
-      console.log('Removing from expanded:', cardName);
       newExpanded.delete(cardName);
     } else {
-      console.log('Adding to expanded:', cardName);
       newExpanded.add(cardName);
     }
-    console.log('New expanded cards:', Array.from(newExpanded));
     setExpandedCards(newExpanded);
   };
 
@@ -511,7 +507,6 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
     // Only initialize once when we have cards but no expanded state set yet
     if (Object.keys(cyclesByCard).length > 0 && expandedCards.size === 0) {
       // Historical cycles default to closed, so keep expandedCards as empty Set
-      console.log('Initializing expandedCards as empty for historical cycles to be closed');
       setExpandedCards(new Set());
     }
   }, [cyclesByCard, expandedCards.size]);
@@ -566,7 +561,6 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
             const card = cards.find(c => c.name === cardName);
             const colorIndex = getCardColorIndex(cardName, card?.id);
             const isExpanded = expandedCards.has(cardName);
-            console.log('Rendering card:', { cardName, isExpanded, expandedCardsArray: Array.from(expandedCards) });
 
             return (
               <SortableCard
@@ -690,10 +684,7 @@ function CardContent({
           </div>
           {historical.length > 0 && (
             <button
-              onClick={() => {
-                console.log('Historical cycles button clicked!', { cardName, isExpanded, historicalLength: historical.length });
-                onToggleExpand();
-              }}
+              onClick={onToggleExpand}
               className="flex items-center text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200"
             >
               {isExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}
