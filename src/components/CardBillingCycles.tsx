@@ -119,31 +119,11 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
       const lastStatementBalance = Math.abs(mostRecentClosedCycle?.statementBalance || 0);
       openCycleSpend = Math.max(0, currentBalance - lastStatementBalance);
       
-      console.log('Current cycle spend calculation:', {
-        currentBalance,
-        lastStatementBalance,
-        openCycleSpend: `${currentBalance} - ${lastStatementBalance} = ${openCycleSpend}`,
-        mostRecentClosedCycleEnd: mostRecentClosedCycle ? new Date(mostRecentClosedCycle.endDate).toDateString() : 'None'
-      });
     } else {
       // For completed cycles, use the stored totalSpend
       openCycleSpend = openCycle?.totalSpend || 0;
     }
     
-    console.log('Open cycle detection:', {
-      today: today.toDateString(),
-      foundOpenCycle: !!openCycle,
-      openCycleDate: openCycle ? `${formatDate(openCycle.startDate)} - ${formatDate(openCycle.endDate)}` : 'None',
-      openCycleSpend,
-      openCycleStatementBalance: openCycle?.statementBalance,
-      allCyclesCount: allCycles.length,
-      cyclesWithSpend: allCycles.filter(c => c.totalSpend > 0).length,
-      allCyclesPreview: allCycles.slice(0, 3).map(c => ({
-        dates: `${formatDate(c.startDate)} - ${formatDate(c.endDate)}`,
-        totalSpend: c.totalSpend,
-        isOpen: today >= new Date(c.startDate) && today <= new Date(c.endDate)
-      }))
-    });
     
     // Find ALL closed cycles (with statement balance), sorted by end date
     const allClosedCycles = allCycles.filter(c => 
@@ -160,54 +140,16 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
     const remainingFromOlderCycles = currentBalance - accountedFor;
     
     // Check if this cycle IS the most recent closed cycle (should show "Due By")
-    console.log('🔍 CYCLE COMPARISON DEBUG:', {
-      cardName: cycle.creditCardName,
-      currentCycleId: cycle.id,
-      currentCycleEndDate: formatDate(cycle.endDate),
-      currentCycleStatementBalance: cycle.statementBalance,
-      mostRecentClosedCycleId: mostRecentClosedCycle?.id,
-      mostRecentClosedCycleEndDate: mostRecentClosedCycle ? formatDate(mostRecentClosedCycle.endDate) : 'None',
-      mostRecentClosedCycleBalance: mostRecentClosedCycle?.statementBalance,
-      idsMatch: mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id,
-      allClosedCyclesCount: allClosedCycles.length,
-      allClosedCyclesPreview: allClosedCycles.slice(0, 3).map(c => ({
-        id: c.id,
-        endDate: formatDate(c.endDate),
-        statementBalance: c.statementBalance
-      }))
-    });
     
     if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
       paymentStatus = 'due';
       paymentAnalysis = `Most recent closed cycle - Due By ${cycle.dueDate ? formatDate(cycle.dueDate) : 'NO DUE DATE'}`;
-      console.log('✅ SETTING DUE STATUS:', {
-        cycleId: cycle.id,
-        cardName: cycle.creditCardName,
-        dueDate: cycle.dueDate,
-        dueDateFormatted: cycle.dueDate ? formatDate(cycle.dueDate) : 'NO DUE DATE',
-        paymentStatus
-      });
     }
     // Step 3: Check if older cycles are paid
     else {
       // If remaining is negative or zero, all older cycles are paid
       const allOlderCyclesPaid = remainingFromOlderCycles <= 0;
       
-      console.log('Payment calculation:', {
-        cardName: cycle.creditCardName,
-        cycleDate: formatDate(cycle.endDate),
-        currentBalance,
-        mostRecentClosedBalance,
-        openCycleSpend,
-        accountedFor: `${mostRecentClosedBalance} + ${openCycleSpend} = ${accountedFor}`,
-        remainingFromOlderCycles: `${currentBalance} - ${accountedFor} = ${remainingFromOlderCycles}`,
-        allOlderCyclesPaid,
-        mostRecentClosedCycleDate: mostRecentClosedCycle ? formatDate(mostRecentClosedCycle.endDate) : 'None',
-        isThisCycleOlder: mostRecentClosedCycle ? 
-          new Date(cycle.endDate) < new Date(mostRecentClosedCycle.endDate) : 
-          false,
-        willTakeIterativePath: !allOlderCyclesPaid
-      });
       
       if (allOlderCyclesPaid) {
         // All historical cycles (except most recent closed) are paid
@@ -235,15 +177,6 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
         let remainingUnpaid = remainingFromOlderCycles; // Start with the outstanding amount
         let foundThisCycle = false;
         
-        console.log('Iterative outstanding detection:', {
-          startingUnpaid: remainingUnpaid,
-          historicalCyclesCount: historicalCycles.length,
-          checkingCycle: formatDate(cycle.endDate),
-          historicalCycleDates: historicalCycles.map(c => formatDate(c.endDate)),
-          mostRecentClosedCycleId: mostRecentClosedCycle?.id,
-          openCycleId: openCycle?.id,
-          thisCheckingCycleId: cycle.id
-        });
         
         // Work through historical cycles from newest to oldest
         for (const historicalCycle of historicalCycles) {
@@ -255,16 +188,6 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
               paymentStatus = 'outstanding';
               paymentAnalysis = `Outstanding - ${formatCurrency(unpaidAmount)} of ${formatCurrency(historicalCycle.statementBalance || 0)} unpaid`;
               
-              console.log('🚨 MARKING CYCLE AS OUTSTANDING:', {
-                cycleDate: formatDate(cycle.endDate),
-                remainingUnpaid,
-                cycleBalance: historicalCycle.statementBalance,
-                unpaidAmount,
-                currentBalance,
-                mostRecentClosedBalance,
-                openCycleSpend,
-                calculationCheck: `${currentBalance} - ${mostRecentClosedBalance} - ${openCycleSpend} = ${remainingFromOlderCycles}`
-              });
             } else {
               // No remaining unpaid balance - this cycle is paid
               paymentStatus = 'paid';
@@ -275,7 +198,6 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
           
           // Subtract this cycle's balance from remaining unpaid amount
           remainingUnpaid -= historicalCycle.statementBalance || 0;
-          console.log(`After ${formatDate(historicalCycle.endDate)}: remaining unpaid = ${remainingUnpaid}`);
         }
         
         // If this cycle wasn't found in historical cycles, determine status
@@ -293,36 +215,13 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
       }
     }
     
-    console.log('Payment analysis for', cycle.creditCardName || card?.name, formatDate(cycle.endDate), {
-      cycleId: cycle.id,
-      currentBalance,
-      openCycleSpend,
-      mostRecentClosedBalance,
-      accountedFor,
-      remainingFromOlderCycles,
-      statementBalance: cycle.statementBalance,
-      isMostRecentClosed: mostRecentClosedCycle?.id === cycle.id,
-      paymentStatus,
-      paymentAnalysis,
-      cycleEndDate: formatDate(cycle.endDate)
-    });
   } else {
-    console.log('DEBUG: Cycle did not qualify for payment analysis', {
-      cycleId: cycle.id,
-      cardName: cycle.creditCardName || card?.name,
-      cycleEndDate: formatDate(cycle.endDate),
-      hasStatementBalance: !!(cycle.statementBalance && cycle.statementBalance > 0),
-      hasCard: !!card,
-      hasAllCycles: !!(allCycles && allCycles.length > 0),
-      defaultStatus: paymentStatus
-    });
     
     // For cycles without statement balances or incomplete data, determine status differently
     if (cycle.statementBalance && cycle.statementBalance > 0 && new Date(cycle.endDate) < new Date()) {
       // This is a historical cycle with statement balance but missing other data - likely paid
       paymentStatus = 'paid';
       paymentAnalysis = 'Historical cycle with statement balance - likely paid';
-      console.log('DEBUG: Setting historical cycle to paid');
     }
   }
   
@@ -569,7 +468,6 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
     const cardNames = Object.keys(cyclesByCard).sort(); // Sort for consistency
     const cardIndex = cardNames.indexOf(cardName);
     const colorIndex = cardIndex >= 0 ? cardIndex % cardColors.length : 0;
-    console.log(`Card color assignment: "${cardName}" (ID: ${cardId}) -> index ${colorIndex} (${cardColors[colorIndex]}) [position ${cardIndex}]`);
     return colorIndex;
   };
 
@@ -604,42 +502,14 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
     }
   }, [cyclesByCard, cards]); // Removed propCardOrder dependency to prevent re-syncing
 
-  // Auto-expand cards with current or recently closed cycles
+  // Initialize expandedCards to be empty (historical cycles default to closed)
   useEffect(() => {
-    const cardsToExpand = new Set<string>();
-    const today = new Date();
-    
-    Object.keys(cyclesByCard).forEach(cardName => {
-      const cardCycles = cyclesByCard[cardName];
-      const sortedCycles = [...cardCycles].sort((a, b) => 
-        new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
-      );
-      
-      // Check if card has current ongoing cycle
-      const hasCurrentCycle = sortedCycles.some(c => {
-        const start = new Date(c.startDate);
-        const end = new Date(c.endDate);
-        return today >= start && today <= end;
-      });
-      
-      // Check if card has recently closed cycle (with statement balance)
-      const hasRecentClosedCycle = sortedCycles.some(c => {
-        const end = new Date(c.endDate);
-        const hasStatement = c.statementBalance && c.statementBalance > 0;
-        const endedBeforeToday = end < today;
-        return hasStatement && endedBeforeToday;
-      });
-      
-      // Expand cards that have current cycles or recently closed cycles
-      if (hasCurrentCycle || hasRecentClosedCycle) {
-        cardsToExpand.add(cardName);
-      }
-    });
-    
-    if (cardsToExpand.size > 0) {
-      setExpandedCards(cardsToExpand);
+    // Only initialize once when we have cards but no expanded state set yet
+    if (Object.keys(cyclesByCard).length > 0 && expandedCards.size === 0) {
+      // Historical cycles default to closed, so keep expandedCards as empty Set
+      setExpandedCards(new Set());
     }
-  }, [cyclesByCard]);
+  }, [cyclesByCard, expandedCards.size]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -662,9 +532,6 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
         const newOrder = arrayMove(items, oldIndex, newIndex);
         
         // Independent drag and drop - no longer sync with other components
-        console.log('CardBillingCycles: Order changed independently', { 
-          newCardOrder: newOrder
-        });
         
         return newOrder;
       });
