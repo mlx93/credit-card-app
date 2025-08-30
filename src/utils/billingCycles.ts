@@ -363,17 +363,6 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
       // Apply Capital One-specific cycle limiting
       const isCapitalOne = isCapitalOneCard(item.institutionName, card.name);
       
-      // Debug logging for Amex card specifically
-      if (card.name?.includes('Platinum')) {
-        console.log('🔍 AMEX FILTERING DEBUG:', {
-          cardName: card.name,
-          institutionName: item.institutionName,
-          isCapitalOne,
-          totalCycles: cycles.length,
-          filteredCycles: filteredCycles.length,
-          filteredCycleDates: filteredCycles.map(c => c.endDate.toDateString())
-        });
-      }
       
       if (isCapitalOne) {
         // For Capital One cards, limit to 4 most recent cycles (90 days = ~3-4 billing cycles)
