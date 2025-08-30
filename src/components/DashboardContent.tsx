@@ -452,7 +452,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             <div className="flex items-center space-x-3 flex-shrink-0">
               {isLoggedIn ? (
                 <>
-                  <PlaidLink onSuccess={fetchUserData} />
                   <button 
                     onClick={handleRefresh}
                     disabled={refreshing}
@@ -469,6 +468,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                       />
                     )}
                   </button>
+                  <PlaidLink onSuccess={fetchUserData} />
                 </>
               ) : (
                 <div className="text-center py-2">
