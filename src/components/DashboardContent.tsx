@@ -436,49 +436,51 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-none mx-auto px-8 py-6">
         {/* Header with title and Quick Actions */}
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start mb-4">
-          <div className="mb-4 lg:mb-0">
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">Credit Card Dashboard</h1>
-            <p className="text-gray-600 text-sm">
-              {isLoggedIn 
-                ? 'Track your spending, due dates, and credit utilization' 
-                : 'Sign in to connect your credit cards and see real data'
-              }
-            </p>
-          </div>
-          
-          {/* Quick Actions - moved to left side for better visibility */}
-          <div className="flex items-center space-x-3">
-            {isLoggedIn ? (
-              <>
-                <PlaidLink onSuccess={fetchUserData} />
-                <button 
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-4 rounded-lg transition-all flex items-center space-x-2 text-sm whitespace-nowrap relative overflow-hidden group"
-                >
-                  <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
-                  <span>{refreshing ? refreshStep || 'Refreshing...' : 'Refresh All Data'}</span>
-                  
-                  {/* Progress bar */}
-                  {refreshing && (
-                    <div 
-                      className="absolute bottom-0 left-0 h-0.5 bg-blue-500 transition-all duration-500 ease-out"
-                      style={{ width: `${refreshProgress}%` }}
-                    />
-                  )}
-                </button>
-              </>
-            ) : (
-              <div className="text-center py-2">
-                <p className="text-gray-600 text-xs">Sign in to connect cards</p>
-              </div>
-            )}
+        <div className="mb-3">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-1">Credit Card Dashboard</h1>
+              <p className="text-gray-600 text-sm">
+                {isLoggedIn 
+                  ? 'Track your spending, due dates, and credit utilization' 
+                  : 'Sign in to connect your credit cards and see real data'
+                }
+              </p>
+            </div>
+            
+            {/* Quick Actions - ensure they stay visible */}
+            <div className="flex items-center space-x-3 flex-shrink-0">
+              {isLoggedIn ? (
+                <>
+                  <PlaidLink onSuccess={fetchUserData} />
+                  <button 
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-900 font-medium py-2 px-3 rounded-lg transition-all flex items-center space-x-2 text-xs whitespace-nowrap relative overflow-hidden group"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+                    <span>{refreshing ? refreshStep || 'Refreshing...' : 'Refresh All'}</span>
+                    
+                    {/* Progress bar */}
+                    {refreshing && (
+                      <div 
+                        className="absolute bottom-0 left-0 h-0.5 bg-blue-500 transition-all duration-500 ease-out"
+                        style={{ width: `${refreshProgress}%` }}
+                      />
+                    )}
+                  </button>
+                </>
+              ) : (
+                <div className="text-center py-2">
+                  <p className="text-gray-600 text-xs">Sign in to connect cards</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
         {/* Header Metrics - utilizing more horizontal space */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-6 max-w-6xl">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 max-w-6xl">
           <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
               <TrendingUp className="h-7 w-7 text-green-600 mr-3" />
@@ -539,8 +541,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           <>
 
         {/* Revolutionary Horizontal Card Layout */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent">
                 Credit Card Dashboard
