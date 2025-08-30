@@ -9,8 +9,8 @@
 - `cce291b` - Clean up deprecated SQLite dependencies and warnings
 
 **Exposed Credentials**:
-- Username: `postgres.lfkzznosauorguowtntz` 
-- Password: `RwVDPiqW0IbwVym7`
+- Username: `postgres.[REDACTED]` 
+- Password: `[REDACTED]`
 - Host: `aws-1-us-east-1.pooler.supabase.com`
 
 ## IMMEDIATE ACTIONS REQUIRED

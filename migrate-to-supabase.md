@@ -4,7 +4,7 @@
 
 Project created with connection string:
 ```
-postgres://postgres.lfkzznosauorguowtntz:[REDACTED]@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x
+postgres://[USERNAME]:[PASSWORD]@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x
 ```
 
 ## Step 2: Update Environment Variables
@@ -16,7 +16,7 @@ Update both `.env.local` and `.env` files:
 # DATABASE_URL="postgres://d4689ad2e71d1cd0f4fe972446b34ed88984e624f8ad4e7eae83fca89c44424d:[REDACTED]@db.prisma.io:5432/postgres?sslmode=require"
 
 # New Supabase URL (pooled connection for serverless)
-DATABASE_URL="postgres://postgres.lfkzznosauorguowtntz:[REDACTED]@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x"
+DATABASE_URL="postgres://[USERNAME]:[PASSWORD]@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x"
 ```
 
 ## Step 3: Push Schema to Supabase

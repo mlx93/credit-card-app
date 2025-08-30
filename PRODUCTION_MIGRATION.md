@@ -23,7 +23,7 @@ Based on `user-stats-history.json` (last snapshot: 2025-08-29):
 - Go to Vercel Dashboard → Project Settings → Environment Variables
 - Update `DATABASE_URL`:
 ```
-postgres://postgres.lfkzznosauorguowtntz:RwVDPiqW0IbwVym7@aws-1-us-east-1.pooler.supabase.com:5432/postgres?pgbouncer=true
+postgres://[USERNAME]:[PASSWORD]@aws-1-us-east-1.pooler.supabase.com:5432/postgres?pgbouncer=true
 ```
 
 ### 2. Deploy to Production
