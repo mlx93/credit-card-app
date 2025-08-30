@@ -454,12 +454,22 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
   });
 
   const toggleCardExpansion = (cardName: string) => {
+    console.log(`🔄 toggleCardExpansion called for ${cardName}:`, {
+      cardName,
+      currentExpanded: Array.from(expandedCards),
+      wasExpanded: expandedCards.has(cardName)
+    });
+    
     const newExpanded = new Set(expandedCards);
     if (newExpanded.has(cardName)) {
       newExpanded.delete(cardName);
+      console.log(`➖ Removing ${cardName} from expanded`);
     } else {
       newExpanded.add(cardName);
+      console.log(`➕ Adding ${cardName} to expanded`);
     }
+    
+    console.log(`🔄 Setting new expanded cards:`, Array.from(newExpanded));
     setExpandedCards(newExpanded);
   };
 
@@ -503,13 +513,11 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
   }, [cyclesByCard, cards]); // Removed propCardOrder dependency to prevent re-syncing
 
   // Initialize expandedCards to be empty (historical cycles default to closed)
+  // Only run this once on mount, not on every cyclesByCard change
   useEffect(() => {
-    // Only initialize once when we have cards but no expanded state set yet
-    if (Object.keys(cyclesByCard).length > 0 && expandedCards.size === 0) {
-      // Historical cycles default to closed, so keep expandedCards as empty Set
-      setExpandedCards(new Set());
-    }
-  }, [cyclesByCard]);
+    // Historical cycles default to closed, so keep expandedCards as empty Set
+    setExpandedCards(new Set());
+  }, []); // Empty dependency array - only run once on mount
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

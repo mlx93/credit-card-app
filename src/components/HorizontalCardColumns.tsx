@@ -205,9 +205,17 @@ export function HorizontalCardColumns({
 
   // Initialize card order and expand cards with current/recent cycles by default
   useEffect(() => {
+    console.log('🏁 HorizontalCardColumns useEffect triggered:', {
+      cardsLength: cards.length,
+      cardNames: cards.map(c => c.name),
+      cyclesLength: cycles.length,
+      currentCardOrderLength: cardOrder.length
+    });
+    
     const cardIds = cards.map(card => card.id);
     
     if (cardOrder.length === 0 && cardIds.length > 0) {
+      console.log('📝 Initializing card order...');
       if (initialCardOrder && initialCardOrder.length > 0) {
         const validOrder = initialCardOrder.filter(id => cardIds.includes(id));
         const newCards = cardIds.filter(id => !validOrder.includes(id));
@@ -285,7 +293,13 @@ export function HorizontalCardColumns({
         }
       });
       
+      console.log('📋 Final cards to expand:', Array.from(cardsToExpand));
       setExpandedCards(cardsToExpand);
+    } else {
+      console.log('⏭️ Skipping card order initialization:', {
+        cardOrderLength: cardOrder.length,
+        cardIdsLength: cardIds.length
+      });
     }
   }, [cards, initialCardOrder, cardOrder.length, onOrderChange, cycles]);
 
