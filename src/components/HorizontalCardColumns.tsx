@@ -90,7 +90,7 @@ function SortableCardColumn({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex-shrink-0 w-[420px] ${isDragging ? 'z-50' : ''}`}
+      className={`flex-shrink-0 w-80 ${isDragging ? 'z-50' : ''}`}
     >
       {/* iOS-Inspired Card Column */}
       <div className="relative">
