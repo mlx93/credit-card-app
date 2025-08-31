@@ -92,9 +92,15 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
   let paymentStatus: 'paid' | 'outstanding' | 'current' | 'due' = 'current';
   let paymentAnalysis = '';
   
+  // Check if card has $0 balance - if so, all cycles should be marked as paid
+  const hasZeroBalance = card && Math.abs(card.balanceCurrent || 0) < 0.01;
   
+  if (hasZeroBalance && cycle.statementBalance && cycle.statementBalance > 0) {
+    paymentStatus = 'paid';
+    paymentAnalysis = 'Paid - card has $0 balance';
+  }
   // Only analyze cycles with statement balances when we have full data
-  if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
+  else if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
     const currentBalance = Math.abs(card.balanceCurrent || 0);
     
     // Step 1: Find current open cycle (the one that includes today's date)
@@ -313,9 +319,9 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
               {paymentStatus === 'paid' ? (
                 <div className="space-y-1">
                   <div className="flex items-center justify-end gap-1.5">
-                    <span className="text-xs font-medium text-gray-500">Paid</span>
-                    <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center">
-                      <svg className="w-2.5 h-2.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <span className="text-xs font-medium text-green-600">Paid</span>
+                    <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
@@ -620,7 +626,7 @@ function CardContent({
   const today = new Date();
   
   // Find current ongoing cycle and most recently closed cycle
-  let recentCycles = [];
+  const recentCycles = [];
   let historicalCycles = [];
   
   if (sortedCycles.length > 0) {
@@ -658,21 +664,24 @@ function CardContent({
     });
     
     // Find most recently closed cycle (has statement balance and ended before today)
-    const mostRecentClosedCycle = sortedCycles.find(c => {
+    // For Capital One: Look for cycles that are truly closed (ended + have statement balance)
+    const closedCyclesWithStatements = sortedCycles.filter(c => {
       const end = new Date(c.endDate);
       const hasStatement = c.statementBalance && c.statementBalance > 0;
       const endedBeforeToday = end < today;
-      const qualifies = hasStatement && endedBeforeToday;
-      
-      if (cardName.includes('Platinum') && qualifies) {
-        console.log('✅ AMEX MOST RECENT CLOSED:', {
-          end: end.toDateString(),
-          statementBalance: c.statementBalance
-        });
-      }
-      
-      return qualifies;
+      return hasStatement && endedBeforeToday;
     });
+    
+    const mostRecentClosedCycle = closedCyclesWithStatements[0]; // Already sorted newest first
+    
+    if (cardName.toLowerCase().includes('capital') && mostRecentClosedCycle) {
+      console.log('✅ CAPITAL ONE MOST RECENT CLOSED:', {
+        cycleId: mostRecentClosedCycle.id,
+        end: new Date(mostRecentClosedCycle.endDate).toDateString(),
+        statementBalance: mostRecentClosedCycle.statementBalance,
+        cardBalance: card?.balanceCurrent
+      });
+    }
     
     // Show current cycle first (if it exists)
     if (currentCycle) {
@@ -684,9 +693,34 @@ function CardContent({
       recentCycles.push(mostRecentClosedCycle);
     }
     
-    // All other cycles are historical
+    // All other cycles are historical - ensure we exclude BOTH current and most recent closed
     const shownCycleIds = new Set(recentCycles.map(c => c.id));
     historicalCycles = sortedCycles.filter(c => !shownCycleIds.has(c.id));
+    
+    // Additional logging for Capital One to debug classification
+    if (cardName.toLowerCase().includes('capital')) {
+      console.log('🎯 CAPITAL ONE CYCLE CLASSIFICATION:', {
+        cardName,
+        totalCycles: sortedCycles.length,
+        currentCycleId: currentCycle?.id,
+        mostRecentClosedId: mostRecentClosedCycle?.id,
+        recentCyclesCount: recentCycles.length,
+        historicalCyclesCount: historicalCycles.length,
+        cardBalance: card?.balanceCurrent,
+        recentCycles: recentCycles.map(c => ({
+          id: c.id,
+          end: new Date(c.endDate).toDateString(),
+          statementBalance: c.statementBalance,
+          isCurrentCycle: c === currentCycle,
+          isMostRecentClosed: c === mostRecentClosedCycle
+        })),
+        historicalCycles: historicalCycles.slice(0, 3).map(c => ({ // Only log first 3 for brevity
+          id: c.id,
+          end: new Date(c.endDate).toDateString(),
+          statementBalance: c.statementBalance
+        }))
+      });
+    }
     
     // Debug final classification for Amex
     if (cardName.includes('Platinum')) {

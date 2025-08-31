@@ -246,10 +246,25 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       });
       
       if (response.ok) {
+        const syncData = await response.json();
+        console.log('Sync response data:', syncData);
+        
+        // Check if sync was actually successful
+        const hasErrors = syncData.results?.some((r: any) => r.status === 'error');
+        const successCount = syncData.results?.filter((r: any) => r.status === 'success').length || 0;
+        
+        if (hasErrors) {
+          console.warn(`Sync completed with ${successCount} successes and some errors`);
+          alert(`Sync completed but some connections need attention. ${successCount} cards synced successfully.`);
+        } else {
+          console.log('Card sync fully successful');
+        }
+        
         await fetchUserData(); // Refresh data after sync
-        console.log('Card sync successful');
       } else {
         console.error('Card sync failed:', response.status);
+        const errorText = await response.text();
+        console.error('Sync error details:', errorText);
         alert('Failed to sync card data. Please try again.');
       }
     } catch (error) {
