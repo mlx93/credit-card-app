@@ -3,7 +3,7 @@ import { SupabaseAdapter } from '@next-auth/supabase-adapter';
 import GoogleProvider from 'next-auth/providers/google';
 
 export const authOptions: NextAuthOptions = {
-  debug: true,
+  debug: process.env.NODE_ENV === 'development',
   adapter: SupabaseAdapter({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
     secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -57,6 +57,27 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'database',
+  },
+  events: {
+    async signIn({ user, account, profile, isNewUser }) {
+      console.log('NextAuth signIn event:', { 
+        user: user?.email, 
+        account: account?.provider,
+        isNewUser 
+      });
+    },
+    async signOut({ token, session }) {
+      console.log('NextAuth signOut event');
+    },
+    async createUser({ user }) {
+      console.log('NextAuth createUser event:', user?.email);
+    },
+    async linkAccount({ user, account, profile }) {
+      console.log('NextAuth linkAccount event:', { 
+        user: user?.email, 
+        provider: account.provider 
+      });
+    },
   },
   logger: {
     error(code, metadata) {
