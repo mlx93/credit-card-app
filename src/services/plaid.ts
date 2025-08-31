@@ -124,6 +124,34 @@ class PlaidServiceImpl implements PlaidService {
     return access_token;
   }
 
+  // Rate limiting helper
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Retry logic with exponential backoff
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        // Check if it's a rate limit error (429)
+        if (error.response?.status === 429 && attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(`⏱️ Rate limit hit, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          await this.delay(delay);
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error('Max retries exceeded');
+  }
+
   async getTransactions(accessToken: string, startDate: Date, endDate: Date, isCapitalOne: boolean = false): Promise<any[]> {
     try {
       console.log(`=== GET TRANSACTIONS DEBUG ===`);
@@ -166,7 +194,13 @@ class PlaidServiceImpl implements PlaidService {
           end_date: currentEnd.toISOString().split('T')[0]
         };
 
-        const response = await plaidClient.transactionsGet(request);
+        // Use retry logic for rate limit handling
+        const response = await this.retryWithBackoff(() => 
+          plaidClient.transactionsGet(request)
+        );
+        
+        // Add delay between requests to prevent rate limiting
+        await this.delay(500); // 500ms between transaction requests
         const chunkTransactions = response.data.transactions;
         
         console.log(`Chunk result: ${chunkTransactions.length} transactions (total available in period: ${response.data.total_transactions})`);
@@ -234,7 +268,7 @@ class PlaidServiceImpl implements PlaidService {
       };
 
       console.log('Calling liabilitiesGet...');
-      const response = await plaidClient.liabilitiesGet(request);
+      const response = await this.retryWithBackoff(() => plaidClient.liabilitiesGet(request));
       console.log('✅ liabilitiesGet succeeded, found', response.data.liabilities?.credit?.length || 0, 'credit accounts');
       return response.data;
     } catch (error) {
@@ -267,7 +301,7 @@ class PlaidServiceImpl implements PlaidService {
       };
 
       console.log('Calling accountsBalanceGet with request:', JSON.stringify(request, null, 2));
-      const response = await plaidClient.accountsBalanceGet(request);
+      const response = await this.retryWithBackoff(() => plaidClient.accountsBalanceGet(request));
       console.log('✅ accountsBalanceGet succeeded, returned', response.data.accounts.length, 'accounts');
       return response.data;
     } catch (error) {
@@ -285,7 +319,7 @@ class PlaidServiceImpl implements PlaidService {
           access_token: accessToken
         };
         
-        const fallbackResponse = await plaidClient.accountsBalanceGet(fallbackRequest);
+        const fallbackResponse = await this.retryWithBackoff(() => plaidClient.accountsBalanceGet(fallbackRequest));
         console.log('✅ accountsBalanceGet fallback succeeded, returned', fallbackResponse.data.accounts.length, 'accounts');
         return fallbackResponse.data;
       } catch (fallbackError) {
@@ -302,7 +336,7 @@ class PlaidServiceImpl implements PlaidService {
       };
 
       console.log('Calling accountsGet...');
-      const response = await plaidClient.accountsGet(request);
+      const response = await this.retryWithBackoff(() => plaidClient.accountsGet(request));
       console.log('✅ accountsGet succeeded, returned', response.data.accounts.length, 'accounts');
       return response.data;
     } catch (error) {
@@ -338,7 +372,11 @@ class PlaidServiceImpl implements PlaidService {
     console.log(`🔄 Starting syncAccounts for itemId: ${itemId}`);
     
     const liabilitiesData = await this.getLiabilities(accessToken);
+    await this.delay(300); // Throttle between API calls
+    
     const balancesData = await this.getBalances(accessToken);
+    await this.delay(300); // Throttle between API calls
+    
     const accountsData = await this.getAccounts(accessToken);
 
     console.log('📊 Plaid API call results:', {
