@@ -8,12 +8,13 @@ const supabase = createClient(
 );
 
 // Initialize Resend with API key
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Debug logging
-console.log('Environment check:');
+console.log('=== EMAIL CONFIGURATION CHECK ===');
 console.log('- RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
 console.log('- RESEND_API_KEY preview:', process.env.RESEND_API_KEY?.substring(0, 10) + '...');
+console.log('- Resend initialized:', !!resend);
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,7 +69,12 @@ export async function POST(request: NextRequest) {
     // Send email with verification code
     try {
       console.log('Attempting to send email to:', email);
-      console.log('Using from address: CardCycle <noreply@cardcycle.app>');
+      
+      if (!resend) {
+        throw new Error('Resend not initialized - RESEND_API_KEY missing');
+      }
+      
+      console.log('Using from address: CardCycle <onboarding@resend.dev>');
       
       const emailResult = await resend.emails.send({
         from: 'CardCycle <onboarding@resend.dev>',  // Use Resend's test domain for now
@@ -114,6 +120,15 @@ export async function POST(request: NextRequest) {
       console.log('Code:', code);
       console.log('Expires in 3 minutes');
       console.log('============================================');
+      
+      // In development/testing, return the code if email fails
+      if (process.env.NODE_ENV !== 'production') {
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Email service unavailable - code logged to console',
+          debugCode: code // Only in non-production!
+        });
+      }
     }
 
     return NextResponse.json({ 

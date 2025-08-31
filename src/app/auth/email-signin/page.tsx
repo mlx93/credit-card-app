@@ -107,12 +107,12 @@ export default function EmailSignIn() {
       <div className="absolute bottom-0 -right-4 w-72 h-72 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
       
       <div className="relative w-full max-w-md">
-        <div className={`backdrop-blur-xl bg-white/80 border border-white/60 rounded-3xl p-8 shadow-2xl transition-all duration-300 ${
+        <div className={`backdrop-blur-xl bg-white/80 border border-white/60 rounded-3xl p-6 shadow-2xl transition-all duration-300 ${
           stepTransition ? 'scale-95 opacity-50' : 'scale-100 opacity-100'
         }`}>
           {/* Header */}
-          <div className="text-center mb-8">
-            <div className={`w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg transition-all duration-500 ${
+          <div className="text-center mb-6">
+            <div className={`w-14 h-14 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg transition-all duration-500 ${
               isSuccess ? 'bg-gradient-to-r from-green-500 to-emerald-500 scale-110' : ''
             }`}>
               {isSuccess ? (
@@ -151,7 +151,7 @@ export default function EmailSignIn() {
                     type="email"
                     autoComplete="email"
                     required
-                    className="w-full px-4 py-4 bg-white/70 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200 hover:bg-white/90 hover:border-slate-300"
+                    className="w-full px-4 py-3 bg-white/70 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200 hover:bg-white/90 hover:border-slate-300"
                     placeholder="Enter your email address"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -177,7 +177,7 @@ export default function EmailSignIn() {
               <button
                 type="submit"
                 disabled={loading || !email}
-                className="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium rounded-2xl shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-purple-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 group"
+                className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium rounded-2xl shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-purple-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 group"
               >
                 <span className="flex items-center justify-center space-x-2">
                   {loading ? (
@@ -197,7 +197,7 @@ export default function EmailSignIn() {
               <button
                 type="button"
                 onClick={() => window.location.href = '/'}
-                className="w-full py-3 text-slate-600 hover:text-slate-800 font-medium rounded-xl hover:bg-slate-100/50 transition-all duration-200"
+                className="w-full py-2 text-slate-600 hover:text-slate-800 font-medium rounded-xl hover:bg-slate-100/50 transition-all duration-200"
               >
                 ← Back to main sign-in
               </button>
@@ -232,7 +232,7 @@ export default function EmailSignIn() {
                         ref={(el) => (inputRefs.current[index] = el)}
                         type="text"
                         maxLength={1}
-                        className={`w-12 h-16 bg-white/70 border-2 rounded-xl text-slate-800 text-center text-2xl font-mono focus:outline-none transition-all duration-200 ${
+                        className={`w-12 h-14 bg-white/70 border-2 rounded-xl text-slate-800 text-center text-xl font-mono focus:outline-none transition-all duration-200 ${
                           digit ? 'border-indigo-400/60 bg-indigo-50/80' : 'border-slate-200'
                         } focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 hover:bg-white/90 hover:border-slate-300`}
                         aria-label={`Digit ${index + 1} of 6`}
@@ -319,7 +319,7 @@ export default function EmailSignIn() {
               <button
                 type="submit"
                 disabled={loading || code.join('').length !== 6 || timeLeft <= 0 || isSuccess}
-                className={`w-full py-4 font-medium rounded-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:cursor-not-allowed transform transition-all duration-200 group ${
+                className={`w-full py-3 font-medium rounded-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:cursor-not-allowed transform transition-all duration-200 group ${
                   isSuccess 
                     ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/25' 
                     : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:shadow-xl hover:from-indigo-600 hover:to-purple-600 hover:scale-[1.02] disabled:opacity-50'
@@ -349,12 +349,11 @@ export default function EmailSignIn() {
               <div className="flex flex-col space-y-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setLoading(true);
-                    handleSendCode({ preventDefault: () => {} } as React.FormEvent);
+                  onClick={async () => {
+                    await handleSendCode({ preventDefault: () => {} } as React.FormEvent);
                   }}
                   disabled={loading || isSuccess}
-                  className="py-3 text-slate-600 hover:text-slate-800 font-medium rounded-xl hover:bg-slate-100/50 transition-all duration-200 disabled:opacity-50 group"
+                  className="py-2 text-slate-600 hover:text-slate-800 font-medium rounded-xl hover:bg-slate-100/50 transition-all duration-200 disabled:opacity-50 group"
                 >
                   <span className="flex items-center justify-center space-x-2">
                     <span>📧</span>
@@ -373,7 +372,7 @@ export default function EmailSignIn() {
                     setIsSuccess(false);
                   }}
                   disabled={isSuccess}
-                  className="py-3 text-slate-500 hover:text-slate-700 text-sm rounded-xl hover:bg-slate-100/50 transition-all duration-200 disabled:opacity-50"
+                  className="py-2 text-slate-500 hover:text-slate-700 text-sm rounded-xl hover:bg-slate-100/50 transition-all duration-200 disabled:opacity-50"
                 >
                   ← Use Different Email
                 </button>
