@@ -438,6 +438,14 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
     // Apply Capital One-specific cycle limiting
     const isCapitalOne = isCapitalOneCard(plaidItem?.institutionName, card.name);
     
+    // Debug: Log cycle limiting decisions
+    console.log(`🔍 Cycle limiting decision for ${card.name}:`, {
+      cardName: card.name,
+      institutionName: plaidItem?.institutionName,
+      isCapitalOne,
+      totalCyclesBeforeLimit: filteredCycles.length
+    });
+    
     if (isCapitalOne) {
       // For Capital One cards, limit to 4 most recent cycles (90 days = ~3-4 billing cycles)
       const limitedCycles = filteredCycles

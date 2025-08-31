@@ -78,11 +78,38 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 setLoading(false);
                 setSyncInProgress(false);
                 
-                // Give the sync process time to complete billing cycle generation
-                // before triggering the refresh
-                setTimeout(() => {
-                  onSuccess?.();
-                }, 500);
+                // Trigger immediate refresh to show the new card
+                onSuccess?.();
+                
+                // Poll for billing cycle completion and trigger second refresh
+                const pollForBillingCycles = async () => {
+                  try {
+                    setLoadingMessage('Finalizing billing cycles...');
+                    setLoadingSubMessage('This may take a few more seconds');
+                    
+                    const maxAttempts = 10; // Poll for up to 30 seconds
+                    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                      const response = await fetch('/api/billing-cycles/status');
+                      if (response.ok) {
+                        const status = await response.json();
+                        if (status.ready) {
+                          console.log('✅ Billing cycles ready, triggering final refresh');
+                          onSuccess?.(); // Second refresh when cycles are ready
+                          break;
+                        }
+                      }
+                      
+                      if (attempt < maxAttempts) {
+                        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds between polls
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error polling for billing cycles:', error);
+                  }
+                };
+                
+                // Start polling in background (don't block completion)
+                pollForBillingCycles();
               }, 1500);
             }
           } catch (syncError) {

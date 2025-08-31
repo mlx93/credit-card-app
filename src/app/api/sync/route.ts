@@ -82,18 +82,26 @@ export async function POST(request: NextRequest) {
           throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
         }
         
-        for (const card of (creditCards || [])) {
+        // Start billing cycle regeneration asynchronously (don't block sync completion)
+        console.log('Step 3: Starting async billing cycle regeneration...');
+        const cyclePromises = (creditCards || []).map(async (card) => {
           console.log(`Regenerating billing cycles for ${card.name}...`);
           try {
             const cycles = await calculateBillingCycles(card.id);
             console.log(`Generated ${cycles.length} billing cycles for ${card.name}`);
           } catch (cycleError) {
             console.error(`Failed to generate billing cycles for ${card.name}:`, cycleError);
-            // Continue with other cards instead of failing entire sync
-            console.log(`Continuing sync despite billing cycle error for ${card.name}`);
           }
-        }
-        console.log('Step 3: Billing cycle regeneration completed');
+        });
+        
+        // Don't wait for cycles to complete - let them run in background
+        Promise.all(cyclePromises).then(() => {
+          console.log('✅ Background billing cycle regeneration completed');
+        }).catch((error) => {
+          console.error('❌ Background billing cycle regeneration had errors:', error);
+        });
+        
+        console.log('Step 3: Billing cycle regeneration started in background');
         
         // Update connection status to active on successful sync
         const { error: updateError } = await supabaseAdmin
