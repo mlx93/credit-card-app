@@ -106,6 +106,7 @@ class PlaidServiceImpl implements PlaidService {
     const { error: createError } = await supabaseAdmin
       .from('plaid_items')
       .insert({
+        id: crypto.randomUUID(),
         userId,
         itemId: item_id,
         accessToken: encrypt(access_token),

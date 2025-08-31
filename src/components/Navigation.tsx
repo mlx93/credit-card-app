@@ -73,13 +73,22 @@ export function Navigation() {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => signIn('google')}
-                className="flex items-center space-x-1 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
-              >
-                <LogIn className="h-4 w-4" />
-                <span>Sign In</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => signIn('google')}
+                  className="flex items-center space-x-1 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span>Google</span>
+                </button>
+                <a
+                  href="/auth/email-signin"
+                  className="flex items-center space-x-1 px-3 py-2 border border-indigo-600 text-indigo-600 text-sm font-medium rounded-md hover:bg-indigo-50 transition-colors"
+                >
+                  <span>📧</span>
+                  <span>Email</span>
+                </a>
+              </div>
             )}
           </div>
         </div>
