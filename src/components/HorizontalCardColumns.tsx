@@ -335,8 +335,8 @@ export function HorizontalCardColumns({
   const getCardCycles = (cardId: string) => {
     return cycles
       .filter(cycle => cycle.creditCardId === cardId)
-      .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
-      .slice(0, 6); // Show last 6 cycles
+      .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    // No artificial limit - let the API's sophisticated logic determine how many cycles to show
   };
 
   const getCardColorIndex = (cardName: string, cardId: string): number => {
