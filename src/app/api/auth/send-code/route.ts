@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     const expires = new Date(Date.now() + 3 * 60 * 1000).toISOString();
 
     // Store verification code in database
+    // First try the verification_tokens table, if it fails, use users table as fallback
     const { error: dbError } = await supabase
       .from('verification_tokens')
       .upsert({
@@ -42,11 +43,26 @@ export async function POST(request: NextRequest) {
       });
 
     if (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to generate verification code' },
-        { status: 500 }
-      );
+      console.error('Verification tokens table error:', dbError);
+      console.log('Attempting fallback to users table...');
+      
+      // Fallback: Store in users table temporarily
+      const { error: userError } = await supabase
+        .from('users')
+        .upsert({
+          email: email,
+          verificationCode: code,
+          verificationExpires: expires,
+          updatedAt: new Date().toISOString(),
+        }, {
+          onConflict: 'email'
+        });
+        
+      if (userError) {
+        console.error('Users table error:', userError);
+        // Continue anyway - we'll still try to send the email
+        console.log('WARNING: Could not store verification code in database');
+      }
     }
 
     // Send email with verification code
@@ -55,7 +71,7 @@ export async function POST(request: NextRequest) {
       console.log('Using from address: CardCycle <noreply@cardcycle.app>');
       
       const emailResult = await resend.emails.send({
-        from: 'CardCycle <noreply@cardcycle.app>',
+        from: 'CardCycle <onboarding@resend.dev>',  // Use Resend's test domain for now
         to: email,
         subject: 'Your CardCycle Verification Code',
         html: `

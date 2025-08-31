@@ -33,20 +33,43 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Get verification code from database
-          const { data: verification, error: verifyError } = await supabase
+          // First try to get verification code from verification_tokens table
+          let verification: any = null;
+          let verifyError: any = null;
+          
+          const { data: tokenData, error: tokenError } = await supabase
             .from('verification_tokens')
             .select('token, expires')
             .eq('identifier', credentials.email)
             .single();
+            
+          if (!tokenError && tokenData) {
+            verification = tokenData;
+          } else {
+            // Fallback: Check users table for verification code
+            const { data: userData, error: userError } = await supabase
+              .from('users')
+              .select('verificationCode, verificationExpires')
+              .eq('email', credentials.email)
+              .single();
+              
+            if (!userError && userData && userData.verificationCode) {
+              verification = {
+                token: userData.verificationCode,
+                expires: userData.verificationExpires
+              };
+            }
+          }
 
-          if (verifyError || !verification) {
+          if (!verification) {
+            console.log('No verification code found for:', credentials.email);
             return null;
           }
 
           // Check if code matches and is not expired
           if (verification.token !== credentials.code || 
               new Date() > new Date(verification.expires)) {
+            console.log('Invalid or expired code for:', credentials.email);
             return null;
           }
 
@@ -79,11 +102,20 @@ export const authOptions: NextAuthOptions = {
             user = existingUser;
           }
 
-          // Clean up used verification token
+          // Clean up used verification token from both tables
           await supabase
             .from('verification_tokens')
             .delete()
             .eq('identifier', credentials.email);
+            
+          // Also clear from users table if stored there
+          await supabase
+            .from('users')
+            .update({
+              verificationCode: null,
+              verificationExpires: null
+            })
+            .eq('email', credentials.email);
 
           return {
             id: user.id,
