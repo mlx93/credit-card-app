@@ -1,5 +1,6 @@
 import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import { createClient } from '@supabase/supabase-js';
 
 // Create Supabase client for NextAuth operations
@@ -18,6 +19,83 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+    CredentialsProvider({
+      id: 'email-code',
+      name: 'Email Verification',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        code: { label: 'Verification Code', type: 'text' }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.code) {
+          return null;
+        }
+
+        try {
+          // Get verification code from database
+          const { data: verification, error: verifyError } = await supabase
+            .from('verification_tokens')
+            .select('token, expires')
+            .eq('identifier', credentials.email)
+            .single();
+
+          if (verifyError || !verification) {
+            return null;
+          }
+
+          // Check if code matches and is not expired
+          if (verification.token !== credentials.code || 
+              new Date() > new Date(verification.expires)) {
+            return null;
+          }
+
+          // Code is valid! Get or create user
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('id, email, name, image')
+            .eq('email', credentials.email)
+            .single();
+
+          let user;
+          if (!existingUser) {
+            // Create new user
+            const userId = crypto.randomUUID();
+            const { data: newUser, error: createError } = await supabase
+              .from('users')
+              .insert({
+                id: userId,
+                email: credentials.email,
+                updatedAt: new Date().toISOString(),
+              })
+              .select('id, email, name, image')
+              .single();
+
+            if (createError || !newUser) {
+              return null;
+            }
+            user = newUser;
+          } else {
+            user = existingUser;
+          }
+
+          // Clean up used verification token
+          await supabase
+            .from('verification_tokens')
+            .delete()
+            .eq('identifier', credentials.email);
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          };
+        } catch (error) {
+          console.error('Email verification error:', error);
+          return null;
+        }
+      }
     }),
   ],
   callbacks: {
