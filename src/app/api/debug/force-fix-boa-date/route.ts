@@ -13,28 +13,50 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
     // Find the Bank of America Customized Cash Rewards card specifically
-    const boaCard = await prisma.creditCard.findFirst({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        name: {
-          contains: 'Customized Cash Rewards'
-        }
-      },
-      include: {
-        plaidItem: {
-          select: {
-            institutionName: true
-          }
-        },
-        transactions: {
-          orderBy: { date: 'asc' },
-          take: 1 // Get the earliest transaction
-        }
+    const { data: boaCards, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds)
+      .ilike('name', '%Customized Cash Rewards%');
+
+    if (cardError) {
+      throw new Error(`Failed to fetch credit cards: ${cardError.message}`);
+    }
+
+    const boaCard = boaCards?.[0];
+
+    // Get plaid item info for the card
+    const plaidItem = plaidItems?.find(item => item.id === boaCard?.plaidItemId);
+
+    // Get earliest transaction for the card
+    let earliestTransaction = null;
+    if (boaCard) {
+      const { data: transactions, error: txnError } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .eq('accountId', boaCard.accountId)
+        .order('date', { ascending: true })
+        .limit(1);
+
+      if (txnError) {
+        throw new Error(`Failed to fetch transactions: ${txnError.message}`);
       }
-    });
+
+      earliestTransaction = transactions?.[0];
+    }
 
     if (!boaCard) {
       return NextResponse.json({ error: 'Bank of America Customized Cash Rewards card not found' }, { status: 404 });
@@ -44,43 +66,48 @@ export async function POST() {
       id: boaCard.id,
       name: boaCard.name,
       currentOpenDate: boaCard.openDate,
-      transactionCount: boaCard.transactions.length
+      institutionName: plaidItem?.institutionName,
+      hasTransaction: !!earliestTransaction
     });
 
-    if (boaCard.transactions.length === 0) {
+    if (!earliestTransaction) {
       return NextResponse.json({ error: 'No transactions found for this card' }, { status: 400 });
     }
-
-    const earliestTransaction = boaCard.transactions[0];
     const correctedOpenDate = new Date(earliestTransaction.date);
     correctedOpenDate.setDate(correctedOpenDate.getDate() - 7);
 
     console.log('Attempting to update BoA card with corrected date:', {
       cardId: boaCard.id,
-      earliestTransactionDate: earliestTransaction.date.toDateString(),
+      earliestTransactionDate: new Date(earliestTransaction.date).toDateString(),
       correctedOpenDate: correctedOpenDate.toDateString()
     });
 
-    // Force update with explicit transaction
-    const updateResult = await prisma.$transaction(async (tx) => {
-      // First, update the card
-      const updatedCard = await tx.creditCard.update({
-        where: { id: boaCard.id },
-        data: { 
-          openDate: correctedOpenDate,
-          updatedAt: new Date() // Force timestamp update
-        }
-      });
+    // Force update the card
+    const { data: updatedCard, error: updateError } = await supabaseAdmin
+      .from('credit_cards')
+      .update({ 
+        openDate: correctedOpenDate.toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      .eq('id', boaCard.id)
+      .select()
+      .single();
 
-      // Then delete all billing cycles for this card
-      const deleteResult = await tx.billingCycle.deleteMany({
-        where: {
-          creditCardId: boaCard.id
-        }
-      });
+    if (updateError) {
+      throw new Error(`Failed to update card: ${updateError.message}`);
+    }
 
-      return { updatedCard, deletedCycles: deleteResult.count };
-    });
+    // Delete all billing cycles for this card
+    const { error: deleteError, count: deletedCount } = await supabaseAdmin
+      .from('billing_cycles')
+      .delete()
+      .eq('creditCardId', boaCard.id);
+
+    if (deleteError) {
+      throw new Error(`Failed to delete billing cycles: ${deleteError.message}`);
+    }
+
+    const updateResult = { updatedCard, deletedCycles: deletedCount || 0 };
 
     console.log('Database update completed:', {
       updatedCardOpenDate: updateResult.updatedCard.openDate,
@@ -110,7 +137,7 @@ export async function POST() {
       cardName: boaCard.name,
       oldOpenDate: boaCard.openDate?.toDateString() || 'null',
       newOpenDate: correctedOpenDate.toDateString(),
-      earliestTransactionDate: earliestTransaction.date.toDateString(),
+      earliestTransactionDate: new Date(earliestTransaction.date).toDateString(),
       deletedCycles: updateResult.deletedCycles,
       billingCyclesRegenerated: true
     });

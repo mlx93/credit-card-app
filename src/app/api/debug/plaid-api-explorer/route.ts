@@ -16,19 +16,25 @@ export async function POST() {
     }
 
     // Get all Plaid items for the user
-    const plaidItems = await prisma.plaidItem.findMany({
-      where: { userId: session.user.id },
-      include: {
-        accounts: {
-          select: {
-            id: true,
-            accountId: true,
-            name: true,
-            openDate: true
-          }
-        }
-      }
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    // Get all credit cards for these plaid items
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('id, accountId, name, openDate, plaidItemId')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
 
     console.log(`Found ${plaidItems.length} Plaid items`);
 
@@ -196,7 +202,8 @@ export async function POST() {
         }
         
         // Compare with database
-        itemResult.accounts = item.accounts.map(dbAccount => ({
+        const itemAccounts = (creditCards || []).filter(card => card.plaidItemId === item.id);
+        itemResult.accounts = itemAccounts.map(dbAccount => ({
           databaseInfo: {
             name: dbAccount.name,
             accountId: dbAccount.accountId,

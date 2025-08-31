@@ -13,59 +13,67 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
     // Get the BoA Customized Cash Rewards card
-    const boaCard = await prisma.creditCard.findFirst({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        name: {
-          contains: 'Customized'
-        }
-      },
-      include: {
-        plaidItem: {
-          select: {
-            institutionName: true,
-            status: true,
-            lastSyncAt: true
-          }
-        }
-      }
-    });
+    const { data: boaCards, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds)
+      .ilike('name', '%Customized%');
+
+    if (cardError) {
+      throw new Error(`Failed to fetch credit cards: ${cardError.message}`);
+    }
+
+    const boaCard = boaCards?.[0];
+
+    if (!boaCard) {
+      return NextResponse.json({ error: 'BoA Customized card not found' }, { status: 404 });
+    }
+
+    const plaidItem = plaidItems?.find(item => item.id === boaCard.plaidItemId);
 
     if (!boaCard) {
       return NextResponse.json({ error: 'BoA Customized card not found' }, { status: 404 });
     }
 
     // Get ALL transactions for this card
-    const allTransactions = await prisma.transaction.findMany({
-      where: {
-        creditCardId: boaCard.id
-      },
-      orderBy: { date: 'desc' },
-      select: {
-        id: true,
-        transactionId: true,
-        date: true,
-        amount: true,
-        name: true,
-        category: true,
-        merchantName: true
-      }
-    });
+    const { data: allTransactions, error: txnError } = await supabaseAdmin
+      .from('transactions')
+      .select('id, transactionId, date, amount, name, category, merchantName')
+      .eq('creditCardId', boaCard.id)
+      .order('date', { ascending: false });
+
+    if (txnError) {
+      throw new Error(`Failed to fetch transactions: ${txnError.message}`);
+    }
 
     // Get ALL billing cycles for this card
-    const allBillingCycles = await prisma.billingCycle.findMany({
-      where: {
-        creditCardId: boaCard.id
-      },
-      orderBy: { startDate: 'desc' }
-    });
+    const { data: allBillingCycles, error: cyclesError } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .eq('creditCardId', boaCard.id)
+      .order('startDate', { ascending: false });
+
+    if (cyclesError) {
+      throw new Error(`Failed to fetch billing cycles: ${cyclesError.message}`);
+    }
 
     // Group transactions by month for easier analysis
-    const transactionsByMonth = allTransactions.reduce((acc: any, t) => {
-      const monthKey = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}`;
+    const transactionsByMonth = (allTransactions || []).reduce((acc: any, t) => {
+      const date = new Date(t.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       if (!acc[monthKey]) acc[monthKey] = [];
       acc[monthKey].push(t);
       return acc;
@@ -75,9 +83,9 @@ export async function GET() {
     const june2025Transactions = transactionsByMonth['2025-06'] || [];
 
     // Analyze billing cycles
-    const cycleAnalysis = allBillingCycles.map(cycle => ({
+    const cycleAnalysis = (allBillingCycles || []).map(cycle => ({
       id: cycle.id,
-      period: `${cycle.startDate.toISOString().split('T')[0]} to ${cycle.endDate.toISOString().split('T')[0]}`,
+      period: `${new Date(cycle.startDate).toISOString().split('T')[0]} to ${new Date(cycle.endDate).toISOString().split('T')[0]}`,
       startDate: cycle.startDate,
       endDate: cycle.endDate,
       totalSpend: cycle.totalSpend,
@@ -96,11 +104,11 @@ export async function GET() {
         lastStatementIssueDate: boaCard.lastStatementIssueDate,
         lastStatementBalance: boaCard.lastStatementBalance,
         nextPaymentDueDate: boaCard.nextPaymentDueDate,
-        plaidStatus: boaCard.plaidItem?.status,
-        lastSync: boaCard.plaidItem?.lastSyncAt
+        plaidStatus: plaidItem?.status,
+        lastSync: plaidItem?.lastSyncAt
       },
       transactionSummary: {
-        totalTransactions: allTransactions.length,
+        totalTransactions: (allTransactions || []).length,
         transactionsByMonth: Object.keys(transactionsByMonth).sort().map(month => ({
           month,
           count: transactionsByMonth[month].length,
@@ -110,7 +118,7 @@ export async function GET() {
         june2025TotalSpend: june2025Transactions.reduce((sum: number, t: any) => sum + t.amount, 0)
       },
       billingCycleSummary: {
-        totalCycles: allBillingCycles.length,
+        totalCycles: (allBillingCycles || []).length,
         historicalCycles: cycleAnalysis.filter(c => c.isHistorical).length,
         currentCycles: cycleAnalysis.filter(c => c.isCurrent).length,
         cycleDetails: cycleAnalysis
@@ -118,7 +126,7 @@ export async function GET() {
       rawData: {
         june2025Transactions: june2025Transactions.slice(0, 10), // First 10 June transactions
         allBillingCycles: cycleAnalysis,
-        sampleTransactions: allTransactions.slice(0, 10) // First 10 recent transactions
+        sampleTransactions: (allTransactions || []).slice(0, 10) // First 10 recent transactions
       }
     });
 

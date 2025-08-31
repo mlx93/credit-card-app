@@ -16,9 +16,17 @@ export async function POST(request: NextRequest) {
     console.log('=== PLAID TRANSACTIONS TEST ===');
 
     // Get first Plaid item to test with
-    const plaidItem = await prisma.plaidItem.findFirst({
-      where: { userId: session.user.id },
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id)
+      .limit(1);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItem = plaidItems?.[0];
 
     if (!plaidItem) {
       return NextResponse.json({ error: 'No Plaid items found' }, { status: 404 });

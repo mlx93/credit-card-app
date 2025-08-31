@@ -14,127 +14,112 @@ export async function GET() {
     }
 
     // 1. Check Plaid Items status
-    const plaidItems = await prisma.plaidItem.findMany({
-      where: { userId: session.user.id },
-      select: {
-        id: true,
-        itemId: true,
-        institutionName: true,
-        status: true,
-        lastSyncAt: true,
-        errorCode: true,
-        _count: {
-          select: {
-            accounts: true,
-            transactions: true
-          }
-        }
-      }
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('id, itemId, institutionName, status, lastSyncAt, errorCode')
+      .eq('userId', session.user.id);
 
-    // 2. Check Credit Cards with transaction counts
-    const creditCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        }
-      },
-      select: {
-        id: true,
-        name: true,
-        accountId: true,
-        openDate: true,
-        lastStatementIssueDate: true,
-        _count: {
-          select: {
-            transactions: true,
-            billingCycles: true
-          }
-        }
-      }
-    });
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    // 2. Check Credit Cards
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('id, name, accountId, openDate, lastStatementIssueDate, plaidItemId')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
 
     // 3. Check unlinked transactions
-    const unlinkedTransactions = await prisma.transaction.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        creditCardId: null
-      },
-      select: {
-        id: true,
-        transactionId: true,
-        date: true,
-        amount: true,
-        name: true,
-        plaidItemId: true
-      }
-    });
+    const { data: unlinkedTransactions, error: unlinkedError } = await supabaseAdmin
+      .from('transactions')
+      .select('id, transactionId, date, amount, name, plaidItemId')
+      .in('plaidItemId', plaidItemIds)
+      .is('creditCardId', null);
 
-    // 4. Check billing cycles with transaction counts
-    const billingCycles = await prisma.billingCycle.findMany({
-      where: {
-        creditCard: {
-          plaidItem: {
-            userId: session.user.id
-          }
-        }
-      },
-      orderBy: { startDate: 'desc' },
-      include: {
-        creditCard: {
-          select: {
-            name: true
-          }
-        }
-      }
-    });
+    if (unlinkedError) {
+      throw new Error(`Failed to fetch unlinked transactions: ${unlinkedError.message}`);
+    }
+
+    // 4. Check billing cycles
+    const creditCardIds = (creditCards || []).map(card => card.id);
+    const { data: billingCycles, error: cyclesError } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*, creditCardId')
+      .in('creditCardId', creditCardIds)
+      .order('startDate', { ascending: false });
+
+    if (cyclesError) {
+      throw new Error(`Failed to fetch billing cycles: ${cyclesError.message}`);
+    }
 
     // 5. Check recent transactions
-    const recentTransactions = await prisma.transaction.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        }
-      },
-      orderBy: { date: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        date: true,
-        amount: true,
-        name: true,
-        creditCardId: true,
-        creditCard: {
-          select: {
-            name: true
-          }
-        }
-      }
-    });
+    const { data: recentTransactions, error: recentError } = await supabaseAdmin
+      .from('transactions')
+      .select('id, date, amount, name, creditCardId')
+      .in('plaidItemId', plaidItemIds)
+      .order('date', { ascending: false })
+      .limit(5);
+
+    if (recentError) {
+      throw new Error(`Failed to fetch recent transactions: ${recentError.message}`);
+    }
+
+    // Get transaction counts for credit cards
+    const cardTransactionCounts = await Promise.all(
+      (creditCards || []).map(async (card) => {
+        const { count: transactionCount } = await supabaseAdmin
+          .from('transactions')
+          .select('*', { count: 'exact' })
+          .eq('creditCardId', card.id);
+        const { count: billingCycleCount } = await supabaseAdmin
+          .from('billing_cycles')
+          .select('*', { count: 'exact' })
+          .eq('creditCardId', card.id);
+        return { ...card, _count: { transactions: transactionCount || 0, billingCycles: billingCycleCount || 0 } };
+      })
+    );
+
+    // Get account/transaction counts for plaid items  
+    const plaidItemCounts = await Promise.all(
+      (plaidItems || []).map(async (item) => {
+        const { count: accountCount } = await supabaseAdmin
+          .from('credit_cards')
+          .select('*', { count: 'exact' })
+          .eq('plaidItemId', item.id);
+        const { count: transactionCount } = await supabaseAdmin
+          .from('transactions')
+          .select('*', { count: 'exact' })
+          .eq('plaidItemId', item.id);
+        return { ...item, _count: { accounts: accountCount || 0, transactions: transactionCount || 0 } };
+      })
+    );
 
     // Analysis
     const analysis = {
       dataIntegrity: {
-        totalPlaidItems: plaidItems.length,
-        activeItems: plaidItems.filter(i => i.status === 'active').length,
-        errorItems: plaidItems.filter(i => i.status === 'error' || i.status === 'expired').length,
-        totalCreditCards: creditCards.length,
-        cardsWithTransactions: creditCards.filter(c => c._count.transactions > 0).length,
-        cardsWithoutTransactions: creditCards.filter(c => c._count.transactions === 0).length,
-        totalUnlinkedTransactions: unlinkedTransactions.length
+        totalPlaidItems: (plaidItemCounts || []).length,
+        activeItems: (plaidItemCounts || []).filter(i => i.status === 'active').length,
+        errorItems: (plaidItemCounts || []).filter(i => i.status === 'error' || i.status === 'expired').length,
+        totalCreditCards: (cardTransactionCounts || []).length,
+        cardsWithTransactions: (cardTransactionCounts || []).filter(c => c._count.transactions > 0).length,
+        cardsWithoutTransactions: (cardTransactionCounts || []).filter(c => c._count.transactions === 0).length,
+        totalUnlinkedTransactions: (unlinkedTransactions || []).length
       },
       potentialIssues: []
     };
 
     // Identify issues
-    if (unlinkedTransactions.length > 0) {
+    if ((unlinkedTransactions || []).length > 0) {
       analysis.potentialIssues.push({
         type: 'UNLINKED_TRANSACTIONS',
         severity: 'HIGH',
-        count: unlinkedTransactions.length,
-        message: `${unlinkedTransactions.length} transactions not linked to any credit card`,
+        count: (unlinkedTransactions || []).length,
+        message: `${(unlinkedTransactions || []).length} transactions not linked to any credit card`,
         impact: 'Billing cycles will show $0.00 spend'
       });
     }
@@ -150,7 +135,7 @@ export async function GET() {
     }
 
 
-    const lastSyncTimes = plaidItems.map(item => ({
+    const lastSyncTimes = (plaidItemCounts || []).map(item => ({
       institution: item.institutionName,
       lastSync: item.lastSyncAt,
       minutesAgo: item.lastSyncAt ? Math.round((Date.now() - new Date(item.lastSyncAt).getTime()) / 60000) : null
@@ -161,7 +146,7 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       analysis,
       details: {
-        plaidItems: plaidItems.map(item => ({
+        plaidItems: (plaidItemCounts || []).map(item => ({
           institution: item.institutionName,
           status: item.status,
           accounts: item._count.accounts,
@@ -169,28 +154,31 @@ export async function GET() {
           lastSync: item.lastSyncAt,
           errorCode: item.errorCode
         })),
-        creditCards: creditCards.map(card => ({
+        creditCards: (cardTransactionCounts || []).map(card => ({
           name: card.name,
           transactions: card._count.transactions,
           billingCycles: card._count.billingCycles,
           openDate: card.openDate,
           hasOpenDate: !!card.openDate
         })),
-        unlinkedTransactions: unlinkedTransactions.slice(0, 5).map(t => ({
+        unlinkedTransactions: (unlinkedTransactions || []).slice(0, 5).map(t => ({
           date: t.date,
           name: t.name,
           amount: t.amount
         })),
-        allBillingCycles: billingCycles.map(cycle => ({
-          card: cycle.creditCard.name,
-          period: `${new Date(cycle.startDate).toLocaleDateString()} - ${new Date(cycle.endDate).toLocaleDateString()}`,
-          totalSpend: cycle.totalSpend,
-          statementBalance: cycle.statementBalance
-        })),
+        allBillingCycles: (billingCycles || []).map(cycle => {
+          const card = (cardTransactionCounts || []).find(c => c.id === cycle.creditCardId);
+          return {
+            card: card?.name || 'Unknown',
+            period: `${new Date(cycle.startDate).toLocaleDateString()} - ${new Date(cycle.endDate).toLocaleDateString()}`,
+            totalSpend: cycle.totalSpend,
+            statementBalance: cycle.statementBalance
+          };
+        }),
         lastSyncTimes
       },
       recommendations: [
-        unlinkedTransactions.length > 0 && 'Run billing cycle regeneration to link orphaned transactions',
+        (unlinkedTransactions || []).length > 0 && 'Run billing cycle regeneration to link orphaned transactions',
         analysis.dataIntegrity.errorItems > 0 && 'Reconnect failed Plaid items'
       ].filter(Boolean)
     });

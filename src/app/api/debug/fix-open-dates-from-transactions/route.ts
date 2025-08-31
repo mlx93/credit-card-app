@@ -13,26 +13,52 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
     // Find cards without open dates
-    const cardsWithoutOpenDates = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        openDate: null
-      },
-      include: {
-        plaidItem: {
-          select: {
-            institutionName: true
-          }
-        },
-        transactions: {
-          orderBy: { date: 'asc' },
-          take: 1 // Get the earliest transaction
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds)
+      .is('openDate', null);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Get earliest transaction for each card without open dates
+    const cardsWithoutOpenDates = await Promise.all(
+      (creditCards || []).map(async (card) => {
+        const { data: transactions, error: txnError } = await supabaseAdmin
+          .from('transactions')
+          .select('*')
+          .eq('creditCardId', card.id)
+          .order('date', { ascending: true })
+          .limit(1);
+
+        if (txnError) {
+          throw new Error(`Failed to fetch transactions for card ${card.id}: ${txnError.message}`);
         }
-      }
-    });
+
+        const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+        
+        return {
+          ...card,
+          plaidItem: { institutionName: plaidItem?.institutionName },
+          transactions: transactions || []
+        };
+      })
+    );
 
     console.log(`Found ${cardsWithoutOpenDates.length} cards without open dates`);
 
@@ -49,27 +75,31 @@ export async function POST() {
         
         console.log(`Setting open date for ${card.name} based on earliest transaction:`, {
           cardName: card.name,
-          earliestTransactionDate: earliestTransaction.date.toDateString(),
+          earliestTransactionDate: new Date(earliestTransaction.date).toDateString(),
           earliestTransactionName: earliestTransaction.name,
           estimatedOpenDate: estimatedOpenDate.toDateString()
         });
 
         // Update the card with the estimated open date
-        await prisma.creditCard.update({
-          where: { id: card.id },
-          data: { openDate: estimatedOpenDate }
-        });
+        const { error: updateError1 } = await supabaseAdmin
+          .from('credit_cards')
+          .update({ openDate: estimatedOpenDate.toISOString() })
+          .eq('id', card.id);
+
+        if (updateError1) {
+          throw new Error(`Failed to update card ${card.id}: ${updateError1.message}`);
+        }
 
         fixes.push({
           cardName: card.name,
           institutionName: card.plaidItem?.institutionName,
           method: 'earliest_transaction',
-          earliestTransactionDate: earliestTransaction.date.toDateString(),
+          earliestTransactionDate: new Date(earliestTransaction.date).toDateString(),
           estimatedOpenDate: estimatedOpenDate.toDateString(),
           transactionUsed: {
             name: earliestTransaction.name,
             amount: earliestTransaction.amount,
-            date: earliestTransaction.date.toDateString()
+            date: new Date(earliestTransaction.date).toDateString()
           }
         });
       } else {
@@ -81,20 +111,24 @@ export async function POST() {
 
           console.log(`Setting open date for ${card.name} based on statement date:`, {
             cardName: card.name,
-            lastStatementDate: card.lastStatementIssueDate.toDateString(),
+            lastStatementDate: new Date(card.lastStatementIssueDate).toDateString(),
             estimatedOpenDate: estimatedOpenDate.toDateString()
           });
 
-          await prisma.creditCard.update({
-            where: { id: card.id },
-            data: { openDate: estimatedOpenDate }
-          });
+          const { error: updateError2 } = await supabaseAdmin
+            .from('credit_cards')
+            .update({ openDate: estimatedOpenDate.toISOString() })
+            .eq('id', card.id);
+
+          if (updateError2) {
+            throw new Error(`Failed to update card ${card.id}: ${updateError2.message}`);
+          }
 
           fixes.push({
             cardName: card.name,
             institutionName: card.plaidItem?.institutionName,
             method: 'statement_date_minus_6_months',
-            lastStatementDate: card.lastStatementIssueDate.toDateString(),
+            lastStatementDate: new Date(card.lastStatementIssueDate).toDateString(),
             estimatedOpenDate: estimatedOpenDate.toDateString()
           });
         } else {
@@ -107,10 +141,14 @@ export async function POST() {
             estimatedOpenDate: estimatedOpenDate.toDateString()
           });
 
-          await prisma.creditCard.update({
-            where: { id: card.id },
-            data: { openDate: estimatedOpenDate }
-          });
+          const { error: updateError2 } = await supabaseAdmin
+            .from('credit_cards')
+            .update({ openDate: estimatedOpenDate.toISOString() })
+            .eq('id', card.id);
+
+          if (updateError2) {
+            throw new Error(`Failed to update card ${card.id}: ${updateError2.message}`);
+          }
 
           fixes.push({
             cardName: card.name,
@@ -126,15 +164,19 @@ export async function POST() {
     if (fixes.length > 0) {
       console.log('Deleting existing billing cycles to force regeneration with correct open dates...');
       
-      const deleteResult = await prisma.billingCycle.deleteMany({
-        where: {
-          creditCard: {
-            plaidItem: {
-              userId: session.user.id
-            }
-          }
-        }
-      });
+      // Get all credit card IDs for this user to delete their billing cycles
+      const creditCardIds = (creditCards || []).map(card => card.id);
+      
+      const { error: deleteError, count: deletedCount } = await supabaseAdmin
+        .from('billing_cycles')
+        .delete()
+        .in('creditCardId', creditCardIds);
+
+      if (deleteError) {
+        throw new Error(`Failed to delete billing cycles: ${deleteError.message}`);
+      }
+
+      const deleteResult = { count: deletedCount || 0 };
       
       console.log(`Deleted ${deleteResult.count} billing cycles`);
 

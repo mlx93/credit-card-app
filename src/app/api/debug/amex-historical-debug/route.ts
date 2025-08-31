@@ -13,29 +13,45 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
     // Find Amex Platinum card
-    const amexCard = await prisma.creditCard.findFirst({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        name: {
-          contains: 'Platinum'
-        }
-      }
-    });
+    const { data: amexCards, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds)
+      .ilike('name', '%Platinum%');
+
+    if (cardError) {
+      throw new Error(`Failed to fetch credit cards: ${cardError.message}`);
+    }
+
+    const amexCard = amexCards?.[0];
 
     if (!amexCard) {
       return NextResponse.json({ error: 'Amex card not found' }, { status: 404 });
     }
 
     // Get ALL billing cycles for Amex card (before any filtering)
-    const allAmexCycles = await prisma.billingCycle.findMany({
-      where: {
-        creditCardId: amexCard.id
-      },
-      orderBy: { startDate: 'desc' }
-    });
+    const { data: allAmexCycles, error: cyclesError } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .eq('creditCardId', amexCard.id)
+      .order('startDate', { ascending: false });
+
+    if (cyclesError) {
+      throw new Error(`Failed to fetch billing cycles: ${cyclesError.message}`);
+    }
 
     // Calculate date limits
     const today = new Date();
@@ -45,7 +61,7 @@ export async function GET() {
     const earliestCycleDate = cardOpenDate > oneYearAgo ? cardOpenDate : oneYearAgo;
 
     // Analyze each cycle
-    const cycleAnalysis = allAmexCycles.map(cycle => {
+    const cycleAnalysis = (allAmexCycles || []).map(cycle => {
       const startDate = new Date(cycle.startDate);
       const endDate = new Date(cycle.endDate);
       
@@ -81,7 +97,7 @@ export async function GET() {
       },
       cycleAnalysis: cycleAnalysis,
       summary: {
-        totalCyclesInDatabase: allAmexCycles.length,
+        totalCyclesInDatabase: (allAmexCycles || []).length,
         cyclesWithinOneYear: cycleAnalysis.filter(c => c.isWithinOneYear).length,
         cyclesAfterCardOpen: cycleAnalysis.filter(c => c.isAfterCardOpen).length,
         cyclesAfterEarliestDate: cycleAnalysis.filter(c => c.isAfterEarliestDate).length,

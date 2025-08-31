@@ -13,38 +13,81 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Find the Bank of America card and analyze its transaction patterns
-    const boaCard = await prisma.creditCard.findFirst({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        name: {
-          contains: 'Customized Cash Rewards'
-        }
-      },
-      include: {
-        plaidItem: {
-          select: {
-            institutionName: true
-          }
-        },
-        transactions: {
-          orderBy: { date: 'asc' },
-          take: 50 // Get more transactions to analyze patterns
-        },
-        billingCycles: {
-          orderBy: { startDate: 'asc' },
-          include: {
-            transactions: {
-              select: {
-                id: true
-              }
-            }
-          }
-        }
-      }
-    });
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Find the Bank of America card
+    const { data: boaCards, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds)
+      .ilike('name', '%Customized Cash Rewards%');
+
+    if (cardError) {
+      throw new Error(`Failed to fetch credit cards: ${cardError.message}`);
+    }
+
+    const boaCard = boaCards?.[0];
+
+    if (!boaCard) {
+      return NextResponse.json({ error: 'Bank of America card not found' }, { status: 404 });
+    }
+
+    // Get plaid item info
+    const plaidItem = plaidItems?.find(item => item.id === boaCard.plaidItemId);
+
+    // Get transactions for analysis
+    const { data: transactions, error: txnError } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .eq('creditCardId', boaCard.id)
+      .order('date', { ascending: true })
+      .limit(50);
+
+    if (txnError) {
+      throw new Error(`Failed to fetch transactions: ${txnError.message}`);
+    }
+
+    // Get billing cycles
+    const { data: billingCycles, error: cyclesError } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .eq('creditCardId', boaCard.id)
+      .order('startDate', { ascending: true });
+
+    if (cyclesError) {
+      throw new Error(`Failed to fetch billing cycles: ${cyclesError.message}`);
+    }
+
+    // Get transaction counts for each billing cycle
+    const cyclesWithTransactionCounts = await Promise.all(
+      (billingCycles || []).map(async (cycle) => {
+        const { count } = await supabaseAdmin
+          .from('transactions')
+          .select('*', { count: 'exact' })
+          .eq('creditCardId', boaCard.id)
+          .gte('date', cycle.startDate)
+          .lte('date', cycle.endDate);
+        return { ...cycle, transactionCount: count || 0 };
+      })
+    );
+
+    // Reconstruct boaCard with nested data
+    const boaCardWithData = {
+      ...boaCard,
+      plaidItem: { institutionName: plaidItem?.institutionName },
+      transactions: transactions || [],
+      billingCycles: cyclesWithTransactionCounts || []
+    };
 
     if (!boaCard) {
       return NextResponse.json({ error: 'Bank of America card not found' }, { status: 404 });
@@ -53,10 +96,10 @@ export async function POST() {
     console.log('=== TRANSACTION ANALYSIS ===');
     
     // Analyze transaction patterns
-    const allTransactions = boaCard.transactions;
+    const allTransactions = boaCardWithData.transactions;
     const earliestTransaction = allTransactions[0];
     const transactionDates = allTransactions.slice(0, 10).map(t => ({
-      date: t.date.toDateString(),
+      date: new Date(t.date).toDateString(),
       name: t.name,
       amount: t.amount
     }));
@@ -65,30 +108,30 @@ export async function POST() {
 
     // Analyze existing cycles to see which ones have transaction data
     console.log('=== EXISTING CYCLES ANALYSIS ===');
-    const cyclesWithTransactions = boaCard.billingCycles
-      .filter(cycle => cycle.transactions.length > 0)
+    const cyclesWithTransactions = boaCardWithData.billingCycles
+      .filter(cycle => cycle.transactionCount > 0)
       .map(cycle => ({
-        startDate: cycle.startDate.toDateString(),
-        endDate: cycle.endDate.toDateString(),
-        transactionCount: cycle.transactions.length,
+        startDate: new Date(cycle.startDate).toDateString(),
+        endDate: new Date(cycle.endDate).toDateString(),
+        transactionCount: cycle.transactionCount,
         totalSpend: cycle.totalSpend
       }));
 
     console.log('Cycles with transactions:', cyclesWithTransactions);
 
     // Find the earliest cycle that has transactions (this should be preserved)
-    const earliestCycleWithTransactions = boaCard.billingCycles
-      .filter(cycle => cycle.transactions.length > 0)
-      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0];
+    const earliestCycleWithTransactions = boaCardWithData.billingCycles
+      .filter(cycle => cycle.transactionCount > 0)
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0];
 
     if (!earliestCycleWithTransactions) {
       return NextResponse.json({ error: 'No cycles with transactions found' }, { status: 400 });
     }
 
     console.log('Earliest cycle with transactions:', {
-      startDate: earliestCycleWithTransactions.startDate.toDateString(),
-      endDate: earliestCycleWithTransactions.endDate.toDateString(),
-      transactionCount: earliestCycleWithTransactions.transactions.length,
+      startDate: new Date(earliestCycleWithTransactions.startDate).toDateString(),
+      endDate: new Date(earliestCycleWithTransactions.endDate).toDateString(),
+      transactionCount: earliestCycleWithTransactions.transactionCount,
       totalSpend: earliestCycleWithTransactions.totalSpend
     });
 
@@ -97,38 +140,44 @@ export async function POST() {
     smartOpenDate.setDate(smartOpenDate.getDate() - 21); // 3 weeks before first real cycle
 
     console.log('=== SMART OPEN DATE CALCULATION ===');
-    console.log('Current open date:', boaCard.openDate?.toDateString() || 'null');
-    console.log('Earliest transaction date:', earliestTransaction?.date.toDateString() || 'none');
-    console.log('Earliest cycle with transactions starts:', earliestCycleWithTransactions.startDate.toDateString());
+    console.log('Current open date:', boaCard.openDate ? new Date(boaCard.openDate).toDateString() : 'null');
+    console.log('Earliest transaction date:', earliestTransaction ? new Date(earliestTransaction.date).toDateString() : 'none');
+    console.log('Earliest cycle with transactions starts:', new Date(earliestCycleWithTransactions.startDate).toDateString());
     console.log('Smart open date (3 weeks before first real cycle):', smartOpenDate.toDateString());
 
-    // Update with the smart open date using a transaction
-    const updateResult = await prisma.$transaction(async (tx) => {
-      // Update the card with smart open date
-      const updatedCard = await tx.creditCard.update({
-        where: { id: boaCard.id },
-        data: { 
-          openDate: smartOpenDate,
-          updatedAt: new Date()
-        }
-      });
+    // Update the card with smart open date
+    const { data: updatedCard, error: updateError } = await supabaseAdmin
+      .from('credit_cards')
+      .update({ 
+        openDate: smartOpenDate.toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      .eq('id', boaCard.id)
+      .select()
+      .single();
 
-      // Delete only cycles that start before the smart open date AND have no transactions
-      const deleteResult = await tx.billingCycle.deleteMany({
-        where: {
-          creditCardId: boaCard.id,
-          startDate: {
-            lt: smartOpenDate
-          },
-          // This ensures we only delete empty cycles
-          transactions: {
-            none: {}
-          }
-        }
-      });
+    if (updateError) {
+      throw new Error(`Failed to update card: ${updateError.message}`);
+    }
 
-      return { updatedCard, deletedEmptyCycles: deleteResult.count };
-    });
+    // Delete only cycles that start before the smart open date AND have no transactions
+    const cyclesToDelete = (cyclesWithTransactionCounts || []).filter(cycle => 
+      new Date(cycle.startDate) < smartOpenDate && cycle.transactionCount === 0
+    );
+
+    let deletedCount = 0;
+    for (const cycle of cyclesToDelete) {
+      const { error: deleteError } = await supabaseAdmin
+        .from('billing_cycles')
+        .delete()
+        .eq('id', cycle.id);
+      
+      if (!deleteError) {
+        deletedCount++;
+      }
+    }
+
+    const updateResult = { updatedCard, deletedEmptyCycles: deletedCount };
 
     console.log('Smart update completed:', {
       newOpenDate: updateResult.updatedCard.openDate?.toDateString(),
@@ -158,11 +207,11 @@ export async function POST() {
       message: 'BoA cycles intelligently corrected',
       cardName: boaCard.name,
       analysis: {
-        oldOpenDate: boaCard.openDate?.toDateString() || 'null',
+        oldOpenDate: boaCard.openDate ? new Date(boaCard.openDate).toDateString() : 'null',
         newSmartOpenDate: smartOpenDate.toDateString(),
-        earliestTransactionDate: earliestTransaction?.date.toDateString() || 'none',
-        earliestCycleWithTransactionsStart: earliestCycleWithTransactions.startDate.toDateString(),
-        earliestCycleWithTransactionsEnd: earliestCycleWithTransactions.endDate.toDateString()
+        earliestTransactionDate: earliestTransaction ? new Date(earliestTransaction.date).toDateString() : 'none',
+        earliestCycleWithTransactionsStart: new Date(earliestCycleWithTransactions.startDate).toDateString(),
+        earliestCycleWithTransactionsEnd: new Date(earliestCycleWithTransactions.endDate).toDateString()
       },
       preservedCycles: cyclesWithTransactions,
       deletedEmptyCycles: updateResult.deletedEmptyCycles,

@@ -13,25 +13,51 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Find all cards and check if open date seems wrong compared to earliest transaction
-    const allCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Get earliest transaction for each card
+    const allCards = await Promise.all(
+      (creditCards || []).map(async (card) => {
+        const { data: transactions, error: txnError } = await supabaseAdmin
+          .from('transactions')
+          .select('*')
+          .eq('creditCardId', card.id)
+          .order('date', { ascending: true })
+          .limit(1);
+
+        if (txnError) {
+          throw new Error(`Failed to fetch transactions for card ${card.id}: ${txnError.message}`);
         }
-      },
-      include: {
-        plaidItem: {
-          select: {
-            institutionName: true
-          }
-        },
-        transactions: {
-          orderBy: { date: 'asc' },
-          take: 1 // Get the earliest transaction
-        }
-      }
-    });
+
+        const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+        
+        return {
+          ...card,
+          plaidItem: { institutionName: plaidItem?.institutionName },
+          transactions: transactions || []
+        };
+      })
+    );
 
     console.log(`Found ${allCards.length} total cards to check`);
 
@@ -61,10 +87,14 @@ export async function POST() {
           console.log(`Correcting open date for ${card.name} from ${currentOpenDate.toDateString()} to ${correctedOpenDate.toDateString()}`);
 
           // Update the card with the corrected open date
-          await prisma.creditCard.update({
-            where: { id: card.id },
-            data: { openDate: correctedOpenDate }
-          });
+          const { error: updateError } = await supabaseAdmin
+            .from('credit_cards')
+            .update({ openDate: correctedOpenDate.toISOString() })
+            .eq('id', card.id);
+
+          if (updateError) {
+            throw new Error(`Failed to update card ${card.id}: ${updateError.message}`);
+          }
 
           fixes.push({
             cardName: card.name,
@@ -76,7 +106,7 @@ export async function POST() {
             transactionUsed: {
               name: earliestTransaction.name,
               amount: earliestTransaction.amount,
-              date: earliestTransaction.date.toDateString()
+              date: new Date(earliestTransaction.date).toDateString()
             }
           });
         }
@@ -87,15 +117,19 @@ export async function POST() {
     if (fixes.length > 0) {
       console.log('Deleting existing billing cycles to force regeneration with corrected open dates...');
       
-      const deleteResult = await prisma.billingCycle.deleteMany({
-        where: {
-          creditCard: {
-            plaidItem: {
-              userId: session.user.id
-            }
-          }
-        }
-      });
+      // Get all credit card IDs for this user
+      const creditCardIds = (creditCards || []).map(card => card.id);
+      
+      const { error: deleteError, count: deletedCount } = await supabaseAdmin
+        .from('billing_cycles')
+        .delete()
+        .in('creditCardId', creditCardIds);
+
+      if (deleteError) {
+        throw new Error(`Failed to delete billing cycles: ${deleteError.message}`);
+      }
+
+      const deleteResult = { count: deletedCount || 0 };
       
       console.log(`Deleted ${deleteResult.count} billing cycles`);
 
