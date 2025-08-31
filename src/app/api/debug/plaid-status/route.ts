@@ -14,24 +14,34 @@ export async function GET() {
     }
 
     // Get all Plaid items with their current status
-    const plaidItems = await prisma.plaidItem.findMany({
-      where: { userId: session.user.id },
-      include: {
-        accounts: {
-          select: {
-            id: true,
-            name: true,
-            mask: true,
-            openDate: true,
-            balanceCurrent: true,
-            lastStatementIssueDate: true,
-            nextPaymentDueDate: true
-          }
-        }
-      }
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
 
-    const itemStatus = plaidItems.map(item => ({
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards (accounts) for these items
+    const { data: accounts, error: accountsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('id, name, mask, openDate, balanceCurrent, lastStatementIssueDate, nextPaymentDueDate, plaidItemId')
+      .in('plaidItemId', plaidItemIds);
+
+    if (accountsError) {
+      throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
+    }
+
+    // Combine plaid items with their accounts
+    const plaidItemsWithAccounts = (plaidItems || []).map(item => ({
+      ...item,
+      accounts: (accounts || []).filter(account => account.plaidItemId === item.id)
+    }));
+
+    const itemStatus = plaidItemsWithAccounts.map(item => ({
       institutionName: item.institutionName,
       itemId: item.itemId,
       status: item.status,
@@ -62,16 +72,16 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       items: itemStatus,
       summary: {
-        totalItems: plaidItems.length,
-        activeItems: plaidItems.filter(item => item.status === 'active').length,
-        expiredItems: plaidItems.filter(item => item.status === 'expired').length,
-        errorItems: plaidItems.filter(item => item.status === 'error').length,
-        itemsWithRecentErrors: plaidItems.filter(item => item.errorCode).length,
-        oldestSync: plaidItems.reduce((oldest, item) => {
+        totalItems: plaidItemsWithAccounts.length,
+        activeItems: plaidItemsWithAccounts.filter(item => item.status === 'active').length,
+        expiredItems: plaidItemsWithAccounts.filter(item => item.status === 'expired').length,
+        errorItems: plaidItemsWithAccounts.filter(item => item.status === 'error').length,
+        itemsWithRecentErrors: plaidItemsWithAccounts.filter(item => item.errorCode).length,
+        oldestSync: plaidItemsWithAccounts.reduce((oldest, item) => {
           if (!item.lastSyncAt) return oldest;
-          if (!oldest || item.lastSyncAt < oldest) return item.lastSyncAt;
+          if (!oldest || new Date(item.lastSyncAt) < new Date(oldest)) return item.lastSyncAt;
           return oldest;
-        }, null as Date | null),
+        }, null as string | null),
         accountsWithFutureDates: itemStatus.reduce((count, item) => 
           count + item.accounts.filter(acc => acc.isOpenDateInFuture || acc.isStatementDateInFuture).length, 0)
       }

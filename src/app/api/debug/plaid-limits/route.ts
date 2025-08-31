@@ -14,13 +14,18 @@ export async function GET() {
     }
 
     // Get all Plaid items for the user
-    const plaidItems = await prisma.plaidItem.findMany({
-      where: { userId: session.user.id },
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
 
     const results = [];
 
-    for (const item of plaidItems) {
+    for (const item of (plaidItems || [])) {
       const decryptedAccessToken = decrypt(item.accessToken);
       
       // Test multiple Plaid endpoints for credit limits

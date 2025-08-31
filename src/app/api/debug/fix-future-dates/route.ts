@@ -16,37 +16,38 @@ export async function POST() {
     const now = new Date();
     const currentYear = now.getFullYear();
     
-    // Find cards with future dates
-    const cardsWithFutureDates = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        OR: [
-          {
-            openDate: {
-              gt: now
-            }
-          },
-          {
-            lastStatementIssueDate: {
-              gt: now
-            }
-          },
-          {
-            nextPaymentDueDate: {
-              gt: new Date(currentYear + 1, 0, 1) // More than 1 year in future
-            }
-          }
-        ]
-      },
-      include: {
-        plaidItem: {
-          select: {
-            institutionName: true
-          }
-        }
-      }
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('id, institutionName')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards for the user
+    const { data: allCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Filter cards with future dates (Supabase doesn't support complex OR with nested conditions)
+    const futureYearThreshold = new Date(currentYear + 1, 0, 1);
+    const cardsWithFutureDates = (allCards || []).filter(card => {
+      const hasOpenDate = card.openDate && new Date(card.openDate) > now;
+      const hasStatementDate = card.lastStatementIssueDate && new Date(card.lastStatementIssueDate) > now;
+      const hasFutureDueDate = card.nextPaymentDueDate && new Date(card.nextPaymentDueDate) > futureYearThreshold;
+      return hasOpenDate || hasStatementDate || hasFutureDueDate;
+    }).map(card => {
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      return { ...card, plaidItem };
     });
 
     console.log(`Found ${cardsWithFutureDates.length} cards with future dates`);
@@ -58,7 +59,7 @@ export async function POST() {
       let fixesApplied = [];
       
       // Fix future open date
-      if (card.openDate && card.openDate > now) {
+      if (card.openDate && new Date(card.openDate) > now) {
         const correctedOpenDate = new Date(card.openDate);
         // If year is 2025+, change to 2024, if still future, change to 2023
         if (correctedOpenDate.getFullYear() >= 2025) {
@@ -68,12 +69,12 @@ export async function POST() {
           correctedOpenDate.setFullYear(2023);
         }
         
-        updates.openDate = correctedOpenDate;
-        fixesApplied.push(`Open date: ${card.openDate.toDateString()} → ${correctedOpenDate.toDateString()}`);
+        updates.openDate = correctedOpenDate.toISOString();
+        fixesApplied.push(`Open date: ${new Date(card.openDate).toDateString()} → ${correctedOpenDate.toDateString()}`);
       }
       
       // Fix future statement date
-      if (card.lastStatementIssueDate && card.lastStatementIssueDate > now) {
+      if (card.lastStatementIssueDate && new Date(card.lastStatementIssueDate) > now) {
         const correctedStatementDate = new Date(card.lastStatementIssueDate);
         // If year is 2025+, change to 2024, if still future, go back further
         if (correctedStatementDate.getFullYear() >= 2025) {
@@ -84,12 +85,12 @@ export async function POST() {
           correctedStatementDate.setMonth(correctedStatementDate.getMonth() - 3);
         }
         
-        updates.lastStatementIssueDate = correctedStatementDate;
-        fixesApplied.push(`Statement date: ${card.lastStatementIssueDate.toDateString()} → ${correctedStatementDate.toDateString()}`);
+        updates.lastStatementIssueDate = correctedStatementDate.toISOString();
+        fixesApplied.push(`Statement date: ${new Date(card.lastStatementIssueDate).toDateString()} → ${correctedStatementDate.toDateString()}`);
       }
       
       // Fix future due date (if more than 1 year in future)
-      if (card.nextPaymentDueDate && card.nextPaymentDueDate > new Date(currentYear + 1, 0, 1)) {
+      if (card.nextPaymentDueDate && new Date(card.nextPaymentDueDate) > new Date(currentYear + 1, 0, 1)) {
         const correctedDueDate = new Date(card.nextPaymentDueDate);
         if (correctedDueDate.getFullYear() >= 2025) {
           correctedDueDate.setFullYear(2024);
@@ -102,8 +103,8 @@ export async function POST() {
           correctedDueDate.setMonth(correctedDueDate.getMonth() - 6);
         }
         
-        updates.nextPaymentDueDate = correctedDueDate;
-        fixesApplied.push(`Due date: ${card.nextPaymentDueDate.toDateString()} → ${correctedDueDate.toDateString()}`);
+        updates.nextPaymentDueDate = correctedDueDate.toISOString();
+        fixesApplied.push(`Due date: ${new Date(card.nextPaymentDueDate).toDateString()} → ${correctedDueDate.toDateString()}`);
       }
       
       // Add default open date if missing
@@ -112,17 +113,22 @@ export async function POST() {
         const estimatedOpenDate = new Date(updates.lastStatementIssueDate || card.lastStatementIssueDate);
         estimatedOpenDate.setMonth(estimatedOpenDate.getMonth() - 6);
         
-        updates.openDate = estimatedOpenDate;
+        updates.openDate = estimatedOpenDate.toISOString();
         fixesApplied.push(`Added estimated open date: ${estimatedOpenDate.toDateString()}`);
       }
       
       if (Object.keys(updates).length > 0) {
         console.log(`Fixing ${card.name}:`, fixesApplied);
         
-        await prisma.creditCard.update({
-          where: { id: card.id },
-          data: updates
-        });
+        const { error: updateError } = await supabaseAdmin
+          .from('credit_cards')
+          .update(updates)
+          .eq('id', card.id);
+
+        if (updateError) {
+          console.error(`Failed to update card ${card.id}:`, updateError);
+          continue;
+        }
         
         fixes.push({
           cardName: card.name,
@@ -135,16 +141,20 @@ export async function POST() {
     // After fixing dates, delete all existing billing cycles so they can be regenerated
     if (fixes.length > 0) {
       console.log('Deleting existing billing cycles to force regeneration...');
-      const deleteResult = await prisma.billingCycle.deleteMany({
-        where: {
-          creditCard: {
-            plaidItem: {
-              userId: session.user.id
-            }
-          }
-        }
-      });
-      console.log(`Deleted ${deleteResult.count} existing billing cycles`);
+      
+      // Get all credit card IDs for the user
+      const cardIds = (allCards || []).map(card => card.id);
+      
+      const { error: deleteError } = await supabaseAdmin
+        .from('billing_cycles')
+        .delete()
+        .in('creditCardId', cardIds);
+
+      if (deleteError) {
+        console.error('Error deleting billing cycles:', deleteError);
+      } else {
+        console.log('Deleted existing billing cycles for regeneration');
+      }
     }
 
     console.log('🔧 FUTURE DATE FIXES COMPLETED');

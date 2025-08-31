@@ -14,33 +14,60 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all credit cards for the user
-    const creditCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        }
-      },
-      include: {
-        plaidItem: true,
-        transactions: {
-          orderBy: { date: 'desc' },
-          take: 100 // Get sample transactions
-        }
-      }
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Get sample transactions for each card
+    const { data: allTransactions, error: transactionsError } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .in('creditCardId', (creditCards || []).map(card => card.id))
+      .order('date', { ascending: false })
+      .limit(100 * (creditCards || []).length);
+
+    if (transactionsError) {
+      throw new Error(`Failed to fetch transactions: ${transactionsError.message}`);
+    }
+
+    // Combine data
+    const creditCardsWithData = (creditCards || []).map(card => {
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      const transactions = (allTransactions || [])
+        .filter(t => t.creditCardId === card.id)
+        .slice(0, 100); // Limit to 100 per card
+      return { ...card, plaidItem, transactions };
     });
 
-    console.log(`Found ${creditCards.length} credit cards`);
+    console.log(`Found ${(creditCards || []).length} credit cards`);
 
     const results = [];
     
-    for (const card of creditCards) {
+    for (const card of creditCardsWithData) {
       console.log(`\n=== Processing ${card.name} ===`);
       console.log(`Card has ${card.transactions.length} sample transactions (limited to 100)`);
       
       // Get transaction date range
       if (card.transactions.length > 0) {
-        const dates = card.transactions.map(t => t.date);
+        const dates = card.transactions.map(t => new Date(t.date));
         console.log('Transaction date range:', {
           newest: dates[0],
           oldest: dates[dates.length - 1]
@@ -48,10 +75,16 @@ export async function POST() {
       }
       
       // Delete ALL existing billing cycles for this card to force complete regeneration
-      const deleteResult = await prisma.billingCycle.deleteMany({
-        where: { creditCardId: card.id }
-      });
-      console.log(`Deleted ${deleteResult.count} existing cycles for ${card.name}`);
+      const { error: deleteError } = await supabaseAdmin
+        .from('billing_cycles')
+        .delete()
+        .eq('creditCardId', card.id);
+
+      if (deleteError) {
+        console.error(`Failed to delete cycles for ${card.name}:`, deleteError);
+      } else {
+        console.log(`Deleted existing cycles for ${card.name}`);
+      }
       
       // Regenerate cycles
       console.log('Regenerating cycles...');

@@ -15,29 +15,41 @@ export async function GET(request: NextRequest) {
 
     console.log('=== CAPITAL ONE LIMITS DEBUG ===');
 
-    // Get Capital One cards from database
-    const capitalOneCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: { userId: session.user.id },
-        OR: [
-          { name: { contains: 'Capital One', mode: 'insensitive' } },
-          { name: { contains: 'Quicksilver', mode: 'insensitive' } },
-          { name: { contains: 'Venture', mode: 'insensitive' } },
-          { name: { contains: 'Savor', mode: 'insensitive' } },
-          { name: { contains: 'Spark', mode: 'insensitive' } },
-          { plaidItem: { institutionName: { contains: 'Capital One', mode: 'insensitive' } } },
-        ]
-      },
-      include: {
-        plaidItem: {
-          select: {
-            id: true,
-            itemId: true,
-            institutionName: true,
-            accessToken: true
-          }
-        }
-      }
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards for filtering
+    const { data: allCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Filter for Capital One cards (Supabase doesn't support complex OR with nested conditions)
+    const capitalOneIndicators = ['capital one', 'quicksilver', 'venture', 'savor', 'spark'];
+    const capitalOneCards = (allCards || []).filter(card => {
+      const cardNameLower = card.name?.toLowerCase() || '';
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      const institutionNameLower = plaidItem?.institutionName?.toLowerCase() || '';
+      
+      return capitalOneIndicators.some(indicator => 
+        cardNameLower.includes(indicator) || institutionNameLower.includes(indicator)
+      );
+    }).map(card => {
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      return { ...card, plaidItem };
     });
 
     const results = [];

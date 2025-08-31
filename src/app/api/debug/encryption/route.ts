@@ -49,14 +49,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Check actual stored access tokens
-    const plaidItem = await prisma.plaidItem.findFirst({
-      where: { userId: session.user.id },
-      select: { 
-        id: true,
-        institutionName: true,
-        accessToken: true
-      }
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('id, institutionName, accessToken')
+      .eq('userId', session.user.id)
+      .limit(1);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid item: ${plaidError.message}`);
+    }
+
+    const plaidItem = plaidItems?.[0];
 
     if (!plaidItem) {
       return NextResponse.json({

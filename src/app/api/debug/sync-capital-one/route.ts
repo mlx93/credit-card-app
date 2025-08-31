@@ -16,12 +16,18 @@ export async function POST(request: NextRequest) {
     console.log('=== CAPITAL ONE SYNC TEST ===');
 
     // Get Capital One Plaid item
-    const capitalOnePlaidItem = await prisma.plaidItem.findFirst({
-      where: {
-        userId: session.user.id,
-        institutionName: { contains: 'Capital One', mode: 'insensitive' }
-      }
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const capitalOnePlaidItem = (plaidItems || []).find(item => 
+      item.institutionName?.toLowerCase().includes('capital one')
+    );
 
     if (!capitalOnePlaidItem) {
       return NextResponse.json({ error: 'No Capital One Plaid item found' }, { status: 404 });
@@ -37,17 +43,14 @@ export async function POST(request: NextRequest) {
       await plaidService.syncAccounts(decryptedAccessToken, capitalOnePlaidItem.itemId);
       
       // Get updated card data
-      const updatedCards = await prisma.creditCard.findMany({
-        where: { plaidItemId: capitalOnePlaidItem.id },
-        select: {
-          id: true,
-          name: true,
-          mask: true,
-          balanceLimit: true,
-          balanceCurrent: true,
-          balanceAvailable: true
-        }
-      });
+      const { data: updatedCards, error: cardsError } = await supabaseAdmin
+        .from('credit_cards')
+        .select('id, name, mask, balanceLimit, balanceCurrent, balanceAvailable')
+        .eq('plaidItemId', capitalOnePlaidItem.id);
+
+      if (cardsError) {
+        throw new Error(`Failed to fetch updated cards: ${cardsError.message}`);
+      }
 
       console.log('Updated Capital One cards after sync:', updatedCards);
 

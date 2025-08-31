@@ -11,27 +11,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get Capital One cards with all relevant fields
-    const capitalOneCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: { userId: session.user.id },
-        OR: [
-          { name: { contains: 'Capital One', mode: 'insensitive' } },
-          { name: { contains: 'Quicksilver', mode: 'insensitive' } },
-          { name: { contains: 'Venture', mode: 'insensitive' } },
-        ]
-      },
-      select: {
-        id: true,
-        name: true,
-        mask: true,
-        balanceCurrent: true,
-        balanceLimit: true,
-        balanceAvailable: true,
-        lastStatementBalance: true,
-        nextPaymentDueDate: true,
-        minimumPaymentAmount: true
-      }
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards
+    const { data: allCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Filter for Capital One cards
+    const capitalOneIndicators = ['capital one', 'quicksilver', 'venture'];
+    const capitalOneCards = (allCards || []).filter(card => {
+      const cardNameLower = card.name?.toLowerCase() || '';
+      return capitalOneIndicators.some(indicator => cardNameLower.includes(indicator));
     });
 
     // Calculate the same values as DueDateCard component
