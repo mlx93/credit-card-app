@@ -3,6 +3,7 @@ import { SupabaseAdapter } from '@next-auth/supabase-adapter';
 import GoogleProvider from 'next-auth/providers/google';
 
 export const authOptions: NextAuthOptions = {
+  debug: true,
   adapter: SupabaseAdapter({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
     secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -24,13 +25,27 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     signIn: async ({ user, account, profile }) => {
-      // NextAuth will handle user creation in next_auth schema
-      // We'll sync to public.users in a separate callback if needed
+      console.log('SignIn callback triggered:', { 
+        userId: user.id, 
+        userEmail: user.email,
+        provider: account?.provider 
+      });
       return true;
     },
   },
   session: {
     strategy: 'database',
+  },
+  logger: {
+    error(code, metadata) {
+      console.error('NextAuth Error:', code, metadata);
+    },
+    warn(code) {
+      console.warn('NextAuth Warning:', code);
+    },
+    debug(code, metadata) {
+      console.log('NextAuth Debug:', code, metadata);
+    },
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
