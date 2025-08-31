@@ -95,9 +95,11 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
   // Check if card has $0 balance - if so, all cycles should be marked as paid
   const hasZeroBalance = card && Math.abs(card.balanceCurrent || 0) < 0.01;
   
-  if (hasZeroBalance && cycle.statementBalance && cycle.statementBalance > 0) {
+  if (hasZeroBalance && (cycle.statementBalance !== null && cycle.statementBalance !== undefined)) {
     paymentStatus = 'paid';
-    paymentAnalysis = 'Paid - card has $0 balance';
+    paymentAnalysis = cycle.statementBalance > 0 ? 
+      'Paid - card has $0 balance' : 
+      'Paid - balance was $0 at statement';
   }
   // Only analyze cycles with statement balances when we have full data
   else if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
