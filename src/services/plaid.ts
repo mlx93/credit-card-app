@@ -800,6 +800,7 @@ class PlaidServiceImpl implements PlaidService {
           const { error: createError } = await supabaseAdmin
             .from('credit_cards')
             .insert({
+              id: crypto.randomUUID(),
               ...cardData,
               accountId: account.account_id,
               plaidItemId: plaidItem.id,
@@ -852,6 +853,7 @@ class PlaidServiceImpl implements PlaidService {
               const { error: createAprError } = await supabaseAdmin
                 .from('aprs')
                 .insert({
+                  id: crypto.randomUUID(),
                   creditCardId: creditCardForAprs.id,
                   aprType: apr.apr_type,
                   aprPercentage: apr.apr_percentage,
@@ -1039,6 +1041,7 @@ class PlaidServiceImpl implements PlaidService {
           const { error: createError } = await supabaseAdmin
             .from('transactions')
             .insert({
+              id: crypto.randomUUID(),
               ...transactionData,
               transactionId: transaction.transaction_id,
               plaidItemId: plaidItem.id,

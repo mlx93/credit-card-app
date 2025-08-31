@@ -266,6 +266,7 @@ async function createOrUpdateCycle(
     const { data: newCycle, error: createError } = await supabaseAdmin
       .from('billing_cycles')
       .insert({
+        id: crypto.randomUUID(),
         creditCardId: creditCard.id,
         startDate: cycleStart.toISOString(),
         endDate: cycleEnd.toISOString(),
