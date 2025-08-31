@@ -38,7 +38,7 @@ export const authOptions: NextAuthOptions = {
               email: user.email,
               name: user.name,
               image: user.image,
-              updated_at: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             })
             .onConflict('id');
         } catch (error) {
