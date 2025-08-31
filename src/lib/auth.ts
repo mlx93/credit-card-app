@@ -25,8 +25,33 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     signIn: async ({ user, account, profile }) => {
-      // Let NextAuth handle all user creation in next_auth schema
-      // No manual syncing to avoid conflicts
+      // After NextAuth creates the user, sync to public.users table
+      if (user.email && user.id) {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          );
+          
+          // Sync NextAuth user to public.users table using the same UUID
+          await supabase
+            .from('users')
+            .upsert({
+              id: user.id, // Use NextAuth's UUID
+              email: user.email,
+              name: user.name,
+              image: user.image,
+              updatedAt: new Date().toISOString(),
+            })
+            .onConflict('id');
+          
+          console.log('User synced to public.users:', user.email);
+        } catch (error) {
+          console.error('Error syncing user to public.users:', error);
+          // Don't fail the sign-in if sync fails
+        }
+      }
       return true;
     },
   },
