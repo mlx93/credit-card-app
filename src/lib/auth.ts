@@ -1,6 +1,5 @@
 import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import EmailProvider from 'next-auth/providers/email';
 import { createClient } from '@supabase/supabase-js';
 
 // Create Supabase client for NextAuth operations
@@ -19,18 +18,6 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    EmailProvider({
-      from: process.env.EMAIL_FROM || 'noreply@cardcycle.app',
-      // For testing - log verification URLs to console
-      sendVerificationRequest: async ({ identifier: email, url, provider }) => {
-        console.log('=== EMAIL VERIFICATION ===');
-        console.log('Email:', email);
-        console.log('Verification URL:', url);
-        console.log('========================');
-        // In production, you'd send the actual email here
-        return Promise.resolve();
-      },
     }),
   ],
   callbacks: {
