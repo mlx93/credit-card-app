@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function POST() {
   try {
@@ -13,26 +13,54 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all credit cards with their billing cycles
-    const creditCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        }
-      },
-      include: {
-        plaidItem: true,
-        billingCycles: {
-          orderBy: { startDate: 'asc' }
-        }
-      }
-    });
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
 
-    console.log(`Found ${creditCards.length} credit cards for open date debug`);
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Get billing cycles for each card
+    const creditCardsWithCycles = [];
+    for (const card of (creditCards || [])) {
+      const { data: billingCycles, error: cyclesError } = await supabaseAdmin
+        .from('billing_cycles')
+        .select('*')
+        .eq('creditCardId', card.id)
+        .order('startDate', { ascending: true });
+
+      if (cyclesError) {
+        console.error('Failed to fetch billing cycles:', cyclesError);
+      }
+
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      creditCardsWithCycles.push({
+        ...card,
+        plaidItem,
+        billingCycles: billingCycles || []
+      });
+    }
+
+    console.log(`Found ${(creditCards || []).length} credit cards for open date debug`);
 
     const debugResults = [];
 
-    for (const card of creditCards) {
+    for (const card of creditCardsWithCycles) {
       console.log(`\n=== DEBUGGING ${card.name} OPEN DATE ===`);
       
       const cardOpenDate = card.openDate ? new Date(card.openDate) : null;

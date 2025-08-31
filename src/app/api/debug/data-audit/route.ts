@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // Helper function to identify payment transactions based on transaction name
 function isPaymentTransaction(transactionName: string): boolean {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function POST() {
   try {
@@ -15,27 +15,41 @@ export async function POST() {
 
     const now = new Date();
     
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
     // Find cards with future open dates
-    const cardsWithFutureDates = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        openDate: {
-          gt: now // Greater than current date = future date
-        }
-      },
-      include: {
-        plaidItem: true
-      }
+    const { data: cardsWithFutureDates, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds)
+      .gt('openDate', now.toISOString());
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Add plaidItem reference to each card
+    const cardsWithPlaidItems = (cardsWithFutureDates || []).map(card => {
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      return { ...card, plaidItem };
     });
 
-    console.log(`Found ${cardsWithFutureDates.length} cards with future open dates`);
+    console.log(`Found ${(cardsWithFutureDates || []).length} cards with future open dates`);
 
     const fixes = [];
     
-    for (const card of cardsWithFutureDates) {
-      const currentOpenDate = card.openDate;
+    for (const card of cardsWithPlaidItems) {
+      const currentOpenDate = card.openDate ? new Date(card.openDate) : null;
       
       if (currentOpenDate) {
         // Fix common year mistakes: 2025 -> 2024, 2026 -> 2024, etc.
@@ -54,10 +68,15 @@ export async function POST() {
           console.log(`Fixing ${card.name}: ${currentOpenDate.toDateString()} -> ${correctedDate.toDateString()}`);
           
           // Update the card with the corrected date
-          await prisma.creditCard.update({
-            where: { id: card.id },
-            data: { openDate: correctedDate }
-          });
+          const { error: updateError } = await supabaseAdmin
+            .from('credit_cards')
+            .update({ openDate: correctedDate.toISOString() })
+            .eq('id', card.id);
+
+          if (updateError) {
+            console.error(`Failed to update card ${card.id}:`, updateError);
+            continue;
+          }
           
           fixes.push({
             cardName: card.name,

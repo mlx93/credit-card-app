@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { plaidClient } from '@/lib/plaid';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { decrypt } from '@/lib/encryption';
 
 export async function POST() {

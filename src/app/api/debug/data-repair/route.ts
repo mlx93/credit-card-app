@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // Helper function to identify payment transactions based on transaction name
 function isPaymentTransaction(transactionName: string): boolean {
@@ -34,29 +34,63 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all credit cards with related data
-    const creditCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        }
-      },
-      include: {
-        plaidItem: true,
-        transactions: {
-          orderBy: { date: 'desc' }
-        },
-        billingCycles: {
-          orderBy: { endDate: 'desc' }
-        }
-      }
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Get all transactions for these cards
+    const { data: allTransactions, error: transactionsError } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .in('plaidItemId', plaidItemIds)
+      .order('date', { ascending: false });
+
+    if (transactionsError) {
+      throw new Error(`Failed to fetch transactions: ${transactionsError.message}`);
+    }
+
+    // Get all billing cycles for these cards
+    const { data: allBillingCycles, error: cyclesError } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .in('creditCardId', (creditCards || []).map(card => card.id))
+      .order('endDate', { ascending: false });
+
+    if (cyclesError) {
+      throw new Error(`Failed to fetch billing cycles: ${cyclesError.message}`);
+    }
+
+    // Combine data
+    const creditCardsWithRelations = (creditCards || []).map(card => {
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      const transactions = (allTransactions || []).filter(t => t.creditCardId === card.id);
+      const billingCycles = (allBillingCycles || []).filter(c => c.creditCardId === card.id);
+      return { ...card, plaidItem, transactions, billingCycles };
     });
 
-    console.log(`Found ${creditCards.length} credit cards for repair`);
+    console.log(`Found ${(creditCards || []).length} credit cards for repair`);
 
     const repairResults = [];
 
-    for (const card of creditCards) {
+    for (const card of creditCardsWithRelations) {
       console.log(`\n=== REPAIRING ${card.name} ===`);
       
       const cardRepair = {
@@ -75,9 +109,10 @@ export async function POST() {
         
         // Get transactions for this cycle
         const effectiveEndDate = cycleEnd > today ? today : cycleEnd;
-        const cycleTransactions = card.transactions.filter(t => 
-          t.date >= cycleStart && t.date <= effectiveEndDate
-        );
+        const cycleTransactions = card.transactions.filter(t => {
+          const transactionDate = new Date(t.date);
+          return transactionDate >= cycleStart && transactionDate <= effectiveEndDate;
+        });
         
         const transactionBasedSpend = cycleTransactions.reduce((sum, t) => {
           // Exclude payment transactions, include charges and refunds
@@ -131,16 +166,20 @@ export async function POST() {
           });
           
           try {
-            const updatedCycle = await prisma.billingCycle.update({
-              where: { id: cycle.id },
-              data: {
+            const { error: updateError } = await supabaseAdmin
+              .from('billing_cycles')
+              .update({
                 totalSpend: correctSpend,
                 statementBalance: correctStatementBalance,
                 minimumPayment: correctStatementBalance && correctStatementBalance > 0 
                   ? Math.max(25, correctStatementBalance * 0.02) 
                   : null
-              }
-            });
+              })
+              .eq('id', cycle.id);
+
+            if (updateError) {
+              throw new Error(updateError.message);
+            }
             
             cardRepair.repairs.push({
               cycleId: cycle.id,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
 
@@ -15,29 +15,44 @@ export async function POST(request: NextRequest) {
 
     console.log('=== CAPITAL ONE SYNC DEBUG ===');
 
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
     // Get Capital One cards from database
-    const capitalOneCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: { userId: session.user.id },
-        OR: [
-          { name: { contains: 'Capital One', mode: 'insensitive' } },
-          { name: { contains: 'Quicksilver', mode: 'insensitive' } },
-          { name: { contains: 'Venture', mode: 'insensitive' } },
-          { name: { contains: 'Savor', mode: 'insensitive' } },
-          { name: { contains: 'Spark', mode: 'insensitive' } },
-          { plaidItem: { institutionName: { contains: 'Capital One', mode: 'insensitive' } } },
-        ]
-      },
-      include: {
-        plaidItem: {
-          select: {
-            id: true,
-            itemId: true,
-            institutionName: true,
-            accessToken: true
-          }
-        }
-      }
+    const { data: allCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Filter for Capital One cards
+    const capitalOneIndicators = ['capital one', 'quicksilver', 'venture', 'savor', 'spark'];
+    const capitalOneCards = (allCards || []).filter(card => {
+      const cardNameLower = card.name?.toLowerCase() || '';
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      const institutionNameLower = plaidItem?.institutionName?.toLowerCase() || '';
+      
+      return capitalOneIndicators.some(indicator => 
+        cardNameLower.includes(indicator) || institutionNameLower.includes(indicator)
+      );
+    });
+
+    // Add plaidItem reference to each card
+    const capitalOneCardsWithPlaidItem = capitalOneCards.map(card => {
+      const plaidItem = plaidItems?.find(item => item.id === card.plaidItemId);
+      return { ...card, plaidItem };
     });
 
     if (capitalOneCards.length === 0) {
@@ -50,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     const results = [];
 
-    for (const card of capitalOneCards) {
+    for (const card of capitalOneCardsWithPlaidItem) {
       console.log(`\n=== SYNCING CAPITAL ONE CARD: ${card.name} ===`);
       
       try {
@@ -67,9 +82,15 @@ export async function POST(request: NextRequest) {
         await plaidService.syncAccounts(decryptedToken, card.plaidItem.itemId);
         
         // Check updated values
-        const updatedCard = await prisma.creditCard.findUnique({
-          where: { id: card.id }
-        });
+        const { data: updatedCard, error: updateError } = await supabaseAdmin
+          .from('credit_cards')
+          .select('*')
+          .eq('id', card.id)
+          .single();
+
+        if (updateError) {
+          console.error('Failed to fetch updated card:', updateError);
+        }
         
         console.log('After sync - updated database values:');
         console.log('Balance Limit:', updatedCard?.balanceLimit);

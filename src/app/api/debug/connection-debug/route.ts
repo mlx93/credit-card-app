@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -17,24 +17,65 @@ export async function GET() {
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-    // Get all user data in one comprehensive query
-    const userData = await prisma.plaidItem.findMany({
-      where: { userId: session.user.id },
-      include: {
-        accounts: {
-          include: {
-            billingCycles: {
-              orderBy: { startDate: 'desc' },
-              take: 15 // Get more cycles to see the problem
-            },
-            transactions: {
-              orderBy: { date: 'asc' },
-              take: 5 // Get earliest transactions for fallback logic
-            }
-          }
-        }
-      }
-    });
+    // Get all user plaid items
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+
+    // Get all credit cards (accounts)
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Get billing cycles with limit
+    const { data: allBillingCycles, error: cyclesError } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .in('creditCardId', (creditCards || []).map(card => card.id))
+      .order('startDate', { ascending: false })
+      .limit(15 * (creditCards || []).length);
+
+    if (cyclesError) {
+      throw new Error(`Failed to fetch billing cycles: ${cyclesError.message}`);
+    }
+
+    // Get earliest transactions
+    const { data: allTransactions, error: transactionsError } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .in('creditCardId', (creditCards || []).map(card => card.id))
+      .order('date', { ascending: true })
+      .limit(5 * (creditCards || []).length);
+
+    if (transactionsError) {
+      throw new Error(`Failed to fetch transactions: ${transactionsError.message}`);
+    }
+
+    // Reconstruct the nested structure
+    const userData = (plaidItems || []).map(plaidItem => ({
+      ...plaidItem,
+      accounts: (creditCards || []).filter(card => card.plaidItemId === plaidItem.id).map(account => ({
+        ...account,
+        billingCycles: (allBillingCycles || [])
+          .filter(cycle => cycle.creditCardId === account.id)
+          .slice(0, 15),
+        transactions: (allTransactions || [])
+          .filter(transaction => transaction.creditCardId === account.id)
+          .slice(0, 5)
+      }))
+    }));
 
     const results = userData.map(plaidItem => {
       const itemResult = {
