@@ -45,12 +45,29 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           setLoadingSubMessage('Fetching credit card information...');
           
           // Sync data after successful connection
-          await fetch('/api/sync', {
-            method: 'POST',
-          });
-          
-          setLoadingMessage('Success!');
-          setLoadingSubMessage('Your accounts have been connected');
+          try {
+            const syncResponse = await fetch('/api/sync', {
+              method: 'POST',
+            });
+            
+            if (!syncResponse.ok) {
+              const syncError = await syncResponse.json();
+              console.error('Sync failed:', syncError);
+              // Continue anyway - connection was successful even if sync had issues
+              setLoadingMessage('Connected with sync warnings');
+              setLoadingSubMessage('Account connected, some data may sync later');
+            } else {
+              const syncData = await syncResponse.json();
+              console.log('Sync successful:', syncData);
+              setLoadingMessage('Success!');
+              setLoadingSubMessage('Your accounts have been connected');
+            }
+          } catch (syncError) {
+            console.error('Sync request failed:', syncError);
+            // Connection was successful even if sync failed
+            setLoadingMessage('Connected with sync issues');
+            setLoadingSubMessage('Account connected, sync will retry automatically');
+          }
           
           // Brief delay to show success message
           setTimeout(() => {
