@@ -1236,6 +1236,11 @@ class PlaidServiceImpl implements PlaidService {
       
       if (allTransactionsForUpsert.length > 0) {
         // Use upsert to handle both creates and updates in a single operation
+        // Log first transaction for debugging
+        if (allTransactionsForUpsert.length > 0) {
+          console.log('🔍 Sample transaction data being upserted:', JSON.stringify(allTransactionsForUpsert[0], null, 2));
+        }
+        
         const { error: upsertError, count } = await supabaseAdmin
           .from('transactions')
           .upsert(allTransactionsForUpsert, { 
