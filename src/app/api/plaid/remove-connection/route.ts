@@ -53,8 +53,8 @@ export async function DELETE(request: NextRequest) {
     const { error: clearLimitsError } = await supabaseAdmin
       .from('credit_cards')
       .update({
-        isManualLimit: false,
-        manualCreditLimit: null,
+        ismanuallimit: false,
+        manualcreditlimit: null,
         updatedAt: new Date().toISOString()
       })
       .eq('plaidItemId', plaidItem.id);

@@ -25,8 +25,8 @@ interface CreditCardInfo {
   mask: string;
   balanceCurrent: number;
   balanceLimit: number;
-  manualCreditLimit?: number | null;
-  isManualLimit?: boolean;
+  manualcreditlimit?: number | null;
+  ismanuallimit?: boolean;
   lastStatementBalance?: number;
   nextPaymentDueDate?: Date;
   minimumPaymentAmount?: number;
@@ -234,12 +234,12 @@ export function DueDateCard({
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
   
   // Determine credit limit logic
-  const isManualLimit = card.isManualLimit || false;
+  const isManualLimit = card.ismanuallimit || false;
   const hasValidPlaidLimit = card.balanceLimit && card.balanceLimit > 0 && isFinite(card.balanceLimit) && !isNaN(card.balanceLimit);
   
   // Effective limit: if valid Plaid limit exists, it always takes precedence
   // Otherwise, use manual limit if available
-  const effectiveLimit = hasValidPlaidLimit ? card.balanceLimit : (isManualLimit ? card.manualCreditLimit : null);
+  const effectiveLimit = hasValidPlaidLimit ? card.balanceLimit : (isManualLimit ? card.manualcreditlimit : null);
   const hasValidEffectiveLimit = effectiveLimit && effectiveLimit > 0 && isFinite(effectiveLimit) && !isNaN(effectiveLimit);
   const utilization = hasValidEffectiveLimit ? Math.abs(card.balanceCurrent) / effectiveLimit * 100 : 0;
   
@@ -340,8 +340,8 @@ export function DueDateCard({
           // Create updated card object with new manual limit
           const updatedCard = { 
             ...card, 
-            manualCreditLimit: data.card.manualCreditLimit,
-            isManualLimit: data.card.isManualLimit
+            manualcreditlimit: data.card.manualcreditlimit,
+            ismanuallimit: data.card.ismanuallimit
           };
           
           // If parent component provides an update callback, use it
@@ -350,8 +350,8 @@ export function DueDateCard({
             // Store the update in sessionStorage so parent can pick it up
             sessionStorage.setItem(`creditLimit_${card.id}`, JSON.stringify({
               cardId: card.id,
-              manualCreditLimit: data.card.manualCreditLimit,
-              isManualLimit: data.card.isManualLimit,
+              manualcreditlimit: data.card.manualcreditlimit,
+              ismanuallimit: data.card.ismanuallimit,
               timestamp: Date.now()
             }));
             
@@ -359,8 +359,8 @@ export function DueDateCard({
             window.dispatchEvent(new CustomEvent('creditLimitUpdated', {
               detail: { 
                 cardId: card.id, 
-                manualCreditLimit: data.card.manualCreditLimit,
-                isManualLimit: data.card.isManualLimit
+                manualcreditlimit: data.card.manualcreditlimit,
+                ismanuallimit: data.card.ismanuallimit
               }
             }));
           }

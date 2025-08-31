@@ -44,8 +44,8 @@ export async function PUT(
     const { data: updatedCard, error: updateError } = await supabaseAdmin
       .from('credit_cards')
       .update({
-        manualCreditLimit,
-        isManualLimit: true,
+        manualcreditlimit: manualCreditLimit,
+        ismanuallimit: true,
         updatedAt: new Date().toISOString()
       })
       .eq('id', cardId)
@@ -103,8 +103,8 @@ export async function DELETE(
     const { data: updatedCard, error: updateError } = await supabaseAdmin
       .from('credit_cards')
       .update({
-        manualCreditLimit: null,
-        isManualLimit: false,
+        manualcreditlimit: null,
+        ismanuallimit: false,
         updatedAt: new Date().toISOString()
       })
       .eq('id', cardId)

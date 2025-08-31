@@ -379,14 +379,14 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   // Listen for credit limit updates
   useEffect(() => {
     const handleCreditLimitUpdate = (event: any) => {
-      const { cardId, manualCreditLimit, isManualLimit } = event.detail;
-      console.log('📝 Credit limit updated event received:', { cardId, manualCreditLimit, isManualLimit });
+      const { cardId, manualcreditlimit, ismanuallimit } = event.detail;
+      console.log('📝 Credit limit updated event received:', { cardId, manualcreditlimit, ismanuallimit });
       
       // Update the credit card data in state
       setCreditCards(prevCards => 
         prevCards.map(card => 
           card.id === cardId 
-            ? { ...card, manualCreditLimit, isManualLimit }
+            ? { ...card, manualcreditlimit, ismanuallimit }
             : card
         )
       );
@@ -434,7 +434,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   );
   const averageUtilization = (() => {
     const cardsWithLimits = displayCards.filter(card => {
-      const effectiveLimit = card.isManualLimit ? card.manualCreditLimit : card.balanceLimit;
+      const effectiveLimit = card.ismanuallimit ? card.manualcreditlimit : card.balanceLimit;
       return effectiveLimit && effectiveLimit > 0 && isFinite(effectiveLimit);
     });
     
@@ -442,7 +442,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     
     return cardsWithLimits.reduce((sum, card) => {
       const balance = Math.abs(card.balanceCurrent || 0);
-      const effectiveLimit = card.isManualLimit ? card.manualCreditLimit! : card.balanceLimit!;
+      const effectiveLimit = card.ismanuallimit ? card.manualcreditlimit! : card.balanceLimit!;
       return sum + (balance / effectiveLimit) * 100;
     }, 0) / cardsWithLimits.length;
   })();
