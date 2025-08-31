@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { prisma } from '@/lib/db';
 
 export async function GET() {
   try {
@@ -11,40 +11,34 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Supabase query with joins
-    const { data: creditCards, error } = await supabase
-      .from('credit_cards')
-      .select(`
-        *,
-        plaid_items!inner (
-          id,
-          item_id,
-          institution_name,
-          status,
-          last_sync_at,
-          error_message
-        ),
-        aprs (*)
-      `)
-      .eq('plaid_items.user_id', session.user.id)
-      .order('created_at', { ascending: false });
-
-    // Get transaction counts separately (Supabase doesn't support _count like Prisma)
-    if (creditCards && creditCards.length > 0) {
-      for (const card of creditCards) {
-        const { count } = await supabase
-          .from('transactions')
-          .select('*', { count: 'exact', head: true })
-          .eq('credit_card_id', card.id);
-        
-        card._count = { transactions: count || 0 };
-      }
-    }
-
-    if (error) {
-      console.error('Supabase error fetching credit cards:', error);
-      return NextResponse.json({ error: 'Database error' }, { status: 500 });
-    }
+    const creditCards = await prisma.creditCard.findMany({
+      where: {
+        plaidItem: {
+          userId: session.user.id,
+        },
+      },
+      include: {
+        plaidItem: {
+          select: {
+            id: true,
+            itemId: true,
+            institutionName: true,
+            status: true,
+            lastSyncAt: true,
+            errorMessage: true,
+          },
+        },
+        aprs: true,
+        _count: {
+          select: {
+            transactions: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
     const response = NextResponse.json({ creditCards });
     

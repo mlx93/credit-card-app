@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { prisma } from '@/lib/db';
 import { addMonths, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
 
 // Helper function to detect Capital One cards based on institution and card names
@@ -332,23 +332,17 @@ async function generateEstimatedCycles(creditCard: any, cycles: BillingCycleData
 }
 
 export async function getAllUserBillingCycles(userId: string): Promise<BillingCycleData[]> {
-  const { data: plaidItems, error } = await supabase
-    .from('plaid_items')
-    .select(`
-      *,
-      credit_cards (*)
-    `)
-    .eq('user_id', userId);
-
-  if (error) {
-    console.error('Error fetching plaid items:', error);
-    throw new Error('Failed to fetch plaid items');
-  }
+  const plaidItems = await prisma.plaidItem.findMany({
+    where: { userId },
+    include: {
+      accounts: true,
+    },
+  });
 
   const allCycles: BillingCycleData[] = [];
   
   for (const item of plaidItems) {
-    for (const card of item.credit_cards) {
+    for (const card of item.accounts) {
       const cycles = await calculateBillingCycles(card.id);
       
       // Filter cycles to only include those that end after card open date (overlaps with card opening)
