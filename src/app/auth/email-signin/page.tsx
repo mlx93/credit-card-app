@@ -100,14 +100,14 @@ export default function EmailSignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center px-4 relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent"></div>
-      <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse"></div>
-      <div className="absolute bottom-0 -right-4 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-1000"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-100/30 via-transparent to-transparent"></div>
+      <div className="absolute top-0 -left-4 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+      <div className="absolute bottom-0 -right-4 w-72 h-72 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
       
       <div className="relative w-full max-w-md">
-        <div className={`backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl transition-all duration-300 ${
+        <div className={`backdrop-blur-xl bg-white/80 border border-white/60 rounded-3xl p-8 shadow-2xl transition-all duration-300 ${
           stepTransition ? 'scale-95 opacity-50' : 'scale-100 opacity-100'
         }`}>
           {/* Header */}
@@ -123,10 +123,10 @@ export default function EmailSignIn() {
                 <CreditCard className="h-8 w-8 text-white" />
               )}
             </div>
-            <h1 className="text-2xl font-semibold text-white mb-2">
+            <h1 className="text-2xl font-semibold text-slate-800 mb-2">
               {step === 'email' ? 'Sign in with Email' : 'Enter Verification Code'}
             </h1>
-            <p className="text-slate-300 text-sm">
+            <p className="text-slate-600 text-sm">
               {isSuccess ? (
                 <span className="text-green-400 font-medium">Welcome to CardCycle! 🎉</span>
               ) : step === 'email' ? (
@@ -141,7 +141,7 @@ export default function EmailSignIn() {
           {step === 'email' && (
             <form onSubmit={handleSendCode} className="space-y-6">
               <div className="space-y-1">
-                <label htmlFor="email" className="text-slate-300 text-sm font-medium">
+                <label htmlFor="email" className="text-slate-700 text-sm font-medium">
                   Email Address
                 </label>
                 <div className="relative group">
@@ -151,7 +151,7 @@ export default function EmailSignIn() {
                     type="email"
                     autoComplete="email"
                     required
-                    className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200 hover:bg-white/10 hover:border-white/20"
+                    className="w-full px-4 py-4 bg-white/70 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200 hover:bg-white/90 hover:border-slate-300"
                     placeholder="Enter your email address"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -197,7 +197,7 @@ export default function EmailSignIn() {
               <button
                 type="button"
                 onClick={() => window.location.href = '/'}
-                className="w-full py-3 text-slate-300 hover:text-white font-medium rounded-xl hover:bg-white/5 transition-all duration-200"
+                className="w-full py-3 text-slate-600 hover:text-slate-800 font-medium rounded-xl hover:bg-slate-100/50 transition-all duration-200"
               >
                 ← Back to main sign-in
               </button>
@@ -222,7 +222,7 @@ export default function EmailSignIn() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-slate-300 text-sm font-medium text-center block">
+                <label className="text-slate-700 text-sm font-medium text-center block">
                   Verification Code
                 </label>
                 <div className={`flex justify-center space-x-3 ${error ? 'animate-pulse' : ''}`}>
@@ -232,9 +232,9 @@ export default function EmailSignIn() {
                         ref={(el) => (inputRefs.current[index] = el)}
                         type="text"
                         maxLength={1}
-                        className={`w-12 h-16 bg-white/10 border-2 rounded-xl text-white text-center text-2xl font-mono focus:outline-none transition-all duration-200 ${
-                          digit ? 'border-indigo-400/60 bg-indigo-500/10' : 'border-white/20'
-                        } focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 hover:bg-white/15 hover:border-white/30`}
+                        className={`w-12 h-16 bg-white/70 border-2 rounded-xl text-slate-800 text-center text-2xl font-mono focus:outline-none transition-all duration-200 ${
+                          digit ? 'border-indigo-400/60 bg-indigo-50/80' : 'border-slate-200'
+                        } focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 hover:bg-white/90 hover:border-slate-300`}
                         aria-label={`Digit ${index + 1} of 6`}
                         inputMode="numeric"
                         pattern="[0-9]*"
@@ -280,7 +280,7 @@ export default function EmailSignIn() {
                     </div>
                   ))}
                 </div>
-                <p className="text-slate-400 text-xs text-center">
+                <p className="text-slate-600 text-xs text-center">
                   Enter the 6-digit code from your email
                 </p>
               </div>
@@ -354,7 +354,7 @@ export default function EmailSignIn() {
                     handleSendCode({ preventDefault: () => {} } as React.FormEvent);
                   }}
                   disabled={loading || isSuccess}
-                  className="py-3 text-slate-300 hover:text-white font-medium rounded-xl hover:bg-white/5 transition-all duration-200 disabled:opacity-50 group"
+                  className="py-3 text-slate-600 hover:text-slate-800 font-medium rounded-xl hover:bg-slate-100/50 transition-all duration-200 disabled:opacity-50 group"
                 >
                   <span className="flex items-center justify-center space-x-2">
                     <span>📧</span>
@@ -373,7 +373,7 @@ export default function EmailSignIn() {
                     setIsSuccess(false);
                   }}
                   disabled={isSuccess}
-                  className="py-3 text-slate-400 hover:text-slate-300 text-sm rounded-xl hover:bg-white/5 transition-all duration-200 disabled:opacity-50"
+                  className="py-3 text-slate-500 hover:text-slate-700 text-sm rounded-xl hover:bg-slate-100/50 transition-all duration-200 disabled:opacity-50"
                 >
                   ← Use Different Email
                 </button>
