@@ -14,10 +14,12 @@ export function formatDate(date: Date | string | null | undefined): string {
     return 'Invalid Date';
   }
   
+  // Use UTC to avoid timezone conversion issues with billing cycle dates
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: 'UTC'
   }).format(dateObj);
 }
 
