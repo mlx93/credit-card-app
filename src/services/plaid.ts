@@ -129,11 +129,11 @@ class PlaidServiceImpl implements PlaidService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // Retry logic with exponential backoff - more aggressive for rate limits
+  // Retry logic with exponential backoff for rate limits
   private async retryWithBackoff<T>(
     operation: () => Promise<T>,
-    maxRetries: number = 5,  // Increased from 3 to 5
-    baseDelay: number = 2000  // Increased from 1000ms to 2000ms
+    maxRetries: number = 5,
+    baseDelay: number = 1000  // Back to 1000ms base delay
   ): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -216,8 +216,8 @@ class PlaidServiceImpl implements PlaidService {
           plaidClient.transactionsGet(request)
         );
         
-        // Add longer delay between requests to prevent rate limiting
-        await this.delay(1500); // Increased to 1.5 seconds between transaction requests
+        // Add small delay between requests to prevent rate limiting
+        await this.delay(300); // 300ms between transaction requests
         const chunkTransactions = response.data.transactions;
         
         console.log(`Chunk result: ${chunkTransactions.length} transactions (total available in period: ${response.data.total_transactions})`);
@@ -389,10 +389,10 @@ class PlaidServiceImpl implements PlaidService {
     console.log(`🔄 Starting syncAccounts for itemId: ${itemId}`);
     
     const liabilitiesData = await this.getLiabilities(accessToken);
-    await this.delay(1000); // Increased delay to 1 second between API calls
+    await this.delay(300); // Small delay between API calls
     
     const balancesData = await this.getBalances(accessToken);
-    await this.delay(1000); // Increased delay to 1 second between API calls
+    await this.delay(300); // Small delay between API calls
     
     const accountsData = await this.getAccounts(accessToken);
 
@@ -897,13 +897,12 @@ class PlaidServiceImpl implements PlaidService {
           }
         } else {
           // Double-check that no card was created by another concurrent process
-          const { data: recheckCard } = await supabaseAdmin
+          const { data: recheckCards } = await supabaseAdmin
             .from('credit_cards')
             .select('id')
-            .eq('accountId', account.account_id)
-            .single();
+            .eq('accountId', account.account_id);
           
-          if (recheckCard) {
+          if (recheckCards && recheckCards.length > 0) {
             console.log(`ℹ️ Card was created by concurrent process for ${account.name}, skipping creation`);
             continue; // Skip to next account
           }
@@ -993,9 +992,9 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`=== TRANSACTION SYNC START for itemId: ${plaidItemRecord.itemId} ===`);
       console.log(`✅ Using passed plaidItem record - no DB lookup needed`);
       
-      // Add initial delay to avoid rate limiting if called too soon after other API calls
+      // Add small initial delay to avoid rate limiting if called too soon after other API calls
       console.log('⏳ Adding pre-sync delay to respect rate limits...');
-      await this.delay(2000); // 2 second delay before starting transaction sync
+      await this.delay(500); // 500ms delay before starting transaction sync
       
       // Determine if this is Capital One using institution name (no API call needed)
       const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
@@ -1052,17 +1051,50 @@ class PlaidServiceImpl implements PlaidService {
       let processedCount = 0;
       let creditCardFoundCount = 0;
       
+      // Batch fetch all credit cards for this plaid item to avoid N queries
+      const uniqueAccountIds = [...new Set(transactions.map(t => t.account_id))];
+      const { data: creditCards, error: creditCardsError } = await supabaseAdmin
+        .from('credit_cards')
+        .select('*')
+        .in('accountId', uniqueAccountIds);
+      
+      if (creditCardsError) {
+        console.error('Error fetching credit cards:', creditCardsError);
+      }
+      
+      // Create a map for quick lookup
+      const creditCardMap = new Map();
+      (creditCards || []).forEach(card => {
+        creditCardMap.set(card.accountId, card);
+      });
+      
+      // Batch fetch existing transactions to avoid N queries
+      const transactionIds = transactions.map(t => t.transaction_id);
+      const { data: existingTransactions, error: existingTransError } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .in('transactionId', transactionIds);
+      
+      if (existingTransError) {
+        console.error('Error fetching existing transactions:', existingTransError);
+      }
+      
+      // Create a map for quick lookup
+      const existingTransMap = new Map();
+      (existingTransactions || []).forEach(trans => {
+        existingTransMap.set(trans.transactionId, trans);
+      });
+      
+      console.log(`Processing ${transactions.length} transactions with batch queries`);
+      console.log(`Found ${creditCards?.length || 0} credit cards and ${existingTransactions?.length || 0} existing transactions`);
+
+      // Prepare batch operations
+      const transactionsToCreate = [];
+      const transactionsToUpdate = [];
+
       for (const transaction of transactions) {
-        const { data: creditCard, error: creditCardError } = await supabaseAdmin
-          .from('credit_cards')
-          .select('*')
-          .eq('accountId', transaction.account_id)
-          .single();
-
-        if (creditCardError && creditCardError.code !== 'PGRST116') {
-          console.error('Error fetching credit card:', creditCardError);
-        }
-
+        const creditCard = creditCardMap.get(transaction.account_id);
+        
         // Debug transaction to credit card association
         if (!creditCard) {
           console.log('No credit card found for transaction:', {
@@ -1076,15 +1108,7 @@ class PlaidServiceImpl implements PlaidService {
           creditCardFoundCount++;
         }
 
-        const { data: existingTransaction, error: existingTransactionError } = await supabaseAdmin
-          .from('transactions')
-          .select('*')
-          .eq('transactionId', transaction.transaction_id)
-          .single();
-
-        if (existingTransactionError && existingTransactionError.code !== 'PGRST116') {
-          console.error('Error checking existing transaction:', existingTransactionError);
-        }
+        const existingTransaction = existingTransMap.get(transaction.transaction_id);
 
         // For Capital One credit cards, handle transaction sign properly
         // Plaid convention: positive = charges, negative = payments
@@ -1127,42 +1151,67 @@ class PlaidServiceImpl implements PlaidService {
         };
 
         if (existingTransaction) {
-          const { error: updateError } = await supabaseAdmin
-            .from('transactions')
-            .update(transactionData)
-            .eq('id', existingTransaction.id);
-
-          if (updateError) {
-            console.error('Failed to update transaction:', updateError);
-          } else {
-            console.log(`Updated transaction: ${transaction.name} (${transaction.amount})`);
-          }
+          transactionsToUpdate.push({
+            id: existingTransaction.id,
+            ...transactionData
+          });
         } else {
-          const { error: createError } = await supabaseAdmin
-            .from('transactions')
-            .insert({
-              id: crypto.randomUUID(),
-              ...transactionData,
-              transactionId: transaction.transaction_id,
-              plaidItemId: plaidItemRecord.id,
-              creditCardId: creditCard?.id || null,
-              updatedAt: new Date().toISOString(),
-            });
-
-          if (createError) {
-            console.error('Failed to create transaction:', createError);
-          } else {
-            console.log(`Created transaction: ${transaction.name} (${transaction.amount})`);
-          }
+          transactionsToCreate.push({
+            id: crypto.randomUUID(),
+            ...transactionData,
+            transactionId: transaction.transaction_id,
+            plaidItemId: plaidItemRecord.id,
+            creditCardId: creditCard?.id || null,
+            updatedAt: new Date().toISOString(),
+          });
         }
         
         processedCount++;
+      }
+
+      // Execute batch operations
+      console.log(`Executing batch operations: ${transactionsToCreate.length} creates, ${transactionsToUpdate.length} updates`);
+      
+      // Batch create new transactions
+      if (transactionsToCreate.length > 0) {
+        console.log(`Creating ${transactionsToCreate.length} new transactions...`);
+        const { error: createError } = await supabaseAdmin
+          .from('transactions')
+          .insert(transactionsToCreate);
+
+        if (createError) {
+          console.error('Failed to create transactions in batch:', createError);
+        } else {
+          console.log(`Successfully created ${transactionsToCreate.length} transactions`);
+        }
+      }
+
+      // Batch update existing transactions
+      if (transactionsToUpdate.length > 0) {
+        console.log(`Updating ${transactionsToUpdate.length} existing transactions...`);
+        
+        // Unfortunately, Supabase doesn't support bulk updates with different data per row
+        // So we'll do them individually but without the delays
+        for (const transaction of transactionsToUpdate) {
+          const { id, ...updateData } = transaction;
+          const { error: updateError } = await supabaseAdmin
+            .from('transactions')
+            .update(updateData)
+            .eq('id', id);
+
+          if (updateError) {
+            console.error('Failed to update transaction:', updateError);
+          }
+        }
+        console.log(`Successfully processed ${transactionsToUpdate.length} transaction updates`);
       }
       
       console.log(`=== TRANSACTION SYNC SUMMARY ===`);
       console.log(`Total transactions processed: ${processedCount}`);
       console.log(`Transactions with credit card match: ${creditCardFoundCount}`);
       console.log(`Transactions without credit card match: ${processedCount - creditCardFoundCount}`);
+      console.log(`New transactions created: ${transactionsToCreate.length}`);
+      console.log(`Existing transactions updated: ${transactionsToUpdate.length}`);
       console.log(`=== END TRANSACTION SYNC DEBUG ===`);
       
     } catch (error) {
