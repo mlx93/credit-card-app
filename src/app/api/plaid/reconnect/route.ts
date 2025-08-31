@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
     const { data: plaidItem, error } = await supabaseAdmin
       .from('plaid_items')
       .select('*')
-      .eq('item_id', itemId)
-      .eq('user_id', session.user.id)
+      .eq('itemId', itemId)
+      .eq('userId', session.user.id)
       .single();
     
     if (error && error.code !== 'PGRST116') {
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         success: true,
         link_token: updateLinkToken,
-        institution_name: plaidItem.institution_name
+        institution_name: plaidItem.institutionName
       });
 
     } catch (plaidError) {

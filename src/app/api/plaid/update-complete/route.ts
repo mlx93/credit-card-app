@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
       const { data: existingItem, error: fetchError } = await supabaseAdmin
         .from('plaid_items')
         .select('*')
-        .eq('item_id', itemId)
-        .eq('user_id', session.user.id)
+        .eq('itemId', itemId)
+        .eq('userId', session.user.id)
         .single();
       
       if (fetchError && fetchError.code !== 'PGRST116') {
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
           balance_limit
         )
       `)
-      .eq('item_id', transactionResult.itemId)
+      .eq('itemId', transactionResult.itemId)
       .single();
     
     if (validationError) {

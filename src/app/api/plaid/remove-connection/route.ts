@@ -23,8 +23,8 @@ export async function DELETE(request: NextRequest) {
     const { data: plaidItem, error } = await supabaseAdmin
       .from('plaid_items')
       .select('*')
-      .eq('item_id', itemId)
-      .eq('user_id', session.user.id)
+      .eq('itemId', itemId)
+      .eq('userId', session.user.id)
       .single();
     
     if (error && error.code !== 'PGRST116') {
@@ -40,7 +40,7 @@ export async function DELETE(request: NextRequest) {
 
     try {
       // Try to remove the item from Plaid (best effort)
-      const decryptedAccessToken = decrypt(plaidItem.access_token);
+      const decryptedAccessToken = decrypt(plaidItem.accessToken);
       await plaidService.removeItem(decryptedAccessToken);
       console.log('Successfully removed item from Plaid');
     } catch (plaidError) {
@@ -59,11 +59,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to remove connection' }, { status: 500 });
     }
 
-    console.log(`Successfully removed connection for ${plaidItem.institution_name}`);
+    console.log(`Successfully removed connection for ${plaidItem.institutionName}`);
 
     return NextResponse.json({ 
       success: true, 
-      message: `Removed connection to ${plaidItem.institution_name}`
+      message: `Removed connection to ${plaidItem.institutionName}`
     });
 
   } catch (error) {
