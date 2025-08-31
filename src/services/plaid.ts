@@ -20,12 +20,12 @@ export interface PlaidService {
   exchangePublicToken(publicToken: string, userId: string): Promise<string>;
   removeItem(accessToken: string): Promise<void>;
   getAccounts(accessToken: string): Promise<any>;
-  getTransactions(accessToken: string, startDate: Date, endDate: Date): Promise<any[]>;
+  getTransactions(accessToken: string, startDate: Date, endDate: Date, isCapitalOne?: boolean): Promise<any[]>;
   getLiabilities(accessToken: string): Promise<any>;
   getBalances(accessToken: string): Promise<any>;
   getStatements(accessToken: string, accountId: string): Promise<any[]>;
   syncAccounts(accessToken: string, itemId: string): Promise<void>;
-  syncTransactions(itemId: string, accessToken: string): Promise<void>;
+  syncTransactions(plaidItemRecord: any, accessToken: string): Promise<void>;
   forceReconnectionSync(accessToken: string, itemId: string, userId: string): Promise<{success: boolean, details: any}>;
 }
 
@@ -124,21 +124,11 @@ class PlaidServiceImpl implements PlaidService {
     return access_token;
   }
 
-  async getTransactions(accessToken: string, startDate: Date, endDate: Date): Promise<any[]> {
+  async getTransactions(accessToken: string, startDate: Date, endDate: Date, isCapitalOne: boolean = false): Promise<any[]> {
     try {
       console.log(`=== GET TRANSACTIONS DEBUG ===`);
       console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
-      
-      // Check if this is Capital One by testing the access token first
-      let isCapitalOne = false;
-      try {
-        const testResponse = await plaidClient.accountsGet({ access_token: accessToken });
-        isCapitalOne = testResponse.data.accounts.some((acc: any) => 
-          this.isCapitalOne(undefined, acc.name)
-        );
-      } catch (error) {
-        console.warn('Could not determine institution type:', error);
-      }
+      console.log('Institution type passed:', isCapitalOne ? 'Capital One' : 'Standard');
 
       // Capital One-specific handling: limit to 90 days max
       if (isCapitalOne) {
@@ -804,7 +794,7 @@ class PlaidServiceImpl implements PlaidService {
               id: crypto.randomUUID(),
               ...cardData,
               accountId: account.account_id,
-              plaidItemId: plaidItem.id,
+              plaidItemId: plaidItemRecord.id,
               // Convert dates to ISO strings
               ...(cardData.lastStatementIssueDate && {
                 lastStatementIssueDate: cardData.lastStatementIssueDate.toISOString()
@@ -874,36 +864,15 @@ class PlaidServiceImpl implements PlaidService {
     }
   }
 
-  async syncTransactions(itemId: string, accessToken: string): Promise<void> {
-    console.log('🚀 TRANSACTION SYNC METHOD CALLED!', { itemId, hasAccessToken: !!accessToken });
+  async syncTransactions(plaidItemRecord: any, accessToken: string): Promise<void> {
+    console.log('🚀 TRANSACTION SYNC METHOD CALLED!', { itemId: plaidItemRecord.itemId, hasAccessToken: !!accessToken });
     try {
-      console.log(`=== TRANSACTION SYNC START for itemId: ${itemId} ===`);
+      console.log(`=== TRANSACTION SYNC START for itemId: ${plaidItemRecord.itemId} ===`);
+      console.log(`✅ Using passed plaidItem record - no DB lookup needed`);
       
-      const { data: plaidItem, error: plaidItemError } = await supabaseAdmin
-        .from('plaid_items')
-        .select('*')
-        .eq('itemId', itemId)
-        .single();
-
-      if (plaidItemError || !plaidItem) {
-        console.error(`No Plaid item found for itemId: ${itemId}`);
-        throw new Error('Plaid item not found');
-      }
-
-      console.log(`Found Plaid item for ${plaidItem.institutionName} (${itemId})`);
-      console.log('✅ Using already decrypted access token from sync route');
-      
-      // Determine if this is Capital One and adjust date range accordingly
-      let isCapitalOneItem = false;
-      try {
-        const testResponse = await plaidClient.accountsGet({ access_token: accessToken });
-        isCapitalOneItem = testResponse.data.accounts.some((acc: any) => 
-          this.isCapitalOne(undefined, acc.name)
-        ) || this.isCapitalOne(plaidItem.institutionName);
-      } catch (error) {
-        console.warn('Could not determine institution type, checking institution name...');
-        isCapitalOneItem = this.isCapitalOne(plaidItem.institutionName);
-      }
+      // Determine if this is Capital One using institution name (no API call needed)
+      const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
+      console.log(`Institution type determined: ${isCapitalOneItem ? 'Capital One' : 'Standard'} (from institution name: ${plaidItemRecord.institutionName})`);
 
       const endDate = new Date();
       const startDate = new Date();
@@ -919,7 +888,7 @@ class PlaidServiceImpl implements PlaidService {
       }
 
       console.log(`=== TRANSACTION DATE RANGE DEBUG ===`);
-      console.log(`Institution: ${plaidItem.institutionName}`);
+      console.log(`Institution: ${plaidItemRecord.institutionName}`);
       console.log(`Is Capital One: ${isCapitalOneItem}`);
       console.log(`Current date: ${new Date().toISOString()}`);
       console.log(`Calculated start date: ${startDate.toISOString()}`);  
@@ -931,7 +900,8 @@ class PlaidServiceImpl implements PlaidService {
       const transactions = await this.getTransactions(
         accessToken,
         startDate,
-        endDate
+        endDate,
+        isCapitalOneItem
       );
 
       console.log(`=== TRANSACTION SYNC DEBUG ===`);
@@ -1047,7 +1017,7 @@ class PlaidServiceImpl implements PlaidService {
               id: crypto.randomUUID(),
               ...transactionData,
               transactionId: transaction.transaction_id,
-              plaidItemId: plaidItem.id,
+              plaidItemId: plaidItemRecord.id,
               creditCardId: creditCard?.id || null,
               updatedAt: new Date().toISOString(),
             });
@@ -1235,7 +1205,7 @@ class PlaidServiceImpl implements PlaidService {
         // First get the plaid item
         const { data: plaidItemForUpdate, error: plaidItemUpdateError } = await supabaseAdmin
           .from('plaid_items')
-          .select('id')
+          .select('*')
           .eq('itemId', itemId)
           .single();
 
@@ -1267,7 +1237,7 @@ class PlaidServiceImpl implements PlaidService {
       console.log('🔄 Step 3: Force syncing transactions...');
       
       try {
-        await this.syncTransactions(itemId, accessToken);
+        await this.syncTransactions(plaidItemForUpdate, accessToken);
         syncDetails.transactionSync.success = true;
         
         // Count transactions updated
@@ -1379,7 +1349,7 @@ class PlaidServiceImpl implements PlaidService {
       const { data: accounts, error: accountsError } = await supabaseAdmin
         .from('credit_cards')
         .select('*')
-        .eq('plaidItemId', plaidItem.id);
+        .eq('plaidItemId', plaidItemRecord.id);
 
       if (accountsError) {
         console.error('Error fetching accounts for validation:', accountsError);

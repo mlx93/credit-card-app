@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         console.log('PlaidService method exists?', typeof plaidService.syncTransactions);
         
         try {
-          await plaidService.syncTransactions(item.itemId, decryptedAccessToken);
+          await plaidService.syncTransactions(item, decryptedAccessToken);
           console.log('Step 2: Transaction sync completed successfully');
         } catch (syncError) {
           console.error('🚨 TRANSACTION SYNC ERROR:', syncError);

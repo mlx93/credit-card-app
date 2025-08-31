@@ -58,7 +58,7 @@ async function handleTransactionWebhook(webhookCode: string, itemId: string) {
 
       // Decrypt the access token before using it
       const decryptedAccessToken = decrypt(plaidItem.accessToken);
-      await plaidService.syncTransactions(itemId, decryptedAccessToken);
+      await plaidService.syncTransactions(plaidItem, decryptedAccessToken);
       break;
     case 'TRANSACTIONS_REMOVED':
       console.log(`Transactions removed for item: ${itemId}`);
