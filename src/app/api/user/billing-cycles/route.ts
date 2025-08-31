@@ -13,6 +13,22 @@ export async function GET() {
 
     const billingCycles = await getAllUserBillingCycles(session.user.id);
 
+    // Debug logging to compare with debug endpoint
+    const amexCycles = billingCycles.filter(c => 
+      c.creditCardName?.toLowerCase().includes('platinum')
+    );
+    
+    console.log('🔍 USER BILLING CYCLES API:', {
+      userId: session.user.id,
+      totalCycles: billingCycles.length,
+      amexCycles: amexCycles.length,
+      amexCycleIds: amexCycles.slice(0, 5).map(c => ({
+        id: c.id?.substring(0, 8),
+        startDate: c.startDate,
+        endDate: c.endDate
+      }))
+    });
+
     return NextResponse.json({ billingCycles });
   } catch (error) {
     console.error('Error fetching billing cycles:', error);
