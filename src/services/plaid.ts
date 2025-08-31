@@ -804,7 +804,30 @@ class PlaidServiceImpl implements PlaidService {
               return originationDate;
             }
             
-            // Priority 3: For existing cards, preserve their current open date if it seems reasonable
+            // Priority 3: Try to extract from statement history first (more accurate than preserving old dates)
+            if (liability?.last_statement_issue_date) {
+              const statementDate = new Date(liability.last_statement_issue_date);
+              const estimatedOpenDate = new Date(statementDate);
+              
+              // Go back approximately 12-15 months from first statement for Amex cards
+              if (plaidItem.institutionName?.toLowerCase().includes('american express') || 
+                  account.name?.toLowerCase().includes('platinum')) {
+                estimatedOpenDate.setMonth(statementDate.getMonth() - 14); // ~14 months back
+                console.log(`✅ Estimated Amex open date from statements for ${account.name}: ${estimatedOpenDate.toDateString()}`);
+                return estimatedOpenDate;
+              }
+              
+              // For Bank of America cards opened recently, be more conservative
+              if (plaidItem.institutionName?.toLowerCase().includes('bank of america')) {
+                estimatedOpenDate.setMonth(5); // June (0-indexed)
+                estimatedOpenDate.setDate(28); // Late June
+                estimatedOpenDate.setFullYear(2025);
+                console.log(`✅ Estimated BofA open date for ${account.name}: ${estimatedOpenDate.toDateString()}`);
+                return estimatedOpenDate;
+              }
+            }
+            
+            // Priority 4: For existing cards, preserve their current open date only as last resort
             if (existingCard?.openDate) {
               const existingOpenDate = new Date(existingCard.openDate);
               const now = new Date();
@@ -813,34 +836,11 @@ class PlaidServiceImpl implements PlaidService {
               
               // Only preserve existing open date if it's within a reasonable range
               if (existingOpenDate >= twoYearsAgo && existingOpenDate <= now) {
-                console.log(`✅ Preserving existing reasonable open date for ${account.name}: ${existingOpenDate.toDateString()}`);
+                console.log(`⚠️ Falling back to existing open date for ${account.name}: ${existingOpenDate.toDateString()}`);
                 return existingOpenDate;
               } else {
                 console.log(`⚠️ Existing open date for ${account.name} is unreasonable (${existingOpenDate.toDateString()}), will estimate`);
               }
-            }
-            
-            // Priority 4: Try to extract from statement history if available
-            if (liability?.last_statement_issue_date) {
-              const statementDate = new Date(liability.last_statement_issue_date);
-              const estimatedOpenDate = new Date(statementDate);
-              
-              // For Bank of America and other cards opened recently, be more conservative
-              if (plaidItem.institutionName?.toLowerCase().includes('bank of america')) {
-                // Bank of America cards were likely opened in June 2025 based on user context
-                estimatedOpenDate.setMonth(5); // June (0-indexed)
-                estimatedOpenDate.setDate(28); // Late June
-                estimatedOpenDate.setFullYear(2025);
-              } else {
-                // For other institutions, estimate 6-12 months before first statement
-                const monthsBack = Math.min(12, Math.max(6, 
-                  Math.floor((new Date().getTime() - statementDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
-                ));
-                estimatedOpenDate.setMonth(estimatedOpenDate.getMonth() - monthsBack);
-              }
-              
-              console.log(`📊 Estimated open date for ${account.name} from statement date: ${liability.last_statement_issue_date} -> ${estimatedOpenDate.toDateString()}`);
-              return estimatedOpenDate;
             }
             
             // Priority 5: Transaction-based fallback (most reliable)
