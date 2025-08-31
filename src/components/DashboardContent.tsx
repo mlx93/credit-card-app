@@ -455,10 +455,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                   <button 
                     onClick={handleRefresh}
                     disabled={refreshing}
-                    className={`relative overflow-hidden font-medium py-3 px-6 rounded-2xl transition-all duration-200 flex items-center justify-center space-x-2 text-sm whitespace-nowrap transform focus:outline-none focus:ring-2 group ${
+                    className={`relative overflow-hidden font-medium py-3 px-6 rounded-2xl transition-all duration-200 flex items-center justify-center space-x-2 text-sm whitespace-nowrap transform focus:outline-none focus:ring-2 group border ${
                       refreshing 
-                        ? 'bg-gradient-to-r from-blue-400 to-indigo-400 text-white cursor-not-allowed opacity-90 shadow-lg' 
-                        : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 hover:shadow-xl hover:scale-[1.02] focus:ring-blue-500/50 shadow-lg'
+                        ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed opacity-90 shadow-sm' 
+                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300 hover:shadow-md hover:scale-[1.02] focus:ring-gray-500/50 shadow-sm'
                     }`}
                   >
                     <RefreshCw className={`h-4 w-4 transition-transform duration-200 ${
@@ -468,11 +468,11 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                       {refreshing ? refreshStep || 'Refreshing...' : 'Refresh All'}
                     </span>
                     
-                    {/* Progress bar - iOS style with gradient */}
+                    {/* Progress bar - iOS style with grey theme */}
                     {refreshing && (
                       <div className="absolute inset-0 flex items-end">
                         <div 
-                          className="h-1 bg-gradient-to-r from-white/30 to-white/60 rounded-full transition-all duration-500 ease-out"
+                          className="h-1 bg-gradient-to-r from-gray-400 to-gray-600 rounded-full transition-all duration-500 ease-out"
                           style={{ width: `${refreshProgress}%` }}
                         />
                       </div>
@@ -480,7 +480,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                     
                     {/* Shimmer effect when not refreshing */}
                     {!refreshing && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
                     )}
                   </button>
                   <PlaidLink onSuccess={fetchUserData} />
