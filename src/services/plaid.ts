@@ -764,24 +764,45 @@ class PlaidServiceImpl implements PlaidService {
         };
 
         if (existingCard) {
+          // Prepare update data, preserving manual credit limits
+          const updateData = {
+            ...cardData,
+            // Convert dates to ISO strings
+            ...(cardData.lastStatementIssueDate && {
+              lastStatementIssueDate: cardData.lastStatementIssueDate.toISOString()
+            }),
+            ...(cardData.nextPaymentDueDate && {
+              nextPaymentDueDate: cardData.nextPaymentDueDate.toISOString()
+            }),
+            ...(cardData.openDate && {
+              openDate: cardData.openDate.toISOString()
+            }),
+            ...(cardData.annualFeeDueDate && {
+              annualFeeDueDate: cardData.annualFeeDueDate.toISOString()
+            })
+          };
+
+          // Preserve manual credit limit only if Plaid data is invalid
+          const plaidLimitIsInvalid = !updateData.balanceLimit || 
+            updateData.balanceLimit === 0 || 
+            updateData.balanceLimit === null || 
+            updateData.balanceLimit === Infinity ||
+            (typeof updateData.balanceLimit === 'string' && 
+             ['N/A', 'Unknown'].includes(updateData.balanceLimit));
+          
+          if (existingCard.isManualLimit && existingCard.manualCreditLimit && plaidLimitIsInvalid) {
+            delete updateData.balanceLimit; // Don't overwrite with invalid Plaid data
+            console.log(`Preserving manual credit limit of $${existingCard.manualCreditLimit} for ${existingCard.name} (Plaid data invalid)`);
+          } else if (!plaidLimitIsInvalid && existingCard.isManualLimit) {
+            // Plaid has valid data, use it and reset manual limit flag
+            updateData.isManualLimit = false;
+            updateData.manualCreditLimit = null;
+            console.log(`Using Plaid credit limit of $${updateData.balanceLimit} for ${existingCard.name} (overriding manual limit)`);
+          }
+
           const { error: updateError } = await supabaseAdmin
             .from('credit_cards')
-            .update({
-              ...cardData,
-              // Convert dates to ISO strings
-              ...(cardData.lastStatementIssueDate && {
-                lastStatementIssueDate: cardData.lastStatementIssueDate.toISOString()
-              }),
-              ...(cardData.nextPaymentDueDate && {
-                nextPaymentDueDate: cardData.nextPaymentDueDate.toISOString()
-              }),
-              ...(cardData.openDate && {
-                openDate: cardData.openDate.toISOString()
-              }),
-              ...(cardData.annualFeeDueDate && {
-                annualFeeDueDate: cardData.annualFeeDueDate.toISOString()
-              })
-            })
+            .update(updateData)
             .eq('id', existingCard.id);
 
           if (updateError) {
@@ -808,6 +829,9 @@ class PlaidServiceImpl implements PlaidService {
               ...(cardData.annualFeeDueDate && {
                 annualFeeDueDate: cardData.annualFeeDueDate.toISOString()
               }),
+              // Initialize manual credit limit fields
+              isManualLimit: false,
+              manualCreditLimit: null,
               updatedAt: new Date().toISOString()
             });
 
