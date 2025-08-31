@@ -458,8 +458,16 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
       
       allCycles.push(...limitedCycles);
     } else {
-      // Standard cards: show all cycles (typically 12+ for 2 years of data)
-      allCycles.push(...filteredCycles);
+      // Standard cards: show 12 months of cycles
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      // Filter to only cycles from the last 12 months
+      const recentCycles = filteredCycles.filter(cycle => 
+        new Date(cycle.endDate) >= twelveMonthsAgo
+      );
+      
+      allCycles.push(...recentCycles);
     }
   }
 

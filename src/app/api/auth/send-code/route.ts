@@ -19,6 +19,11 @@ console.log('- Resend initialized:', !!resend);
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
+    
+    console.log('=== SEND CODE REQUEST ===');
+    console.log('Email requested:', email);
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Vercel Environment:', process.env.VERCEL_ENV);
 
     if (!email || !email.includes('@')) {
       return NextResponse.json(
