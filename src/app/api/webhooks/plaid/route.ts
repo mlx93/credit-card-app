@@ -42,7 +42,20 @@ async function handleTransactionWebhook(webhookCode: string, itemId: string) {
     case 'HISTORICAL_UPDATE':
     case 'DEFAULT_UPDATE':
       console.log(`Processing transaction update for item: ${itemId}`);
-      await plaidService.syncTransactions(itemId);
+      
+      // Get the plaid item and access token from database
+      const { data: plaidItem, error } = await supabaseAdmin
+        .from('plaid_items')
+        .select('*')
+        .eq('itemId', itemId)
+        .single();
+      
+      if (error || !plaidItem) {
+        console.error(`No Plaid item found for itemId: ${itemId}`, error);
+        return;
+      }
+
+      await plaidService.syncTransactions(itemId, plaidItem.accessToken);
       break;
     case 'TRANSACTIONS_REMOVED':
       console.log(`Transactions removed for item: ${itemId}`);
@@ -59,7 +72,7 @@ async function handleLiabilitiesWebhook(webhookCode: string, itemId: string) {
       const { data: plaidItem, error } = await supabaseAdmin
         .from('plaid_items')
         .select('*')
-        .eq('item_id', itemId)
+        .eq('itemId', itemId)
         .single();
       
       if (error) {
@@ -82,8 +95,8 @@ async function handleItemWebhook(webhookCode: string, itemId: string) {
       console.log(`Item error for: ${itemId}`);
       const { error: updateError } = await supabaseAdmin
         .from('plaid_items')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('item_id', itemId);
+        .update({ updatedAt: new Date().toISOString() })
+        .eq('itemId', itemId);
       
       if (updateError) {
         console.error('Error updating plaid item:', updateError);
@@ -97,7 +110,7 @@ async function handleItemWebhook(webhookCode: string, itemId: string) {
       const { error: deleteError } = await supabaseAdmin
         .from('plaid_items')
         .delete()
-        .eq('item_id', itemId);
+        .eq('itemId', itemId);
       
       if (deleteError) {
         console.error('Error deleting plaid item:', deleteError);
