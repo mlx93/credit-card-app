@@ -16,6 +16,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Connecting to your bank');
   const [loadingSubMessage, setLoadingSubMessage] = useState('This may take a few moments...');
+  const [syncInProgress, setSyncInProgress] = useState(false);
 
   const { open, ready } = usePlaidLink({
     token: linkToken,
@@ -46,6 +47,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           
           // Sync data after successful connection
           try {
+            setSyncInProgress(true);
+            setLoadingMessage('Syncing your data');
+            setLoadingSubMessage('This may take up to 30 seconds...');
+            
             const syncResponse = await fetch('/api/sync', {
               method: 'POST',
             });
@@ -53,27 +58,40 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
             if (!syncResponse.ok) {
               const syncError = await syncResponse.json();
               console.error('Sync failed:', syncError);
-              // Continue anyway - connection was successful even if sync had issues
               setLoadingMessage('Connected with sync warnings');
               setLoadingSubMessage('Account connected, some data may sync later');
+              
+              // Still show success after brief delay since connection succeeded
+              setTimeout(() => {
+                setLoading(false);
+                setSyncInProgress(false);
+                onSuccess?.();
+              }, 2000);
             } else {
               const syncData = await syncResponse.json();
               console.log('Sync successful:', syncData);
               setLoadingMessage('Success!');
-              setLoadingSubMessage('Your accounts have been connected');
+              setLoadingSubMessage('Your accounts have been connected and synced');
+              
+              // Brief delay to show success message, then complete
+              setTimeout(() => {
+                setLoading(false);
+                setSyncInProgress(false);
+                onSuccess?.();
+              }, 1500);
             }
           } catch (syncError) {
             console.error('Sync request failed:', syncError);
-            // Connection was successful even if sync failed
             setLoadingMessage('Connected with sync issues');
             setLoadingSubMessage('Account connected, sync will retry automatically');
+            
+            // Still complete the flow since connection succeeded
+            setTimeout(() => {
+              setLoading(false);
+              setSyncInProgress(false);
+              onSuccess?.();
+            }, 2000);
           }
-          
-          // Brief delay to show success message
-          setTimeout(() => {
-            setLoading(false);
-            onSuccess?.();
-          }, 1000);
         } else {
           console.error('Token exchange failed:', data.error);
           alert('Failed to connect account. Please try again.');

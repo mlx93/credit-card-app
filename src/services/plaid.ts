@@ -39,6 +39,18 @@ class PlaidServiceImpl implements PlaidService {
     
     return institutionMatch || accountMatch;
   }
+
+  // American Express detection logic
+  private isAmex(institutionName?: string, accountName?: string): boolean {
+    const amexIndicators = ['american express', 'amex', 'platinum', 'gold card', 'green card', 'blue card', 'delta', 'hilton'];
+    const institutionLower = (institutionName || '').toLowerCase();
+    const accountLower = (accountName || '').toLowerCase();
+    
+    const institutionMatch = institutionLower.includes('american express') || institutionLower.includes('amex');
+    const accountMatch = amexIndicators.some(indicator => accountLower.includes(indicator));
+    
+    return institutionMatch || accountMatch;
+  }
   async createLinkToken(userId: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
     
@@ -127,6 +139,27 @@ class PlaidServiceImpl implements PlaidService {
   // Rate limiting helper
   private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Validate transaction amounts to prevent invalid data
+  private validateTransactionAmount(amount: number, transactionName: string): boolean {
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      console.warn(`❌ Invalid transaction amount (null/undefined/NaN): ${transactionName}, amount: ${amount}`);
+      return false;
+    }
+    
+    if (amount === 0) {
+      console.warn(`⚠️ Zero amount transaction detected: ${transactionName}, amount: ${amount}`);
+      // Allow $0 transactions but log them for investigation
+      return true;
+    }
+    
+    if (Math.abs(amount) > 1000000) { // $1M limit as sanity check
+      console.warn(`❌ Extremely large transaction amount: ${transactionName}, amount: ${amount}`);
+      return false;
+    }
+    
+    return true;
   }
 
   // Retry logic with exponential backoff for rate limits
@@ -996,9 +1029,10 @@ class PlaidServiceImpl implements PlaidService {
       console.log('⏳ Adding pre-sync delay to respect rate limits...');
       await this.delay(500); // 500ms delay before starting transaction sync
       
-      // Determine if this is Capital One using institution name (no API call needed)
+      // Determine institution type using institution name (no API call needed)
       const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
-      console.log(`Institution type determined: ${isCapitalOneItem ? 'Capital One' : 'Standard'} (from institution name: ${plaidItemRecord.institutionName})`);
+      const isAmexItem = this.isAmex(plaidItemRecord.institutionName);
+      console.log(`Institution type determined: ${isCapitalOneItem ? 'Capital One' : isAmexItem ? 'American Express' : 'Standard'} (from institution name: ${plaidItemRecord.institutionName})`);
 
       const endDate = new Date();
       const startDate = new Date();
@@ -1007,6 +1041,10 @@ class PlaidServiceImpl implements PlaidService {
         // Capital One: Only 90 days of history available
         startDate.setDate(startDate.getDate() - 90);
         console.log('📍 Capital One detected: Using 90-day transaction window');
+      } else if (isAmexItem) {
+        // Amex: Try for full 24 months but expect limited historical data
+        startDate.setMonth(startDate.getMonth() - 24);
+        console.log('📍 American Express detected: Using 24-month window (may have limited historical data)');
       } else {
         // Other institutions: 24 months to match Link configuration
         startDate.setMonth(startDate.getMonth() - 24);
@@ -1115,17 +1153,26 @@ class PlaidServiceImpl implements PlaidService {
         // But for display purposes, we might want to show payments as positive
         let adjustedAmount = transaction.amount;
         
-        // Check if this is a Capital One payment (negative amount on credit card)
+        // Check if this is a special case payment (negative amount on credit card)
         if (creditCard && transaction.amount < 0) {
-          const isCapitalOneCard = this.isCapitalOne(plaidItem.institutionName, creditCard.name);
+          const isCapitalOneCard = this.isCapitalOne(plaidItemRecord.institutionName, creditCard.name);
+          const isAmexCard = this.isAmex(plaidItemRecord.institutionName, creditCard.name);
           
-          // For debugging - log Capital One payment detection
+          // For debugging - log payment detection
           if (isCapitalOneCard) {
             console.log('Capital One payment detected:', {
               transactionName: transaction.name,
               originalAmount: transaction.amount,
               cardName: creditCard.name,
-              institution: plaidItem.institutionName,
+              institution: plaidItemRecord.institutionName,
+              isPaymentTransaction: transaction.amount < 0
+            });
+          } else if (isAmexCard) {
+            console.log('Amex payment detected:', {
+              transactionName: transaction.name,
+              originalAmount: transaction.amount,
+              cardName: creditCard.name,
+              institution: plaidItemRecord.institutionName,
               isPaymentTransaction: transaction.amount < 0
             });
           }
@@ -1135,8 +1182,30 @@ class PlaidServiceImpl implements PlaidService {
           adjustedAmount = transaction.amount;
         }
 
+        // Special handling for Amex transactions that may have amount issues
+        if (creditCard && this.isAmex(plaidItemRecord.institutionName, creditCard.name)) {
+          // Log potential Amex transaction issues for debugging
+          if (Math.abs(adjustedAmount) < 0.01 && adjustedAmount !== 0) {
+            console.warn('⚠️ Amex transaction with very small amount detected:', {
+              name: transaction.name,
+              amount: adjustedAmount,
+              originalAmount: transaction.amount,
+              date: transaction.date,
+              category: transaction.category?.[0]
+            });
+          }
+        }
+
+        // Validate transaction amount before processing
+        if (!this.validateTransactionAmount(adjustedAmount, transaction.name)) {
+          console.error(`Skipping invalid transaction: ${transaction.name} with amount: ${adjustedAmount}`);
+          continue;
+        }
+
         const transactionData = {
           amount: adjustedAmount,
+          plaidTransactionId: transaction.transaction_id,
+          accountId: transaction.account_id,
           isoCurrencyCode: transaction.iso_currency_code,
           date: new Date(transaction.date).toISOString(),
           authorizedDate: transaction.authorized_date 
@@ -1150,60 +1219,62 @@ class PlaidServiceImpl implements PlaidService {
           accountOwner: transaction.account_owner,
         };
 
+        // Prepare transaction for upsert (create or update)
+        const transactionForUpsert = {
+          id: existingTransaction?.id || crypto.randomUUID(),
+          ...transactionData,
+          transactionId: transaction.transaction_id,
+          plaidItemId: plaidItemRecord.id,
+          creditCardId: creditCard?.id || null,
+          updatedAt: new Date().toISOString(),
+        };
+
         if (existingTransaction) {
-          transactionsToUpdate.push({
-            id: existingTransaction.id,
-            ...transactionData
-          });
+          transactionsToUpdate.push(transactionForUpsert);
         } else {
-          transactionsToCreate.push({
-            id: crypto.randomUUID(),
-            ...transactionData,
-            transactionId: transaction.transaction_id,
-            plaidItemId: plaidItemRecord.id,
-            creditCardId: creditCard?.id || null,
-            updatedAt: new Date().toISOString(),
-          });
+          transactionsToCreate.push(transactionForUpsert);
         }
         
         processedCount++;
       }
 
-      // Execute batch operations
-      console.log(`Executing batch operations: ${transactionsToCreate.length} creates, ${transactionsToUpdate.length} updates`);
+      // Execute optimized batch operations using upsert
+      const allTransactionsForUpsert = [...transactionsToCreate, ...transactionsToUpdate];
+      console.log(`Executing batch upsert for ${allTransactionsForUpsert.length} transactions (${transactionsToCreate.length} new, ${transactionsToUpdate.length} existing)`);
       
-      // Batch create new transactions
-      if (transactionsToCreate.length > 0) {
-        console.log(`Creating ${transactionsToCreate.length} new transactions...`);
-        const { error: createError } = await supabaseAdmin
+      if (allTransactionsForUpsert.length > 0) {
+        // Use upsert to handle both creates and updates in a single operation
+        const { error: upsertError, count } = await supabaseAdmin
           .from('transactions')
-          .insert(transactionsToCreate);
+          .upsert(allTransactionsForUpsert, { 
+            onConflict: 'transactionId',
+            count: 'exact'
+          });
 
-        if (createError) {
-          console.error('Failed to create transactions in batch:', createError);
-        } else {
-          console.log(`Successfully created ${transactionsToCreate.length} transactions`);
-        }
-      }
-
-      // Batch update existing transactions
-      if (transactionsToUpdate.length > 0) {
-        console.log(`Updating ${transactionsToUpdate.length} existing transactions...`);
-        
-        // Unfortunately, Supabase doesn't support bulk updates with different data per row
-        // So we'll do them individually but without the delays
-        for (const transaction of transactionsToUpdate) {
-          const { id, ...updateData } = transaction;
-          const { error: updateError } = await supabaseAdmin
-            .from('transactions')
-            .update(updateData)
-            .eq('id', id);
-
-          if (updateError) {
-            console.error('Failed to update transaction:', updateError);
+        if (upsertError) {
+          console.error('Failed to upsert transactions in batch:', upsertError);
+          
+          // Fallback to individual operations if batch fails
+          console.log('Falling back to individual transaction processing...');
+          let successCount = 0;
+          let errorCount = 0;
+          
+          for (const transaction of allTransactionsForUpsert) {
+            const { error: individualError } = await supabaseAdmin
+              .from('transactions')
+              .upsert([transaction], { onConflict: 'transactionId' });
+              
+            if (individualError) {
+              console.error(`Failed to process transaction ${transaction.name}:`, individualError);
+              errorCount++;
+            } else {
+              successCount++;
+            }
           }
+          console.log(`Fallback completed: ${successCount} successful, ${errorCount} failed`);
+        } else {
+          console.log(`Successfully upserted ${count || allTransactionsForUpsert.length} transactions in single batch operation`);
         }
-        console.log(`Successfully processed ${transactionsToUpdate.length} transaction updates`);
       }
       
       console.log(`=== TRANSACTION SYNC SUMMARY ===`);
