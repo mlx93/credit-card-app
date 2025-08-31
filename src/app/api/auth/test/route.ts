@@ -13,10 +13,9 @@ export async function GET() {
     const supabase = createClient(supabaseUrl!, supabaseKey!);
     
     // Test next_auth schema access
-    const { data: users, error: usersError } = await supabase
+    const { count: userCount, error: usersError } = await supabase
       .from('users')
-      .select('count(*)')
-      .single();
+      .select('*', { count: 'exact' });
 
     return NextResponse.json({
       environment: {
@@ -28,7 +27,7 @@ export async function GET() {
       },
       database: {
         connection: usersError ? `❌ Error: ${usersError.message}` : '✅ Connected',
-        nextAuthUsers: users || 'Error fetching count'
+        nextAuthUsers: usersError ? 'Error fetching count' : `${userCount || 0} users`
       }
     });
   } catch (error: any) {
