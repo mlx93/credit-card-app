@@ -663,16 +663,36 @@ function CardContent({
       return includesHEOday;
     });
     
-    // Find most recently closed cycle (has statement balance and ended before today)
-    // For Capital One: Look for cycles that are truly closed (ended + have statement balance)
-    const closedCyclesWithStatements = sortedCycles.filter(c => {
-      const end = new Date(c.endDate);
-      const hasStatement = c.statementBalance && c.statementBalance > 0;
-      const endedBeforeToday = end < today;
-      return hasStatement && endedBeforeToday;
-    });
+    // Find most recently closed cycle based on card's lastStatementIssueDate
+    // The cycle ending on or just before the statement date is the most recent closed cycle
+    const lastStatementDate = card?.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
     
-    const mostRecentClosedCycle = closedCyclesWithStatements[0]; // Already sorted newest first
+    let mostRecentClosedCycle = null;
+    if (lastStatementDate) {
+      // Find the cycle that ends on the statement date (most accurate method)
+      mostRecentClosedCycle = sortedCycles.find(c => {
+        const cycleEnd = new Date(c.endDate);
+        const diffDays = Math.abs((cycleEnd.getTime() - lastStatementDate.getTime()) / (1000 * 60 * 60 * 24));
+        return diffDays <= 1; // Allow 1-day difference for timezone/date precision
+      });
+      
+      // Fallback: if no exact match, find the most recent cycle that ended before today
+      if (!mostRecentClosedCycle) {
+        mostRecentClosedCycle = sortedCycles.find(c => {
+          const end = new Date(c.endDate);
+          return end < today;
+        });
+      }
+    } else {
+      // Fallback for cards without statement date: look for cycles with statement balance
+      const closedCyclesWithStatements = sortedCycles.filter(c => {
+        const end = new Date(c.endDate);
+        const hasStatement = c.statementBalance && c.statementBalance > 0;
+        const endedBeforeToday = end < today;
+        return hasStatement && endedBeforeToday;
+      });
+      mostRecentClosedCycle = closedCyclesWithStatements[0];
+    }
     
     if (cardName.toLowerCase().includes('capital') && mostRecentClosedCycle) {
       console.log('✅ CAPITAL ONE MOST RECENT CLOSED:', {
