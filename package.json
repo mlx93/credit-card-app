@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "npm run security:audit && prisma generate && next build",
+    "build": "next build",
+    "build:full": "npm run security:audit && prisma generate && next build",
     "build:with-db": "npm run security:audit && prisma generate && prisma db push && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "security:audit": "npm audit --audit-level=moderate",
