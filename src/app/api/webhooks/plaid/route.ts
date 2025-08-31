@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid';
 import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
+import { decrypt } from '@/lib/encryption';
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,7 +56,9 @@ async function handleTransactionWebhook(webhookCode: string, itemId: string) {
         return;
       }
 
-      await plaidService.syncTransactions(itemId, plaidItem.accessToken);
+      // Decrypt the access token before using it
+      const decryptedAccessToken = decrypt(plaidItem.accessToken);
+      await plaidService.syncTransactions(itemId, decryptedAccessToken);
       break;
     case 'TRANSACTIONS_REMOVED':
       console.log(`Transactions removed for item: ${itemId}`);
@@ -81,7 +84,9 @@ async function handleLiabilitiesWebhook(webhookCode: string, itemId: string) {
       }
 
       if (plaidItem) {
-        await plaidService.syncAccounts(plaidItem.accessToken, itemId);
+        // Decrypt the access token before using it
+        const decryptedAccessToken = decrypt(plaidItem.accessToken);
+        await plaidService.syncAccounts(decryptedAccessToken, itemId);
       }
       break;
     default:
