@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { calculateBillingCycles } from '@/utils/billingCycles';
 
 export async function POST(request: NextRequest) {
@@ -14,47 +14,72 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all credit cards for the user
-    const creditCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        }
-      },
-      include: {
-        plaidItem: true
-      }
+    // Get all plaid items for the user first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Get all credit cards for this user
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds);
+
+    if (cardsError) {
+      throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+    }
+
+    // Create a map for plaid item lookup
+    const plaidItemMap = new Map();
+    (plaidItems || []).forEach(item => {
+      plaidItemMap.set(item.id, item);
     });
 
-    console.log(`Found ${creditCards.length} credit cards for user`);
+    // Add plaidItem reference to each credit card for compatibility
+    const creditCardsWithPlaidItem = (creditCards || []).map(card => ({
+      ...card,
+      plaidItem: plaidItemMap.get(card.plaidItemId)
+    }));
+
+    console.log(`Found ${(creditCards || []).length} credit cards for user`);
 
     // Delete existing billing cycles to force regeneration
     console.log('Deleting existing billing cycles...');
-    const deleteResult = await prisma.billingCycle.deleteMany({
-      where: {
-        creditCard: {
-          plaidItem: {
-            userId: session.user.id
-          }
-        }
-      }
-    });
-    console.log(`Deleted ${deleteResult.count} existing billing cycles`);
+    const creditCardIds = (creditCards || []).map(card => card.id);
+    
+    const { error: deleteError, count: deleteCount } = await supabaseAdmin
+      .from('billing_cycles')
+      .delete()
+      .in('creditCardId', creditCardIds);
+
+    if (deleteError) {
+      console.error('Failed to delete existing billing cycles:', deleteError);
+    } else {
+      console.log(`Deleted ${deleteCount || 0} existing billing cycles`);
+    }
 
     // Regenerate billing cycles for each credit card
     const results = [];
-    for (const card of creditCards) {
+    for (const card of (creditCards || [])) {
       console.log(`Regenerating cycles for ${card.name}...`);
       
       // First, ensure transactions are properly linked
-      const unlinkedTransactions = await prisma.transaction.findMany({
-        where: {
-          plaidItemId: card.plaidItemId,
-          creditCardId: null
-        }
-      });
-      
-      if (unlinkedTransactions.length > 0) {
+      const { data: unlinkedTransactions, error: unlinkedError } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .eq('plaidItemId', card.plaidItemId)
+        .is('creditCardId', null);
+
+      if (unlinkedError) {
+        console.error('Failed to fetch unlinked transactions:', unlinkedError);
+      } else if ((unlinkedTransactions || []).length > 0) {
         console.log(`Found ${unlinkedTransactions.length} unlinked transactions, linking them to ${card.name}...`);
         
         // Link transactions to the credit card based on plaidItemId
@@ -63,11 +88,16 @@ export async function POST(request: NextRequest) {
         for (const transaction of unlinkedTransactions) {
           // For now, link all unlinked transactions from the same plaidItem to this card
           // This assumes one credit card per plaidItem, which is typical
-          await prisma.transaction.update({
-            where: { id: transaction.id },
-            data: { creditCardId: card.id }
-          });
-          console.log(`Linked transaction ${transaction.id} to credit card ${card.name}`);
+          const { error: linkError } = await supabaseAdmin
+            .from('transactions')
+            .update({ creditCardId: card.id })
+            .eq('id', transaction.id);
+            
+          if (linkError) {
+            console.error(`Failed to link transaction ${transaction.id}:`, linkError);
+          } else {
+            console.log(`Linked transaction ${transaction.id} to credit card ${card.name}`);
+          }
         }
       }
       

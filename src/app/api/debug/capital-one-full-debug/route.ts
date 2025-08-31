@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { plaidClient } from '@/lib/plaid';
 import { decrypt } from '@/lib/encryption';
@@ -18,29 +18,32 @@ export async function POST(request: NextRequest) {
 
     // 1. Check database for existing credit limits
     console.log('1. CHECKING DATABASE FOR EXISTING CREDIT LIMITS...');
-    const allCards = await prisma.creditCard.findMany({
-      where: {
-        plaidItem: { userId: session.user.id }
-      },
-      include: {
-        plaidItem: {
-          select: {
-            id: true,
-            itemId: true,
-            institutionName: true,
-            accessToken: true
-          }
-        }
-      }
-    });
+    const { data: allCards, error } = await supabaseAdmin
+      .from('credit_cards')
+      .select(`
+        *,
+        plaid_items!inner (
+          id,
+          item_id,
+          institution_name,
+          access_token,
+          user_id
+        )
+      `)
+      .eq('plaid_items.user_id', session.user.id);
+    
+    if (error) {
+      console.error('Error fetching credit cards:', error);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
 
     console.log('Database Results:');
     allCards.forEach(card => {
       console.log(`Card: ${card.name}`);
-      console.log(`  balanceLimit: ${card.balanceLimit} (type: ${typeof card.balanceLimit})`);
-      console.log(`  balanceCurrent: ${card.balanceCurrent}`);
-      console.log(`  balanceAvailable: ${card.balanceAvailable}`);
-      console.log(`  Institution: ${card.plaidItem?.institutionName}`);
+      console.log(`  balanceLimit: ${card.balance_limit} (type: ${typeof card.balance_limit})`);
+      console.log(`  balanceCurrent: ${card.balance_current}`);
+      console.log(`  balanceAvailable: ${card.balance_available}`);
+      console.log(`  Institution: ${card.plaid_items?.institution_name}`);
       console.log('---');
     });
 
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
       card.name?.toLowerCase().includes('capital one') || 
       card.name?.toLowerCase().includes('quicksilver') ||
       card.name?.toLowerCase().includes('venture') ||
-      card.plaidItem?.institutionName?.toLowerCase().includes('capital one')
+      card.plaid_items?.institution_name?.toLowerCase().includes('capital one')
     );
 
     const apiResults = [];
@@ -59,7 +62,7 @@ export async function POST(request: NextRequest) {
       console.log(`\n=== TESTING API FOR: ${card.name} ===`);
       
       try {
-        const decryptedToken = decrypt(card.plaidItem.accessToken);
+        const decryptedToken = decrypt(card.plaid_items.access_token);
         
         // Test all three API endpoints
         console.log('Testing liabilitiesGet...');
@@ -72,10 +75,10 @@ export async function POST(request: NextRequest) {
         const accountsData = await plaidService.getAccounts(decryptedToken);
 
         // Find the specific account
-        const liabilityAccount = liabilitiesData.accounts?.find(acc => acc.account_id === card.accountId);
-        const liability = liabilitiesData.liabilities?.credit?.find(c => c.account_id === card.accountId);
-        const balanceAccount = balancesData.accounts?.find(acc => acc.account_id === card.accountId);
-        const accountsAccount = accountsData.accounts?.find(acc => acc.account_id === card.accountId);
+        const liabilityAccount = liabilitiesData.accounts?.find(acc => acc.account_id === card.account_id);
+        const liability = liabilitiesData.liabilities?.credit?.find(c => c.account_id === card.account_id);
+        const balanceAccount = balancesData.accounts?.find(acc => acc.account_id === card.account_id);
+        const accountsAccount = accountsData.accounts?.find(acc => acc.account_id === card.account_id);
 
         console.log('Raw API Data for', card.name, ':');
         console.log('  Liability Account:', JSON.stringify(liabilityAccount, null, 2));
@@ -102,8 +105,8 @@ export async function POST(request: NextRequest) {
 
         apiResults.push({
           cardName: card.name,
-          accountId: card.accountId,
-          databaseLimit: card.balanceLimit,
+          accountId: card.account_id,
+          databaseLimit: card.balance_limit,
           apiLimitSources: limitSources,
           hasLiabilityData: !!liability,
           hasBalanceData: !!balanceAccount,
@@ -114,8 +117,8 @@ export async function POST(request: NextRequest) {
         console.error(`API test failed for ${card.name}:`, error);
         apiResults.push({
           cardName: card.name,
-          accountId: card.accountId,
-          databaseLimit: card.balanceLimit,
+          accountId: card.account_id,
+          databaseLimit: card.balance_limit,
           error: error.message
         });
       }
@@ -129,9 +132,9 @@ export async function POST(request: NextRequest) {
       capitalOneCards: capitalOneCards.length,
       databaseResults: allCards.map(card => ({
         name: card.name,
-        balanceLimit: card.balanceLimit,
-        balanceCurrent: card.balanceCurrent,
-        institution: card.plaidItem?.institutionName
+        balanceLimit: card.balance_limit,
+        balanceCurrent: card.balance_current,
+        institution: card.plaid_items?.institution_name
       })),
       apiResults,
       message: 'Full Capital One debug completed - check console for detailed logs'

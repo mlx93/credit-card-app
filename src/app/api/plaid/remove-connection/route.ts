@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
 
@@ -20,22 +20,27 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Find the Plaid item and verify ownership
-    const plaidItem = await prisma.plaidItem.findFirst({
-      where: {
-        itemId,
-        userId: session.user.id
-      }
-    });
+    const { data: plaidItem, error } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('item_id', itemId)
+      .eq('user_id', session.user.id)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching plaid item:', error);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
 
     if (!plaidItem) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
-    console.log(`Removing Plaid connection for ${plaidItem.institutionName} (${itemId})`);
+    console.log(`Removing Plaid connection for ${plaidItem.institution_name} (${itemId})`);
 
     try {
       // Try to remove the item from Plaid (best effort)
-      const decryptedAccessToken = decrypt(plaidItem.accessToken);
+      const decryptedAccessToken = decrypt(plaidItem.access_token);
       await plaidService.removeItem(decryptedAccessToken);
       console.log('Successfully removed item from Plaid');
     } catch (plaidError) {
@@ -44,15 +49,21 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Remove from local database (cascading deletes will handle related data)
-    await prisma.plaidItem.delete({
-      where: { id: plaidItem.id }
-    });
+    const { error: deleteError } = await supabaseAdmin
+      .from('plaid_items')
+      .delete()
+      .eq('id', plaidItem.id);
+    
+    if (deleteError) {
+      console.error('Error deleting plaid item:', deleteError);
+      return NextResponse.json({ error: 'Failed to remove connection' }, { status: 500 });
+    }
 
-    console.log(`Successfully removed connection for ${plaidItem.institutionName}`);
+    console.log(`Successfully removed connection for ${plaidItem.institution_name}`);
 
     return NextResponse.json({ 
       success: true, 
-      message: `Removed connection to ${plaidItem.institutionName}`
+      message: `Removed connection to ${plaidItem.institution_name}`
     });
 
   } catch (error) {

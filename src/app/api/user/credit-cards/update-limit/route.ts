@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -24,40 +24,47 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Verify the card belongs to the authenticated user
-    const card = await prisma.creditCard.findFirst({
-      where: {
-        id: cardId,
-        plaidItem: {
-          userId: session.user.id
-        }
-      },
-      include: {
-        plaidItem: {
-          select: {
-            institutionName: true
-          }
-        }
-      }
-    });
+    // First get user's plaid items
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('id, institutionName')
+      .eq('userId', session.user.id);
 
-    if (!card) {
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    
+    // Verify the card belongs to the authenticated user
+    const { data: card, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*, plaid_items!inner(institutionName)')
+      .eq('id', cardId)
+      .in('plaidItemId', plaidItemIds)
+      .single();
+
+    if (cardError || !card) {
       return NextResponse.json({ 
         error: 'Credit card not found or unauthorized' 
       }, { status: 404 });
     }
 
     // Update the credit limit
-    const updatedCard = await prisma.creditCard.update({
-      where: { id: cardId },
-      data: { 
-        balanceLimit: creditLimit 
-      }
-    });
+    const { data: updatedCard, error: updateError } = await supabaseAdmin
+      .from('credit_cards')
+      .update({ balanceLimit: creditLimit })
+      .eq('id', cardId)
+      .select()
+      .single();
+
+    if (updateError || !updatedCard) {
+      throw new Error(`Failed to update credit limit: ${updateError?.message}`);
+    }
 
     console.log(`✅ Manual credit limit updated for ${card.name}:`, {
       cardName: card.name,
-      institution: card.plaidItem?.institutionName,
+      institution: card.plaid_items?.institutionName,
       oldLimit: card.balanceLimit,
       newLimit: creditLimit,
       userId: session.user.id

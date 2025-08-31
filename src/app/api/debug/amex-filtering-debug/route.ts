@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -12,32 +12,44 @@ export async function GET() {
     }
 
     // Get the exact data that getAllUserBillingCycles processes
-    const plaidItems = await prisma.plaidItem.findMany({
-      where: { userId: session.user.id },
-      include: {
-        accounts: true,
-      },
-    });
+    const { data: plaidItems, error } = await supabaseAdmin
+      .from('plaid_items')
+      .select(`
+        *,
+        credit_cards (*)
+      `)
+      .eq('user_id', session.user.id);
+    
+    if (error) {
+      console.error('Error fetching plaid items:', error);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
 
     const amexDebugInfo = [];
 
     for (const item of plaidItems) {
-      for (const card of item.accounts) {
+      for (const card of item.credit_cards || []) {
         if (card.name?.includes('Platinum')) {
           // Get all cycles for this card
-          const allCycles = await prisma.billingCycle.findMany({
-            where: { creditCardId: card.id },
-            orderBy: { startDate: 'desc' }
-          });
+          const { data: allCycles, error: cyclesError } = await supabaseAdmin
+            .from('billing_cycles')
+            .select('*')
+            .eq('credit_card_id', card.id)
+            .order('start_date', { ascending: false });
+          
+          if (cyclesError) {
+            console.error('Error fetching billing cycles:', cyclesError);
+            continue;
+          }
 
           // Simulate the filtering logic from getAllUserBillingCycles
           const oneYearAgo = new Date();
           oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
-          const cardOpenDate = card.openDate ? new Date(card.openDate) : oneYearAgo;
+          const cardOpenDate = card.open_date ? new Date(card.open_date) : oneYearAgo;
           const earliestCycleDate = cardOpenDate > oneYearAgo ? cardOpenDate : oneYearAgo;
 
-          const filteredCycles = allCycles.filter(cycle => {
-            const cycleEnd = new Date(cycle.endDate);
+          const filteredCycles = (allCycles || []).filter(cycle => {
+            const cycleEnd = new Date(cycle.end_date);
             return cycleEnd >= cardOpenDate;
           });
 

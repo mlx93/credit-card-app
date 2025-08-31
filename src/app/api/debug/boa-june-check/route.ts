@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -13,58 +13,77 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the BoA card
-    const boaCard = await prisma.creditCard.findFirst({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        name: {
-          contains: 'Customized'
-        }
-      }
-    });
+    // Get the user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
 
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+
+    // Get the BoA card
+    const { data: boaCards, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .in('plaidItemId', plaidItemIds)
+      .ilike('name', '%Customized%');
+
+    if (cardError) {
+      throw new Error(`Failed to fetch BoA card: ${cardError.message}`);
+    }
+
+    const boaCard = boaCards?.[0];
     if (!boaCard) {
       return NextResponse.json({ error: 'BoA card not found' }, { status: 404 });
     }
 
     // Get June 2025 transactions specifically
-    const june2025Start = new Date('2025-06-01');
-    const june2025End = new Date('2025-06-30T23:59:59');
+    const june2025Start = '2025-06-01';
+    const june2025End = '2025-06-30';
     
-    const juneTransactions = await prisma.transaction.findMany({
-      where: {
-        creditCardId: boaCard.id,
-        date: {
-          gte: june2025Start,
-          lte: june2025End
-        }
-      },
-      orderBy: { date: 'asc' }
-    });
+    const { data: juneTransactions, error: transactionError } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .eq('creditCardId', boaCard.id)
+      .gte('date', june2025Start)
+      .lte('date', june2025End)
+      .order('date', { ascending: true });
+
+    if (transactionError) {
+      throw new Error(`Failed to fetch June transactions: ${transactionError.message}`);
+    }
 
     // Get the June billing cycle
-    const juneCycle = await prisma.billingCycle.findFirst({
-      where: {
-        creditCardId: boaCard.id,
-        startDate: {
-          gte: new Date('2025-06-01'),
-          lte: new Date('2025-06-30')
-        }
-      }
-    });
+    const { data: juneCycles, error: cycleError } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .eq('creditCardId', boaCard.id)
+      .gte('startDate', '2025-06-01')
+      .lte('startDate', '2025-06-30');
+
+    if (cycleError) {
+      throw new Error(`Failed to fetch June cycle: ${cycleError.message}`);
+    }
+
+    const juneCycle = juneCycles?.[0];
 
     // Get ALL billing cycles for BoA card
-    const allBoaCycles = await prisma.billingCycle.findMany({
-      where: {
-        creditCardId: boaCard.id
-      },
-      orderBy: { startDate: 'desc' }
-    });
+    const { data: allBoaCycles, error: allCyclesError } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .eq('creditCardId', boaCard.id)
+      .order('startDate', { ascending: false });
+
+    if (allCyclesError) {
+      throw new Error(`Failed to fetch all cycles: ${allCyclesError.message}`);
+    }
 
     // Calculate June spending manually
-    const juneSpend = juneTransactions.reduce((sum, t) => {
+    const juneSpend = (juneTransactions || []).reduce((sum, t) => {
       // Skip payments (negative amounts with payment keywords)
       const isPayment = t.name.toLowerCase().includes('pymt') || 
                        t.name.toLowerCase().includes('payment');
@@ -81,12 +100,12 @@ export async function GET() {
         accountId: boaCard.accountId
       },
       juneData: {
-        transactionCount: juneTransactions.length,
+        transactionCount: (juneTransactions || []).length,
         totalSpend: juneSpend,
-        dateRange: `${june2025Start.toISOString().split('T')[0]} to ${june2025End.toISOString().split('T')[0]}`,
-        transactions: juneTransactions.map(t => ({
+        dateRange: `${june2025Start} to ${june2025End}`,
+        transactions: (juneTransactions || []).map(t => ({
           id: t.id,
-          date: t.date.toISOString().split('T')[0],
+          date: t.date,
           amount: t.amount,
           name: t.name,
           category: t.category
@@ -94,25 +113,25 @@ export async function GET() {
       },
       juneCycle: juneCycle ? {
         id: juneCycle.id,
-        startDate: juneCycle.startDate.toISOString().split('T')[0],
-        endDate: juneCycle.endDate.toISOString().split('T')[0],
+        startDate: juneCycle.startDate,
+        endDate: juneCycle.endDate,
         totalSpend: juneCycle.totalSpend,
         statementBalance: juneCycle.statementBalance,
-        dueDate: juneCycle.dueDate?.toISOString().split('T')[0]
+        dueDate: juneCycle.dueDate
       } : null,
-      allCycles: allBoaCycles.map(cycle => ({
+      allCycles: (allBoaCycles || []).map(cycle => ({
         id: cycle.id,
-        period: `${cycle.startDate.toISOString().split('T')[0]} to ${cycle.endDate.toISOString().split('T')[0]}`,
+        period: `${cycle.startDate} to ${cycle.endDate}`,
         totalSpend: cycle.totalSpend,
         statementBalance: cycle.statementBalance,
         hasStatement: cycle.statementBalance !== null
       })),
       summary: {
         cardOpenedInJune: boaCard.openDate ? new Date(boaCard.openDate).getMonth() === 5 : false,
-        hasJuneTransactions: juneTransactions.length > 0,
+        hasJuneTransactions: (juneTransactions || []).length > 0,
         hasJuneCycle: !!juneCycle,
-        totalCycles: allBoaCycles.length,
-        cyclesWithStatements: allBoaCycles.filter(c => c.statementBalance !== null).length
+        totalCycles: (allBoaCycles || []).length,
+        cyclesWithStatements: (allBoaCycles || []).filter(c => c.statementBalance !== null).length
       }
     });
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,91 +12,127 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's Plaid items
-    const plaidItems = await prisma.plaidItem.findMany({
-      where: { userId: session.user.id },
-      select: { id: true, itemId: true, institutionName: true }
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('id, item_id, institution_name')
+      .eq('user_id', session.user.id);
+    
+    if (plaidError) {
+      console.error('Error fetching plaid items:', plaidError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
 
-    // Get user's credit cards
-    const creditCards = await prisma.creditCard.findMany({
-      where: { 
-        plaidItem: { userId: session.user.id }
-      },
-      select: {
-        id: true,
-        accountId: true,
-        name: true,
-        mask: true,
-        plaidItemId: true,
-        balanceCurrent: true,
-        balanceLimit: true,
-        lastStatementBalance: true,
-        _count: {
-          select: { transactions: true }
-        }
-      }
-    });
+    // Get user's credit cards with transaction counts
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select(`
+        id,
+        account_id,
+        name,
+        mask,
+        plaid_item_id,
+        balance_current,
+        balance_limit,
+        last_statement_balance,
+        plaid_items!inner(user_id),
+        transactions(id)
+      `)
+      .eq('plaid_items.user_id', session.user.id);
+    
+    if (cardsError) {
+      console.error('Error fetching credit cards:', cardsError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
 
-    // Get total transaction count and recent transactions
-    const totalTransactions = await prisma.transaction.count({
-      where: {
-        plaidItem: { userId: session.user.id }
-      }
-    });
+    // Get total transaction count
+    const { count: totalTransactions, error: countError } = await supabaseAdmin
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .in('plaid_item_id', (plaidItems || []).map(item => item.id));
+    
+    if (countError) {
+      console.error('Error counting transactions:', countError);
+    }
 
-    const recentTransactions = await prisma.transaction.findMany({
-      where: {
-        plaidItem: { userId: session.user.id }
-      },
-      select: {
-        id: true,
-        transactionId: true,
-        name: true,
-        amount: true,
-        date: true,
-        creditCardId: true,
-        plaidItemId: true
-      },
-      orderBy: { date: 'desc' },
-      take: 10
-    });
+    // Get recent transactions
+    const { data: recentTransactions, error: recentError } = await supabaseAdmin
+      .from('transactions')
+      .select('id, transaction_id, name, amount, date, credit_card_id, plaid_item_id')
+      .in('plaid_item_id', (plaidItems || []).map(item => item.id))
+      .order('date', { ascending: false })
+      .limit(10);
+    
+    if (recentError) {
+      console.error('Error fetching recent transactions:', recentError);
+    }
 
-    // Get transaction counts by credit card
-    const transactionsByCard = await prisma.transaction.groupBy({
-      by: ['creditCardId'],
-      where: {
-        plaidItem: { userId: session.user.id }
-      },
+    // Get transaction counts by credit card (manual grouping with Supabase)
+    const transactionsByCard = (creditCards || []).map(card => ({
+      creditCardId: card.id,
       _count: {
-        _all: true
+        _all: card.transactions?.length || 0
       }
-    });
+    }));
 
     // Get date range of transactions
-    const dateRange = await prisma.transaction.aggregate({
-      where: {
-        plaidItem: { userId: session.user.id }
-      },
-      _min: { date: true },
-      _max: { date: true }
-    });
+    const { data: dateRangeData, error: dateError } = await supabaseAdmin
+      .from('transactions')
+      .select('date')
+      .in('plaid_item_id', (plaidItems || []).map(item => item.id))
+      .order('date', { ascending: true })
+      .limit(1);
+    
+    const { data: maxDateData, error: maxDateError } = await supabaseAdmin
+      .from('transactions')
+      .select('date')
+      .in('plaid_item_id', (plaidItems || []).map(item => item.id))
+      .order('date', { ascending: false })
+      .limit(1);
+    
+    const dateRange = {
+      _min: { date: dateRangeData?.[0]?.date || null },
+      _max: { date: maxDateData?.[0]?.date || null }
+    };
+    
+    if (dateError) console.error('Error fetching min date:', dateError);
+    if (maxDateError) console.error('Error fetching max date:', maxDateError);
 
     return NextResponse.json({
-      plaidItems: plaidItems.map(item => ({
+      plaidItems: (plaidItems || []).map(item => ({
         id: item.id,
-        itemId: item.itemId,
-        institutionName: item.institutionName
+        itemId: item.item_id,
+        institutionName: item.institution_name
       })),
-      creditCards,
+      creditCards: (creditCards || []).map(card => ({
+        id: card.id,
+        accountId: card.account_id,
+        name: card.name,
+        mask: card.mask,
+        plaidItemId: card.plaid_item_id,
+        balanceCurrent: card.balance_current,
+        balanceLimit: card.balance_limit,
+        lastStatementBalance: card.last_statement_balance,
+        _count: {
+          transactions: card.transactions?.length || 0
+        }
+      })),
       transactionStats: {
-        total: totalTransactions,
+        total: totalTransactions || 0,
         byCard: transactionsByCard,
         dateRange: {
           earliest: dateRange._min.date,
           latest: dateRange._max.date
         }
       },
-      recentTransactions
+      recentTransactions: (recentTransactions || []).map(t => ({
+        id: t.id,
+        transactionId: t.transaction_id,
+        name: t.name,
+        amount: t.amount,
+        date: t.date,
+        creditCardId: t.credit_card_id,
+        plaidItemId: t.plaid_item_id
+      }))
     });
 
   } catch (error) {

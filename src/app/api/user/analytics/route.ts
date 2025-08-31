@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 export async function GET() {
@@ -18,29 +18,53 @@ export async function GET() {
     
     const last3MonthsStart = startOfMonth(subMonths(now, 3));
 
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        plaidItem: {
-          userId: session.user.id,
-        },
-        date: {
-          gte: last3MonthsStart,
-          lte: currentMonthEnd,
-        },
-      },
-      include: {
-        creditCard: {
-          select: {
-            name: true,
-          },
-        },
-      },
-      orderBy: {
-        date: 'desc',
-      },
-    });
+    // Get user's plaid items first
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('id')
+      .eq('userId', session.user.id);
 
-    const thisMonthTransactions = transactions.filter(t => 
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
+
+    const plaidItemIds = (plaidItems || []).map(item => item.id);
+    if (plaidItemIds.length === 0) {
+      return NextResponse.json({
+        totalSpendThisMonth: 0,
+        monthlySpend: [],
+        categories: [],
+        cardSpending: [],
+        monthlyComparison: [],
+        transactionCount: 0,
+      });
+    }
+
+    const { data: transactions, error: transactionsError } = await supabaseAdmin
+      .from('transactions')
+      .select(`
+        *,
+        credit_cards(name)
+      `)
+      .in('plaidItemId', plaidItemIds)
+      .gte('date', last3MonthsStart.toISOString())
+      .lte('date', currentMonthEnd.toISOString())
+      .order('date', { ascending: false });
+
+    if (transactionsError) {
+      throw new Error(`Failed to fetch transactions: ${transactionsError.message}`);
+    }
+
+    // Convert date strings back to Date objects for compatibility
+    const formattedTransactions = (transactions || []).map(t => ({
+      ...t,
+      date: new Date(t.date),
+      creditCard: t.credit_cards ? {
+        name: t.credit_cards.name
+      } : null
+    }));
+
+    const thisMonthTransactions = formattedTransactions.filter(t => 
       t.date >= currentMonthStart && t.date <= currentMonthEnd
     );
 
@@ -53,7 +77,7 @@ export async function GET() {
       const monthStart = startOfMonth(subMonths(now, i));
       const monthEnd = endOfMonth(subMonths(now, i));
       
-      const monthTransactions = transactions.filter(t => 
+      const monthTransactions = formattedTransactions.filter(t => 
         t.date >= monthStart && t.date <= monthEnd
       );
       
@@ -96,7 +120,7 @@ export async function GET() {
     const lastMonthStart = startOfMonth(subMonths(now, 1));
     const lastMonthEnd = endOfMonth(subMonths(now, 1));
     
-    const lastMonthTransactions = transactions.filter(t => 
+    const lastMonthTransactions = formattedTransactions.filter(t => 
       t.date >= lastMonthStart && t.date <= lastMonthEnd
     );
 

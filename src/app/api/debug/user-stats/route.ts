@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -15,60 +15,59 @@ export async function GET() {
 
     // Get comprehensive user statistics
     const [
-      totalUsers,
-      usersWithPlaidItems,
-      totalPlaidItems,
-      totalCreditCards,
-      totalTransactions,
-      totalBillingCycles,
-      recentUsers
+      totalUsersResult,
+      usersWithPlaidItemsResult,
+      totalPlaidItemsResult,
+      totalCreditCardsResult,
+      totalTransactionsResult,
+      totalBillingCyclesResult,
+      recentUsersResult
     ] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({
-        where: {
-          items: {
-            some: {}
-          }
-        }
-      }),
-      prisma.plaidItem.count(),
-      prisma.creditCard.count(),
-      prisma.transaction.count(),
-      prisma.billingCycle.count(),
-      prisma.user.findMany({
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          createdAt: true,
-          _count: {
-            select: {
-              items: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
-        take: 10
-      })
+      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('users').select('*, plaid_items!inner(id)', { count: 'exact', head: true }),
+      supabaseAdmin.from('plaid_items').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('credit_cards').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('transactions').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('billing_cycles').select('*', { count: 'exact', head: true }),
+      supabaseAdmin
+        .from('users')
+        .select(`
+          id,
+          email,
+          name,
+          created_at,
+          plaid_items(id)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10)
     ]);
+    
+    // Extract counts from results
+    const totalUsers = totalUsersResult.count || 0;
+    const usersWithPlaidItems = usersWithPlaidItemsResult.count || 0;
+    const totalPlaidItems = totalPlaidItemsResult.count || 0;
+    const totalCreditCards = totalCreditCardsResult.count || 0;
+    const totalTransactions = totalTransactionsResult.count || 0;
+    const totalBillingCycles = totalBillingCyclesResult.count || 0;
+    const recentUsers = recentUsersResult.data || [];
+    
+    // Handle any errors
+    if (totalUsersResult.error) console.error('Error counting users:', totalUsersResult.error);
+    if (usersWithPlaidItemsResult.error) console.error('Error counting users with plaid items:', usersWithPlaidItemsResult.error);
+    if (totalPlaidItemsResult.error) console.error('Error counting plaid items:', totalPlaidItemsResult.error);
+    if (totalCreditCardsResult.error) console.error('Error counting credit cards:', totalCreditCardsResult.error);
+    if (totalTransactionsResult.error) console.error('Error counting transactions:', totalTransactionsResult.error);
+    if (totalBillingCyclesResult.error) console.error('Error counting billing cycles:', totalBillingCyclesResult.error);
+    if (recentUsersResult.error) console.error('Error fetching recent users:', recentUsersResult.error);
 
     // Get active vs inactive items
-    const [activeItems, errorItems] = await Promise.all([
-      prisma.plaidItem.count({
-        where: {
-          status: 'active'
-        }
-      }),
-      prisma.plaidItem.count({
-        where: {
-          status: {
-            not: 'active'
-          }
-        }
-      })
+    const [activeItemsResult, errorItemsResult] = await Promise.all([
+      supabaseAdmin.from('plaid_items').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      supabaseAdmin.from('plaid_items').select('*', { count: 'exact', head: true }).neq('status', 'active')
     ]);
+    
+    const activeItems = activeItemsResult.count || 0;
+    const errorItems = errorItemsResult.count || 0;
 
     const stats = {
       users: {
@@ -91,8 +90,8 @@ export async function GET() {
       recent: recentUsers.map(user => ({
         email: user.email,
         name: user.name,
-        createdAt: user.createdAt,
-        plaidItems: user._count.items,
+        createdAt: user.created_at,
+        plaidItems: user.plaid_items?.length || 0,
         isCurrentUser: user.id === session.user.id
       }))
     };

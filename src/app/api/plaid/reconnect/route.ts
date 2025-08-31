@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 
 export async function POST(request: NextRequest) {
@@ -19,12 +19,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Find the Plaid item and verify ownership
-    const plaidItem = await prisma.plaidItem.findFirst({
-      where: {
-        itemId,
-        userId: session.user.id
-      }
-    });
+    const { data: plaidItem, error } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('item_id', itemId)
+      .eq('user_id', session.user.id)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching plaid item:', error);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
 
     if (!plaidItem) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
@@ -39,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         success: true,
         link_token: updateLinkToken,
-        institution_name: plaidItem.institutionName
+        institution_name: plaidItem.institution_name
       });
 
     } catch (plaidError) {

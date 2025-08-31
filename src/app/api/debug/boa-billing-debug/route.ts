@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -14,39 +14,46 @@ export async function GET() {
     }
 
     // Find the Bank of America card
-    const boaCard = await prisma.creditCard.findFirst({
-      where: {
-        plaidItem: {
-          userId: session.user.id
-        },
-        name: {
-          contains: 'Customized Cash Rewards'
-        }
-      },
-      include: {
-        plaidItem: {
-          select: {
-            institutionName: true
-          }
-        },
-        transactions: {
-          orderBy: { date: 'asc' },
-          take: 10 // Get first 10 transactions to see the pattern
-        },
-        billingCycles: {
-          orderBy: { startDate: 'asc' }
-        }
-      }
-    });
+    const { data: boaCards, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select(`
+        *,
+        plaid_items!inner (
+          institution_name,
+          user_id
+        ),
+        transactions (
+          id,
+          date,
+          name,
+          amount
+        ),
+        billing_cycles (
+          id,
+          start_date,
+          end_date,
+          total_spend
+        )
+      `)
+      .eq('plaid_items.user_id', session.user.id)
+      .ilike('name', '%Customized Cash Rewards%')
+      .limit(1);
+    
+    if (cardError) {
+      console.error('Error fetching BoA card:', cardError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
+    
+    const boaCard = boaCards?.[0];
 
     if (!boaCard) {
       return NextResponse.json({ error: 'BoA card not found' }, { status: 404 });
     }
 
     // Simulate the billing cycle calculation logic
-    const lastStatementDate = boaCard.lastStatementIssueDate;
-    const nextDueDate = boaCard.nextPaymentDueDate;
-    const openDate = boaCard.openDate;
+    const lastStatementDate = boaCard.last_statement_issue_date ? new Date(boaCard.last_statement_issue_date) : null;
+    const nextDueDate = boaCard.next_payment_due_date ? new Date(boaCard.next_payment_due_date) : null;
+    const openDate = boaCard.open_date ? new Date(boaCard.open_date) : null;
     
     console.log('=== BILLING CYCLE DEBUG DATA ===');
     console.log('Card name:', boaCard.name);
@@ -85,7 +92,7 @@ export async function GET() {
     });
     
     // Check which transactions would be in this missing cycle
-    const transactionsInMissingCycle = boaCard.transactions.filter(t => {
+    const transactionsInMissingCycle = (boaCard.transactions || []).filter(t => {
       const transDate = new Date(t.date);
       return transDate >= historicalCycleStart && transDate <= historicalCycleEnd;
     });
@@ -117,10 +124,10 @@ export async function GET() {
           transactionCount: transactionsInMissingCycle.length
         }
       },
-      existingCycles: boaCard.billingCycles.map(cycle => ({
-        start: cycle.startDate.toDateString(),
-        end: cycle.endDate.toDateString(),
-        totalSpend: cycle.totalSpend
+      existingCycles: (boaCard.billing_cycles || []).map(cycle => ({
+        start: new Date(cycle.start_date).toDateString(),
+        end: new Date(cycle.end_date).toDateString(),
+        totalSpend: cycle.total_spend
       })),
       transactionsInMissingCycle: transactionsInMissingCycle.map(t => ({
         date: t.date.toDateString(),

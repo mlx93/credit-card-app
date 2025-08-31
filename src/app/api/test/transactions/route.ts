@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
 
@@ -18,12 +18,21 @@ export async function GET(request: NextRequest) {
     const itemId = searchParams.get('itemId'); // Optional: test specific item
 
     // Get user's plaid items
-    const plaidItems = await prisma.plaidItem.findMany({
-      where: { 
-        userId: session.user.id,
-        ...(itemId ? { itemId } : {})
-      }
-    });
+    let query = supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('user_id', session.user.id);
+    
+    if (itemId) {
+      query = query.eq('item_id', itemId);
+    }
+    
+    const { data: plaidItems, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching plaid items:', error);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
 
     if (plaidItems.length === 0) {
       return NextResponse.json({ error: 'No Plaid items found' }, { status: 404 });
@@ -32,14 +41,14 @@ export async function GET(request: NextRequest) {
     const results = [];
 
     for (const item of plaidItems) {
-      console.log(`\n=== TESTING ${monthsBack} MONTHS FOR ${item.institutionName} ===`);
+      console.log(`\n=== TESTING ${monthsBack} MONTHS FOR ${item.institution_name} ===`);
       
       const endDate = new Date();
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - monthsBack);
       
       try {
-        const accessToken = decrypt(item.accessToken);
+        const accessToken = decrypt(item.access_token);
         
         console.log(`Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
         
@@ -62,8 +71,8 @@ export async function GET(request: NextRequest) {
         const newestMonth = sortedMonths[sortedMonths.length - 1];
         
         results.push({
-          institution: item.institutionName,
-          itemId: item.itemId,
+          institution: item.institution_name,
+          itemId: item.item_id,
           requested: {
             startDate: startDate.toISOString().split('T')[0],
             endDate: endDate.toISOString().split('T')[0],
@@ -89,10 +98,10 @@ export async function GET(request: NextRequest) {
         console.log(`Months returned: ${sortedMonths.length} (requested: ${monthsBack})`);
         
       } catch (error) {
-        console.error(`Error testing ${item.institutionName}:`, error);
+        console.error(`Error testing ${item.institution_name}:`, error);
         results.push({
-          institution: item.institutionName,
-          itemId: item.itemId,
+          institution: item.institution_name,
+          itemId: item.item_id,
           error: error.message
         });
       }
