@@ -62,8 +62,33 @@ export function LoadingOverlay({ isVisible, message = "Connecting to your bank",
           </div>
         </div>
 
+        {/* Loading spinner ring */}
+        <div className="relative mb-6">
+          <div className="h-16 w-16">
+            <svg className="animate-spin" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle
+                cx="32"
+                cy="32"
+                r="28"
+                stroke="url(#gradient)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray="180"
+                strokeDashoffset="60"
+              />
+              <defs>
+                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#818CF8" />
+                  <stop offset="50%" stopColor="#C084FC" />
+                  <stop offset="100%" stopColor="#FB7185" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+        </div>
+
         {/* Text content */}
-        <div className="text-center max-w-sm mt-8">
+        <div className="text-center max-w-sm">
           <h2 className="text-2xl font-bold text-white mb-2">
             {message}{dots}
           </h2>
