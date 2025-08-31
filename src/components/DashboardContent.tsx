@@ -334,7 +334,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   };
 
-  // Check connection health on initial load and auto-fix if possible
+  // Check connection health - be much more conservative about auto-sync
   const checkConnectionHealth = async () => {
     if (!isLoggedIn) return;
 
@@ -348,21 +348,28 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       });
       if (response.ok) {
         const { creditCards: cards } = await response.json();
-        const expiredConnections = cards.filter((card: any) => 
-          card.plaidItem && ['expired', 'error'].includes(card.plaidItem.status)
-        );
+        
+        // Only consider connections truly broken if they have explicit error status
+        // AND haven't been synced in over 24 hours (not just 14 days)
+        const trulyBrokenConnections = cards.filter((card: any) => {
+          if (!card.plaidItem) return false;
+          
+          const hasErrorStatus = ['expired', 'error'].includes(card.plaidItem.status);
+          const lastSync = card.plaidItem.lastSyncAt ? new Date(card.plaidItem.lastSyncAt) : null;
+          const hoursAgo = lastSync ? (Date.now() - lastSync.getTime()) / (1000 * 60 * 60) : Infinity;
+          
+          // Only auto-sync if connection has explicit error AND hasn't synced in 24+ hours
+          return hasErrorStatus && hoursAgo > 24;
+        });
 
-        if (expiredConnections.length > 0) {
-          console.log(`⚠️ ${expiredConnections.length} expired connections detected on page load`);
+        if (trulyBrokenConnections.length > 0) {
+          console.log(`⚠️ ${trulyBrokenConnections.length} truly broken connections detected (error status + 24h+ since sync)`);
+          console.log('ℹ️ Consider manually reconnecting these cards instead of auto-sync');
           
-          // Auto-trigger refresh to try to reconnect expired connections
-          console.log('🔄 Auto-triggering refresh to reconnect expired connections...');
-          
-          // Wait a moment for the page to fully load, then trigger refresh
-          setTimeout(async () => {
-            console.log('🔄 Starting auto-refresh for expired connections...');
-            await handleRefresh();
-          }, 2000); // 2 second delay to let page load complete
+          // Don't auto-trigger sync - just log for user awareness
+          // User can manually refresh if needed
+        } else {
+          console.log('✅ All connections appear healthy - no auto-sync needed');
         }
       }
     } catch (error) {

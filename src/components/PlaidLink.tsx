@@ -77,7 +77,12 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               setTimeout(() => {
                 setLoading(false);
                 setSyncInProgress(false);
-                onSuccess?.();
+                
+                // Give the sync process time to complete billing cycle generation
+                // before triggering the refresh
+                setTimeout(() => {
+                  onSuccess?.();
+                }, 500);
               }, 1500);
             }
           } catch (syncError) {

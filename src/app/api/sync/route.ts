@@ -84,8 +84,14 @@ export async function POST(request: NextRequest) {
         
         for (const card of (creditCards || [])) {
           console.log(`Regenerating billing cycles for ${card.name}...`);
-          const cycles = await calculateBillingCycles(card.id);
-          console.log(`Generated ${cycles.length} billing cycles for ${card.name}`);
+          try {
+            const cycles = await calculateBillingCycles(card.id);
+            console.log(`Generated ${cycles.length} billing cycles for ${card.name}`);
+          } catch (cycleError) {
+            console.error(`Failed to generate billing cycles for ${card.name}:`, cycleError);
+            // Continue with other cards instead of failing entire sync
+            console.log(`Continuing sync despite billing cycle error for ${card.name}`);
+          }
         }
         console.log('Step 3: Billing cycle regeneration completed');
         

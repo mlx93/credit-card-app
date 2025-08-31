@@ -251,7 +251,7 @@ export function DueDateCard({
     console.log('Capital One card limit debug:', {
       name: card.name,
       balanceLimit: card.balanceLimit,
-      hasValidLimit,
+      hasValidLimit: hasValidEffectiveLimit,
       utilization
     });
   }

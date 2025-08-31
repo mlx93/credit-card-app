@@ -40,17 +40,6 @@ class PlaidServiceImpl implements PlaidService {
     return institutionMatch || accountMatch;
   }
 
-  // American Express detection logic
-  private isAmex(institutionName?: string, accountName?: string): boolean {
-    const amexIndicators = ['american express', 'amex', 'platinum', 'gold card', 'green card', 'blue card', 'delta', 'hilton'];
-    const institutionLower = (institutionName || '').toLowerCase();
-    const accountLower = (accountName || '').toLowerCase();
-    
-    const institutionMatch = institutionLower.includes('american express') || institutionLower.includes('amex');
-    const accountMatch = amexIndicators.some(indicator => accountLower.includes(indicator));
-    
-    return institutionMatch || accountMatch;
-  }
   async createLinkToken(userId: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
     
@@ -1029,24 +1018,19 @@ class PlaidServiceImpl implements PlaidService {
       console.log('⏳ Adding pre-sync delay to respect rate limits...');
       await this.delay(500); // 500ms delay before starting transaction sync
       
-      // Determine institution type using institution name (no API call needed)
+      // Determine if this is Capital One using institution name (no API call needed)
       const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
-      const isAmexItem = this.isAmex(plaidItemRecord.institutionName);
-      console.log(`Institution type determined: ${isCapitalOneItem ? 'Capital One' : isAmexItem ? 'American Express' : 'Standard'} (from institution name: ${plaidItemRecord.institutionName})`);
+      console.log(`Institution type determined: ${isCapitalOneItem ? 'Capital One' : 'Standard'} (from institution name: ${plaidItemRecord.institutionName})`);
 
       const endDate = new Date();
       const startDate = new Date();
       
       if (isCapitalOneItem) {
-        // Capital One: Only 90 days of history available
+        // Capital One: Only 90 days of history available due to API limitation
         startDate.setDate(startDate.getDate() - 90);
         console.log('📍 Capital One detected: Using 90-day transaction window');
-      } else if (isAmexItem) {
-        // Amex: Try for full 24 months but expect limited historical data
-        startDate.setMonth(startDate.getMonth() - 24);
-        console.log('📍 American Express detected: Using 24-month window (may have limited historical data)');
       } else {
-        // Other institutions: 24 months to match Link configuration
+        // All other institutions: 24 months to match Link configuration
         startDate.setMonth(startDate.getMonth() - 24);
         console.log('📍 Standard institution: Using 24-month transaction window');
       }
@@ -1153,22 +1137,13 @@ class PlaidServiceImpl implements PlaidService {
         // But for display purposes, we might want to show payments as positive
         let adjustedAmount = transaction.amount;
         
-        // Check if this is a special case payment (negative amount on credit card)
+        // Check if this is a Capital One payment (negative amount on credit card)
         if (creditCard && transaction.amount < 0) {
           const isCapitalOneCard = this.isCapitalOne(plaidItemRecord.institutionName, creditCard.name);
-          const isAmexCard = this.isAmex(plaidItemRecord.institutionName, creditCard.name);
           
-          // For debugging - log payment detection
+          // For debugging Capital One payments only (they have specific behavior)
           if (isCapitalOneCard) {
             console.log('Capital One payment detected:', {
-              transactionName: transaction.name,
-              originalAmount: transaction.amount,
-              cardName: creditCard.name,
-              institution: plaidItemRecord.institutionName,
-              isPaymentTransaction: transaction.amount < 0
-            });
-          } else if (isAmexCard) {
-            console.log('Amex payment detected:', {
               transactionName: transaction.name,
               originalAmount: transaction.amount,
               cardName: creditCard.name,
@@ -1180,20 +1155,6 @@ class PlaidServiceImpl implements PlaidService {
           // Keep the original Plaid sign convention for now
           // The UI can decide whether to display payments as positive or negative
           adjustedAmount = transaction.amount;
-        }
-
-        // Special handling for Amex transactions that may have amount issues
-        if (creditCard && this.isAmex(plaidItemRecord.institutionName, creditCard.name)) {
-          // Log potential Amex transaction issues for debugging
-          if (Math.abs(adjustedAmount) < 0.01 && adjustedAmount !== 0) {
-            console.warn('⚠️ Amex transaction with very small amount detected:', {
-              name: transaction.name,
-              amount: adjustedAmount,
-              originalAmount: transaction.amount,
-              date: transaction.date,
-              category: transaction.category?.[0]
-            });
-          }
         }
 
         // Validate transaction amount before processing
