@@ -1,5 +1,5 @@
 import { plaidClient } from '@/lib/plaid';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { encrypt, decrypt } from '@/lib/encryption';
 import { 
   TransactionsGetRequest,
@@ -103,15 +103,19 @@ class PlaidServiceImpl implements PlaidService {
       console.warn('Could not fetch institution name:', error);
     }
 
-    await prisma.plaidItem.create({
-      data: {
+    const { error: createError } = await supabaseAdmin
+      .from('plaid_items')
+      .insert({
         userId,
         itemId: item_id,
         accessToken: encrypt(access_token),
         institutionId,
         institutionName,
-      },
-    });
+      });
+
+    if (createError) {
+      throw new Error(`Failed to create plaid item: ${createError.message}`);
+    }
 
     await this.syncAccounts(access_token, item_id);
     
@@ -352,11 +356,13 @@ class PlaidServiceImpl implements PlaidService {
       accountsData: accountsData?.accounts?.length || 0
     });
 
-    const plaidItem = await prisma.plaidItem.findUnique({
-      where: { itemId },
-    });
+    const { data: plaidItem, error: plaidItemError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('itemId', itemId)
+      .single();
 
-    if (!plaidItem) {
+    if (plaidItemError || !plaidItem) {
       throw new Error('Plaid item not found');
     }
     
@@ -379,16 +385,32 @@ class PlaidServiceImpl implements PlaidService {
           (a: any) => a.account_id === account.account_id
         );
 
-        const existingCard = await prisma.creditCard.findUnique({
-          where: { accountId: account.account_id },
-        });
+        const { data: existingCard, error: existingCardError } = await supabaseAdmin
+          .from('credit_cards')
+          .select('*')
+          .eq('accountId', account.account_id)
+          .single();
+
+        if (existingCardError && existingCardError.code !== 'PGRST116') {
+          console.error('Error checking existing credit card:', existingCardError);
+        }
 
         // Get earliest transaction for transaction-based open date fallback
-        const earliestTransactions = existingCard ? await prisma.transaction.findMany({
-          where: { creditCardId: existingCard.id },
-          orderBy: { date: 'asc' },
-          take: 1
-        }) : [];
+        let earliestTransactions = [];
+        if (existingCard) {
+          const { data: transactions, error: transactionError } = await supabaseAdmin
+            .from('transactions')
+            .select('*')
+            .eq('creditCardId', existingCard.id)
+            .order('date', { ascending: true })
+            .limit(1);
+
+          if (transactionError) {
+            console.error('Error fetching earliest transactions:', transactionError);
+          } else {
+            earliestTransactions = transactions || [];
+          }
+        }
 
         // Enhanced credit limit extraction with better Capital One support
         let creditLimit = null;
@@ -750,40 +772,96 @@ class PlaidServiceImpl implements PlaidService {
         };
 
         if (existingCard) {
-          await prisma.creditCard.update({
-            where: { id: existingCard.id },
-            data: cardData,
-          });
+          const { error: updateError } = await supabaseAdmin
+            .from('credit_cards')
+            .update({
+              ...cardData,
+              // Convert dates to ISO strings
+              ...(cardData.lastStatementIssueDate && {
+                lastStatementIssueDate: cardData.lastStatementIssueDate.toISOString()
+              }),
+              ...(cardData.nextPaymentDueDate && {
+                nextPaymentDueDate: cardData.nextPaymentDueDate.toISOString()
+              }),
+              ...(cardData.openDate && {
+                openDate: cardData.openDate.toISOString()
+              }),
+              ...(cardData.annualFeeDueDate && {
+                annualFeeDueDate: cardData.annualFeeDueDate.toISOString()
+              })
+            })
+            .eq('id', existingCard.id);
+
+          if (updateError) {
+            console.error('Failed to update credit card:', updateError);
+          }
         } else {
-          await prisma.creditCard.create({
-            data: {
+          const { error: createError } = await supabaseAdmin
+            .from('credit_cards')
+            .insert({
               ...cardData,
               accountId: account.account_id,
               plaidItemId: plaidItem.id,
-            },
-          });
+              // Convert dates to ISO strings
+              ...(cardData.lastStatementIssueDate && {
+                lastStatementIssueDate: cardData.lastStatementIssueDate.toISOString()
+              }),
+              ...(cardData.nextPaymentDueDate && {
+                nextPaymentDueDate: cardData.nextPaymentDueDate.toISOString()
+              }),
+              ...(cardData.openDate && {
+                openDate: cardData.openDate.toISOString()
+              }),
+              ...(cardData.annualFeeDueDate && {
+                annualFeeDueDate: cardData.annualFeeDueDate.toISOString()
+              })
+            });
+
+          if (createError) {
+            throw new Error(`Failed to create credit card: ${createError.message}`);
+          }
         }
 
         // Skip statement sync - no PRODUCT_STATEMENTS consent
         console.log(`Skipping statement sync for ${account.name} - no PRODUCT_STATEMENTS consent`);
 
         if (liability?.aprs) {
-          await prisma.aPR.deleteMany({
-            where: { creditCard: { accountId: account.account_id } },
-          });
+          // First get the credit card ID for this account
+          const { data: creditCardForAprs, error: cardForAprsError } = await supabaseAdmin
+            .from('credit_cards')
+            .select('id')
+            .eq('accountId', account.account_id)
+            .single();
 
-          for (const apr of liability.aprs) {
-            await prisma.aPR.create({
-              data: {
-                aprType: apr.apr_type,
-                aprPercentage: apr.apr_percentage,
-                balanceSubjectToApr: apr.balance_subject_to_apr,
-                interestChargeAmount: apr.interest_charge_amount,
-                creditCard: {
-                  connect: { accountId: account.account_id },
-                },
-              },
-            });
+          if (cardForAprsError) {
+            console.error('Failed to get credit card for APRs:', cardForAprsError);
+          } else {
+            // Delete existing APRs
+            const { error: deleteAprsError } = await supabaseAdmin
+              .from('aprs')
+              .delete()
+              .eq('creditCardId', creditCardForAprs.id);
+
+            if (deleteAprsError) {
+              console.error('Failed to delete existing APRs:', deleteAprsError);
+            }
+
+            // Create new APRs
+            for (const apr of liability.aprs) {
+              const { error: createAprError } = await supabaseAdmin
+                .from('aprs')
+                .insert({
+                  creditCardId: creditCardForAprs.id,
+                  aprType: apr.apr_type,
+                  aprPercentage: apr.apr_percentage,
+                  balanceSubjectToApr: apr.balance_subject_to_apr,
+                  interestChargeAmount: apr.interest_charge_amount,
+                });
+
+              if (createAprError) {
+                console.error('Failed to create APR:', createAprError);
+              }
+            }
           }
         }
       }

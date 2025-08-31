@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
 
@@ -18,16 +18,21 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Fetching Plaid items for user:', session.user.id);
-    const plaidItems = await prisma.plaidItem.findMany({
-      where: { userId: session.user.id },
-    });
+    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('userId', session.user.id);
+
+    if (plaidError) {
+      throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+    }
     
-    console.log(`Found ${plaidItems.length} Plaid items for user`);
-    plaidItems.forEach((item, index) => {
+    console.log(`Found ${(plaidItems || []).length} Plaid items for user`);
+    (plaidItems || []).forEach((item, index) => {
       console.log(`Item ${index + 1}: ${item.institutionName} (${item.itemId})`);
     });
 
-    if (plaidItems.length === 0) {
+    if ((plaidItems || []).length === 0) {
       console.log('No Plaid items found - returning early');
       return NextResponse.json({ 
         message: 'No Plaid items to sync',
@@ -36,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Starting sync promises...');
-    const syncPromises = plaidItems.map(async (item) => {
+    const syncPromises = (plaidItems || []).map(async (item) => {
       try {
         console.log(`=== SYNC DEBUG: Starting sync for ${item.institutionName} (${item.itemId}) ===`);
         const decryptedAccessToken = decrypt(item.accessToken);
@@ -68,11 +73,16 @@ export async function POST(request: NextRequest) {
         const { calculateBillingCycles } = await import('@/utils/billingCycles');
         
         // Get all credit cards for this Plaid item
-        const creditCards = await prisma.creditCard.findMany({
-          where: { plaidItemId: item.id }
-        });
+        const { data: creditCards, error: cardsError } = await supabaseAdmin
+          .from('credit_cards')
+          .select('*')
+          .eq('plaidItemId', item.id);
+
+        if (cardsError) {
+          throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+        }
         
-        for (const card of creditCards) {
+        for (const card of (creditCards || [])) {
           console.log(`Regenerating billing cycles for ${card.name}...`);
           const cycles = await calculateBillingCycles(card.id);
           console.log(`Generated ${cycles.length} billing cycles for ${card.name}`);
@@ -80,15 +90,19 @@ export async function POST(request: NextRequest) {
         console.log('Step 3: Billing cycle regeneration completed');
         
         // Update connection status to active on successful sync
-        await prisma.plaidItem.update({
-          where: { itemId: item.itemId },
-          data: {
+        const { error: updateError } = await supabaseAdmin
+          .from('plaid_items')
+          .update({
             status: 'active',
-            lastSyncAt: new Date(),
+            lastSyncAt: new Date().toISOString(),
             errorCode: null,
             errorMessage: null
-          }
-        });
+          })
+          .eq('itemId', item.itemId);
+
+        if (updateError) {
+          console.error('Failed to update plaid item status:', updateError);
+        }
         
         console.log(`=== SYNC DEBUG: Completed sync for ${item.institutionName} ===`);
         return { itemId: item.itemId, status: 'success' };
@@ -133,14 +147,18 @@ export async function POST(request: NextRequest) {
             console.log(`✅ Update link token created for ${item.institutionName}`);
             
             // Mark as requiring reconnection but provide the means to do it
-            await prisma.plaidItem.update({
-              where: { itemId: item.itemId },
-              data: {
+            const { error: reconnectUpdateError } = await supabaseAdmin
+              .from('plaid_items')
+              .update({
                 status: 'expired',
                 errorCode: errorCode,
                 errorMessage: 'Connection expired - reconnection required'
-              }
-            });
+              })
+              .eq('itemId', item.itemId);
+
+            if (reconnectUpdateError) {
+              console.error('Failed to update plaid item for reconnection:', reconnectUpdateError);
+            }
             
             return { 
               itemId: item.itemId, 
@@ -159,14 +177,18 @@ export async function POST(request: NextRequest) {
         // Update connection status based on error type
         const newStatus = isConnectionError ? 'expired' : 'error';
         
-        await prisma.plaidItem.update({
-          where: { itemId: item.itemId },
-          data: {
+        const { error: statusUpdateError } = await supabaseAdmin
+          .from('plaid_items')
+          .update({
             status: newStatus,
             errorCode: errorCode,
             errorMessage: error.message || error?.response?.data?.error_message || 'Unknown sync error'
-          }
-        });
+          })
+          .eq('itemId', item.itemId);
+
+        if (statusUpdateError) {
+          console.error('Failed to update plaid item error status:', statusUpdateError);
+        }
         
         return { 
           itemId: item.itemId, 
@@ -197,54 +219,83 @@ export async function POST(request: NextRequest) {
     try {
       const { calculateBillingCycles } = await import('@/utils/billingCycles');
       
+      // Get all plaid items for this user first
+      const { data: userPlaidItems, error: userPlaidError } = await supabaseAdmin
+        .from('plaid_items')
+        .select('*')
+        .eq('userId', session.user.id);
+
+      if (userPlaidError) {
+        throw new Error(`Failed to fetch user plaid items: ${userPlaidError.message}`);
+      }
+
+      const userPlaidItemIds = (userPlaidItems || []).map(item => item.id);
+      
       // Get all credit cards for this user
-      const userCreditCards = await prisma.creditCard.findMany({
-        where: {
-          plaidItem: {
-            userId: session.user.id
-          }
-        },
-        include: {
-          plaidItem: true
-        }
+      const { data: userCreditCards, error: userCardsError } = await supabaseAdmin
+        .from('credit_cards')
+        .select('*')
+        .in('plaidItemId', userPlaidItemIds);
+
+      if (userCardsError) {
+        throw new Error(`Failed to fetch user credit cards: ${userCardsError.message}`);
+      }
+
+      // Create a map for plaid item lookup
+      const plaidItemMap = new Map();
+      (userPlaidItems || []).forEach(item => {
+        plaidItemMap.set(item.id, item);
       });
 
-      console.log(`Found ${userCreditCards.length} credit cards for user billing cycle regeneration`);
+      // Add plaidItem reference to each credit card for compatibility
+      const userCreditCardsWithPlaidItem = (userCreditCards || []).map(card => ({
+        ...card,
+        plaidItem: plaidItemMap.get(card.plaidItemId)
+      }));
+
+      console.log(`Found ${userCreditCardsWithPlaidItem.length} credit cards for user billing cycle regeneration`);
 
       // Delete existing billing cycles to force regeneration
       console.log('Deleting existing billing cycles...');
-      const deleteResult = await prisma.billingCycle.deleteMany({
-        where: {
-          creditCard: {
-            plaidItem: {
-              userId: session.user.id
-            }
-          }
-        }
-      });
-      console.log(`Deleted ${deleteResult.count} existing billing cycles`);
+      const creditCardIds = (userCreditCards || []).map(card => card.id);
+      
+      const { error: deleteError, count: deleteCount } = await supabaseAdmin
+        .from('billing_cycles')
+        .delete()
+        .in('creditCardId', creditCardIds);
+
+      if (deleteError) {
+        console.error('Failed to delete existing billing cycles:', deleteError);
+      } else {
+        console.log(`Deleted ${deleteCount || 0} existing billing cycles`);
+      }
 
       // Regenerate billing cycles for each credit card
       const regenResults = [];
-      for (const card of userCreditCards) {
+      for (const card of (userCreditCards || [])) {
         console.log(`Regenerating cycles for ${card.name}...`);
         
         // First, ensure transactions are properly linked
-        const unlinkedTransactions = await prisma.transaction.findMany({
-          where: {
-            plaidItemId: card.plaidItemId,
-            creditCardId: null
-          }
-        });
-        
-        if (unlinkedTransactions.length > 0) {
+        const { data: unlinkedTransactions, error: unlinkedError } = await supabaseAdmin
+          .from('transactions')
+          .select('*')
+          .eq('plaidItemId', card.plaidItemId)
+          .is('creditCardId', null);
+
+        if (unlinkedError) {
+          console.error('Failed to fetch unlinked transactions:', unlinkedError);
+        } else if ((unlinkedTransactions || []).length > 0) {
           console.log(`Found ${unlinkedTransactions.length} unlinked transactions, linking them to ${card.name}...`);
           
           for (const transaction of unlinkedTransactions) {
-            await prisma.transaction.update({
-              where: { id: transaction.id },
-              data: { creditCardId: card.id }
-            });
+            const { error: linkError } = await supabaseAdmin
+              .from('transactions')
+              .update({ creditCardId: card.id })
+              .eq('id', transaction.id);
+              
+            if (linkError) {
+              console.error(`Failed to link transaction ${transaction.id}:`, linkError);
+            }
           }
         }
         

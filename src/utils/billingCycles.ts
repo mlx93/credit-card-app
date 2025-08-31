@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { addMonths, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
 
 // Helper function to detect Capital One cards based on institution and card names
@@ -48,29 +48,59 @@ export interface BillingCycleData {
 }
 
 export async function calculateBillingCycles(creditCardId: string): Promise<BillingCycleData[]> {
-  const creditCard = await prisma.creditCard.findUnique({
-    where: { id: creditCardId },
-    include: {
-      transactions: {
-        orderBy: { date: 'asc' },
-      },
-    },
-  });
+  // Get credit card data
+  const { data: creditCard, error: cardError } = await supabaseAdmin
+    .from('credit_cards')
+    .select('*')
+    .eq('id', creditCardId)
+    .single();
 
-  if (!creditCard) {
+  if (cardError || !creditCard) {
     throw new Error('Credit card not found');
   }
 
-  const cycles: BillingCycleData[] = [];
-  
-  const lastStatementDate = creditCard.lastStatementIssueDate;
-  const nextDueDate = creditCard.nextPaymentDueDate;
-  
-  if (!lastStatementDate) {
-    return generateEstimatedCycles(creditCard, cycles);
+  // Get transactions for this credit card, ordered by date
+  const { data: transactions, error: transactionsError } = await supabaseAdmin
+    .from('transactions')
+    .select('*')
+    .eq('creditCardId', creditCardId)
+    .order('date', { ascending: true });
+
+  if (transactionsError) {
+    throw new Error('Failed to fetch transactions');
   }
 
-  const cycleLength = estimateCycleLength(creditCard, lastStatementDate, nextDueDate);
+  // Add transactions to creditCard object to maintain compatibility
+  const creditCardWithTransactions = {
+    ...creditCard,
+    transactions: transactions || [],
+    // Convert date strings back to Date objects for compatibility
+    lastStatementIssueDate: creditCard.lastStatementIssueDate ? new Date(creditCard.lastStatementIssueDate) : null,
+    nextPaymentDueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate) : null,
+    openDate: creditCard.openDate ? new Date(creditCard.openDate) : null,
+    annualFeeDueDate: creditCard.annualFeeDueDate ? new Date(creditCard.annualFeeDueDate) : null,
+  };
+
+  // Convert transaction dates to Date objects for compatibility
+  const transactionsWithDates = (transactions || []).map(t => ({
+    ...t,
+    date: new Date(t.date),
+    authorizedDate: t.authorizedDate ? new Date(t.authorizedDate) : null,
+  }));
+
+  // Update the credit card object with converted transactions
+  creditCardWithTransactions.transactions = transactionsWithDates;
+
+  const cycles: BillingCycleData[] = [];
+  
+  const lastStatementDate = creditCardWithTransactions.lastStatementIssueDate;
+  const nextDueDate = creditCardWithTransactions.nextPaymentDueDate;
+  
+  if (!lastStatementDate) {
+    return generateEstimatedCycles(creditCardWithTransactions, cycles);
+  }
+
+  const cycleLength = estimateCycleLength(creditCardWithTransactions, lastStatementDate, nextDueDate);
   
   const now = new Date();
   
@@ -80,7 +110,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   closedCycleStart.setDate(closedCycleStart.getDate() - cycleLength + 1);
   
   // Create the closed cycle with statement balance
-  await createOrUpdateCycle(creditCard, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true);
+  await createOrUpdateCycle(creditCardWithTransactions, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true);
   
   // Calculate the current ongoing cycle that starts after the statement date
   const currentCycleStart = new Date(lastStatementDate);
@@ -91,7 +121,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   currentDueDate.setDate(currentDueDate.getDate() + 21);
   
   // Create the current cycle (no statement balance yet)
-  await createOrUpdateCycle(creditCard, cycles, currentCycleStart, currentCycleEnd, currentDueDate, false);
+  await createOrUpdateCycle(creditCardWithTransactions, cycles, currentCycleStart, currentCycleEnd, currentDueDate, false);
   
   // Create historical cycles going back 12 months, but not before card open date
   let historicalCycleEnd = new Date(closedCycleStart);
@@ -101,7 +131,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
   
   // Don't create cycles before card open date
-  const cardOpenDate = creditCard.openDate ? new Date(creditCard.openDate) : oneYearAgo;
+  const cardOpenDate = creditCardWithTransactions.openDate ? new Date(creditCardWithTransactions.openDate) : oneYearAgo;
   const earliestCycleDate = cardOpenDate > oneYearAgo ? cardOpenDate : oneYearAgo;
   
   while (historicalCycleEnd >= earliestCycleDate) {
@@ -109,7 +139,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     historicalCycleStart.setDate(historicalCycleStart.getDate() - cycleLength + 1);
     
     // Skip cycles only if they end before the card open date (no meaningful overlap)
-    if (creditCard.openDate && historicalCycleEnd < new Date(creditCard.openDate)) {
+    if (creditCardWithTransactions.openDate && historicalCycleEnd < new Date(creditCardWithTransactions.openDate)) {
       // Move to the next historical cycle instead of breaking
       historicalCycleEnd = new Date(historicalCycleStart);
       historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
@@ -121,7 +151,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     
     // Historical cycles that have ended should be treated as having statement balances
     const isCompletedCycle = historicalCycleEnd < now;
-    await createOrUpdateCycle(creditCard, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, isCompletedCycle);
+    await createOrUpdateCycle(creditCardWithTransactions, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, isCompletedCycle);
     
     historicalCycleEnd = new Date(historicalCycleStart);
     historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
@@ -198,13 +228,17 @@ async function createOrUpdateCycle(
   }
 
   // Check if cycle already exists
-  const existingCycle = await prisma.billingCycle.findFirst({
-    where: {
-      creditCardId: creditCard.id,
-      startDate: cycleStart,
-      endDate: cycleEnd,
-    },
-  });
+  const { data: existingCycle, error: findError } = await supabaseAdmin
+    .from('billing_cycles')
+    .select('*')
+    .eq('creditCardId', creditCard.id)
+    .eq('startDate', cycleStart.toISOString())
+    .eq('endDate', cycleEnd.toISOString())
+    .single();
+
+  if (findError && findError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+    throw new Error(`Failed to check existing cycle: ${findError.message}`);
+  }
 
   let statementBalance = null;
   let minimumPayment = null;
@@ -228,17 +262,24 @@ async function createOrUpdateCycle(
   }
 
   if (!existingCycle) {
-    const newCycle = await prisma.billingCycle.create({
-      data: {
+    // Create new cycle
+    const { data: newCycle, error: createError } = await supabaseAdmin
+      .from('billing_cycles')
+      .insert({
         creditCardId: creditCard.id,
-        startDate: cycleStart,
-        endDate: cycleEnd,
+        startDate: cycleStart.toISOString(),
+        endDate: cycleEnd.toISOString(),
         statementBalance,
         minimumPayment,
-        dueDate,
+        dueDate: dueDate?.toISOString() || null,
         totalSpend,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (createError || !newCycle) {
+      throw new Error(`Failed to create billing cycle: ${createError?.message}`);
+    }
 
     cycles.push({
       id: newCycle.id,
@@ -255,15 +296,21 @@ async function createOrUpdateCycle(
     });
   } else {
     // Always update existing cycles to ensure transaction-based totals are current
-    const updatedCycle = await prisma.billingCycle.update({
-      where: { id: existingCycle.id },
-      data: {
+    const { data: updatedCycle, error: updateError } = await supabaseAdmin
+      .from('billing_cycles')
+      .update({
         statementBalance,
         minimumPayment,
-        dueDate,
+        dueDate: dueDate?.toISOString() || null,
         totalSpend,
-      },
-    });
+      })
+      .eq('id', existingCycle.id)
+      .select()
+      .single();
+
+    if (updateError || !updatedCycle) {
+      throw new Error(`Failed to update billing cycle: ${updateError?.message}`);
+    }
 
     cycles.push({
       id: updatedCycle.id,
@@ -332,49 +379,73 @@ async function generateEstimatedCycles(creditCard: any, cycles: BillingCycleData
 }
 
 export async function getAllUserBillingCycles(userId: string): Promise<BillingCycleData[]> {
-  const plaidItems = await prisma.plaidItem.findMany({
-    where: { userId },
-    include: {
-      accounts: true,
-    },
-  });
+  // Get all plaid items for the user
+  const { data: plaidItems, error: plaidError } = await supabaseAdmin
+    .from('plaid_items')
+    .select('*')
+    .eq('userId', userId);
+
+  if (plaidError) {
+    throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
+  }
+
+  // Get all credit cards for these plaid items
+  const plaidItemIds = (plaidItems || []).map(item => item.id);
+  if (plaidItemIds.length === 0) {
+    return [];
+  }
+
+  const { data: creditCards, error: cardsError } = await supabaseAdmin
+    .from('credit_cards')
+    .select('*')
+    .in('plaidItemId', plaidItemIds);
+
+  if (cardsError) {
+    throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
+  }
 
   const allCycles: BillingCycleData[] = [];
   
-  for (const item of plaidItems) {
-    for (const card of item.accounts) {
-      const cycles = await calculateBillingCycles(card.id);
+  // Create a map of plaidItem data for easy lookup
+  const plaidItemMap = new Map();
+  (plaidItems || []).forEach(item => {
+    plaidItemMap.set(item.id, item);
+  });
+  
+  for (const card of creditCards || []) {
+    const cycles = await calculateBillingCycles(card.id);
+    
+    // Get the associated plaid item
+    const plaidItem = plaidItemMap.get(card.plaidItemId);
+    
+    // Filter cycles to only include those that end after card open date (overlaps with card opening)
+    let filteredCycles = cycles;
+    if (card.openDate) {
+      const cardOpenDate = new Date(card.openDate);
       
-      // Filter cycles to only include those that end after card open date (overlaps with card opening)
-      let filteredCycles = cycles;
-      if (card.openDate) {
-        const cardOpenDate = new Date(card.openDate);
+      filteredCycles = cycles.filter(cycle => {
+        const cycleEnd = new Date(cycle.endDate);
+        // A cycle is valid if it ends after the card open date (overlaps with card opening)
+        // This allows partial cycles where the start is before open date but end is after
+        const isValid = cycleEnd >= cardOpenDate;
         
-        filteredCycles = cycles.filter(cycle => {
-          const cycleEnd = new Date(cycle.endDate);
-          // A cycle is valid if it ends after the card open date (overlaps with card opening)
-          // This allows partial cycles where the start is before open date but end is after
-          const isValid = cycleEnd >= cardOpenDate;
-          
-          return isValid;
-        });
-      }
+        return isValid;
+      });
+    }
+    
+    // Apply Capital One-specific cycle limiting
+    const isCapitalOne = isCapitalOneCard(plaidItem?.institutionName, card.name);
+    
+    if (isCapitalOne) {
+      // For Capital One cards, limit to 4 most recent cycles (90 days = ~3-4 billing cycles)
+      const limitedCycles = filteredCycles
+        .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
+        .slice(0, 4);
       
-      // Apply Capital One-specific cycle limiting
-      const isCapitalOne = isCapitalOneCard(item.institutionName, card.name);
-      
-      
-      if (isCapitalOne) {
-        // For Capital One cards, limit to 4 most recent cycles (90 days = ~3-4 billing cycles)
-        const limitedCycles = filteredCycles
-          .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
-          .slice(0, 4);
-        
-        allCycles.push(...limitedCycles);
-      } else {
-        // Standard cards: show all cycles (typically 12+ for 2 years of data)
-        allCycles.push(...filteredCycles);
-      }
+      allCycles.push(...limitedCycles);
+    } else {
+      // Standard cards: show all cycles (typically 12+ for 2 years of data)
+      allCycles.push(...filteredCycles);
     }
   }
 
