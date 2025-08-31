@@ -17,11 +17,18 @@ export async function GET() {
       .from('users')
       .select('*', { count: 'exact' });
     
-    // Test verification_tokens table
-    const { count: tokenCount, error: tokenError } = await supabase
-      .schema('next_auth')
-      .from('verification_tokens')
-      .select('*', { count: 'exact' });
+    // Test verification_tokens table (check if we can access next_auth schema)
+    let tokenCount, tokenError;
+    try {
+      const result = await supabase
+        .schema('next_auth')
+        .from('verification_tokens')
+        .select('*', { count: 'exact' });
+      tokenCount = result.count;
+      tokenError = result.error;
+    } catch (e) {
+      tokenError = { message: 'Schema access restricted - using direct SQL query instead' };
+    }
 
     return NextResponse.json({
       environment: {
