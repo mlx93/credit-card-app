@@ -10,6 +10,11 @@ const supabase = createClient(
 // Initialize Resend with API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Debug logging
+console.log('Environment check:');
+console.log('- RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
+console.log('- RESEND_API_KEY preview:', process.env.RESEND_API_KEY?.substring(0, 10) + '...');
+
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
@@ -46,7 +51,10 @@ export async function POST(request: NextRequest) {
 
     // Send email with verification code
     try {
-      await resend.emails.send({
+      console.log('Attempting to send email to:', email);
+      console.log('Using from address: CardCycle <noreply@cardcycle.app>');
+      
+      const emailResult = await resend.emails.send({
         from: 'CardCycle <noreply@cardcycle.app>',
         to: email,
         subject: 'Your CardCycle Verification Code',
@@ -72,9 +80,18 @@ export async function POST(request: NextRequest) {
         text: `Your CardCycle verification code is: ${code}\n\nThis code expires in 3 minutes.\n\nIf you didn't request this code, you can safely ignore this email.`
       });
       
+      console.log('✅ Email sent successfully!');
+      console.log('Email ID:', emailResult.data?.id);
       console.log('Verification code email sent to:', email);
     } catch (emailError) {
-      console.error('Failed to send email:', emailError);
+      console.error('❌ Failed to send email:', emailError);
+      console.error('Email error details:', JSON.stringify(emailError, null, 2));
+      
+      // Check if it's an API key issue
+      if (!process.env.RESEND_API_KEY) {
+        console.error('🚨 RESEND_API_KEY environment variable is not set!');
+      }
+      
       // Fall back to console logging if email fails
       console.log('=== EMAIL VERIFICATION CODE (EMAIL FAILED) ===');
       console.log('Email:', email);
