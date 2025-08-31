@@ -274,6 +274,7 @@ async function createOrUpdateCycle(
         minimumPayment,
         dueDate: dueDate?.toISOString() || null,
         totalSpend,
+        updatedAt: new Date().toISOString(),
       })
       .select()
       .single();

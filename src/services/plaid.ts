@@ -112,6 +112,7 @@ class PlaidServiceImpl implements PlaidService {
         accessToken: encrypt(access_token),
         institutionId,
         institutionName,
+        updatedAt: new Date().toISOString(),
       });
 
     if (createError) {
@@ -816,7 +817,8 @@ class PlaidServiceImpl implements PlaidService {
               }),
               ...(cardData.annualFeeDueDate && {
                 annualFeeDueDate: cardData.annualFeeDueDate.toISOString()
-              })
+              }),
+              updatedAt: new Date().toISOString()
             });
 
           if (createError) {
@@ -859,6 +861,7 @@ class PlaidServiceImpl implements PlaidService {
                   aprPercentage: apr.apr_percentage,
                   balanceSubjectToApr: apr.balance_subject_to_apr,
                   interestChargeAmount: apr.interest_charge_amount,
+                  updatedAt: new Date().toISOString(),
                 });
 
               if (createAprError) {
@@ -1046,6 +1049,7 @@ class PlaidServiceImpl implements PlaidService {
               transactionId: transaction.transaction_id,
               plaidItemId: plaidItem.id,
               creditCardId: creditCard?.id || null,
+              updatedAt: new Date().toISOString(),
             });
 
           if (createError) {
