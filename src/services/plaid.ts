@@ -782,22 +782,32 @@ class PlaidServiceImpl implements PlaidService {
             })
           };
 
-          // Preserve manual credit limit only if Plaid data is invalid
-          const plaidLimitIsInvalid = !updateData.balanceLimit || 
-            updateData.balanceLimit === 0 || 
-            updateData.balanceLimit === null || 
-            updateData.balanceLimit === Infinity ||
-            (typeof updateData.balanceLimit === 'string' && 
-             ['N/A', 'Unknown'].includes(updateData.balanceLimit));
+          // Determine if Plaid data is valid
+          const plaidLimitIsValid = updateData.balanceLimit && 
+            updateData.balanceLimit > 0 && 
+            updateData.balanceLimit !== null && 
+            updateData.balanceLimit !== Infinity &&
+            isFinite(updateData.balanceLimit) &&
+            !(typeof updateData.balanceLimit === 'string' && 
+              ['N/A', 'Unknown'].includes(updateData.balanceLimit));
           
-          if (existingCard.isManualLimit && existingCard.manualCreditLimit && plaidLimitIsInvalid) {
-            delete updateData.balanceLimit; // Don't overwrite with invalid Plaid data
-            console.log(`Preserving manual credit limit of $${existingCard.manualCreditLimit} for ${existingCard.name} (Plaid data invalid)`);
-          } else if (!plaidLimitIsInvalid && existingCard.isManualLimit) {
-            // Plaid has valid data, use it and reset manual limit flag
+          if (plaidLimitIsValid) {
+            // Valid Plaid data overrides manual limits - clear manual limit flags
             updateData.isManualLimit = false;
             updateData.manualCreditLimit = null;
-            console.log(`Using Plaid credit limit of $${updateData.balanceLimit} for ${existingCard.name} (overriding manual limit)`);
+            console.log(`Plaid sync: Using valid Plaid limit ${updateData.balanceLimit} for ${existingCard.name}${existingCard.isManualLimit ? ' (overriding previous manual limit)' : ''}`);
+          } else {
+            // Invalid Plaid data - preserve existing manual limits if they exist
+            if (existingCard.isManualLimit && existingCard.manualCreditLimit) {
+              updateData.isManualLimit = existingCard.isManualLimit;
+              updateData.manualCreditLimit = existingCard.manualCreditLimit;
+              console.log(`Plaid sync: Preserving manual credit limit of $${existingCard.manualCreditLimit} for ${existingCard.name} (invalid Plaid data)`);
+            } else {
+              // No manual limit set, ensure fields are clean
+              updateData.isManualLimit = false;
+              updateData.manualCreditLimit = null;
+              console.log(`Plaid sync: No valid limit available for ${existingCard.name} (invalid Plaid data, no manual override)`);
+            }
           }
 
           const { error: updateError } = await supabaseAdmin
@@ -815,7 +825,7 @@ class PlaidServiceImpl implements PlaidService {
               id: crypto.randomUUID(),
               ...cardData,
               accountId: account.account_id,
-              plaidItemId: plaidItemRecord.id,
+              plaidItemId: plaidItem.id,
               // Convert dates to ISO strings
               ...(cardData.lastStatementIssueDate && {
                 lastStatementIssueDate: cardData.lastStatementIssueDate.toISOString()
@@ -1373,7 +1383,7 @@ class PlaidServiceImpl implements PlaidService {
       const { data: accounts, error: accountsError } = await supabaseAdmin
         .from('credit_cards')
         .select('*')
-        .eq('plaidItemId', plaidItemRecord.id);
+        .eq('plaidItemId', plaidItem.id);
 
       if (accountsError) {
         console.error('Error fetching accounts for validation:', accountsError);
