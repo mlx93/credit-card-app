@@ -18,8 +18,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
     EmailProvider({
-      server: process.env.EMAIL_SERVER,
-      from: process.env.EMAIL_FROM,
+      from: process.env.EMAIL_FROM || 'noreply@cardcycle.app',
       // For testing - log verification URLs to console
       sendVerificationRequest: async ({ identifier: email, url, provider }) => {
         console.log('=== EMAIL VERIFICATION ===');
@@ -27,6 +26,7 @@ export const authOptions: NextAuthOptions = {
         console.log('Verification URL:', url);
         console.log('========================');
         // In production, you'd send the actual email here
+        return Promise.resolve();
       },
     }),
   ],

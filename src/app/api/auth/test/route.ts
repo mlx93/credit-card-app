@@ -16,6 +16,12 @@ export async function GET() {
     const { count: userCount, error: usersError } = await supabase
       .from('users')
       .select('*', { count: 'exact' });
+    
+    // Test verification_tokens table
+    const { count: tokenCount, error: tokenError } = await supabase
+      .schema('next_auth')
+      .from('verification_tokens')
+      .select('*', { count: 'exact' });
 
     return NextResponse.json({
       environment: {
@@ -27,7 +33,8 @@ export async function GET() {
       },
       database: {
         connection: usersError ? `❌ Error: ${usersError.message}` : '✅ Connected',
-        nextAuthUsers: usersError ? 'Error fetching count' : `${userCount || 0} users`
+        nextAuthUsers: usersError ? 'Error fetching count' : `${userCount || 0} users`,
+        verificationTokens: tokenError ? `❌ Error: ${tokenError.message}` : `✅ ${tokenCount || 0} tokens`
       }
     });
   } catch (error: any) {
