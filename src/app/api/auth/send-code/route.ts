@@ -86,10 +86,10 @@ export async function POST(request: NextRequest) {
         throw new Error('Resend not initialized - RESEND_API_KEY missing');
       }
       
-      console.log('Using from address: CardCycle <onboarding@resend.dev>');
+      console.log('Using from address: CardCycle <noreply@cardcycle.app>');
       
       const emailResult = await resend.emails.send({
-        from: 'CardCycle <onboarding@resend.dev>',  // Use Resend's test domain for now
+        from: 'CardCycle <noreply@cardcycle.app>',
         to: email,
         subject: 'Your CardCycle Verification Code',
         html: `
@@ -114,9 +114,14 @@ export async function POST(request: NextRequest) {
         text: `Your CardCycle verification code is: ${code}\n\nThis code expires in 3 minutes.\n\nIf you didn't request this code, you can safely ignore this email.`
       });
       
+      // Check if Resend returned an error in the response
+      if (emailResult.error) {
+        console.error('❌ Resend API error:', emailResult.error);
+        throw new Error(`Resend error: ${emailResult.error.error || emailResult.error.message || 'Unknown error'}`);
+      }
+      
       console.log('✅ Email sent successfully!');
       console.log('Email ID:', emailResult.data?.id);
-      console.log('Email response:', JSON.stringify(emailResult, null, 2));
       console.log('Verification code email sent to:', email);
     } catch (emailError: any) {
       console.error('❌ Failed to send email:', emailError);
@@ -135,6 +140,16 @@ export async function POST(request: NextRequest) {
       console.log('Code:', code);
       console.log('Expires in 3 minutes');
       console.log('============================================');
+      
+      // Check if it's a domain verification issue
+      if (emailError.message?.includes('verify a domain') || emailError.message?.includes('testing emails')) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Email domain not verified. Please contact support.',
+          debugCode: code, // Provide code as fallback
+          message: `Verification code: ${code} (Email service needs domain verification)`
+        }, { status: 200 }); // Still return 200 so user can use the code
+      }
       
       // In development/testing, return the code if email fails
       if (process.env.NODE_ENV !== 'production') {

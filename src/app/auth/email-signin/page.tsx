@@ -47,11 +47,11 @@ export default function EmailSignIn() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        // Debug: Check if we got a debug code (development only)
+      if (response.ok || (response.status === 200 && data.debugCode)) {
+        // Debug: Check if we got a debug code
         if (data.debugCode) {
           console.log('Debug code:', data.debugCode);
-          setMessage(`Debug mode: Your code is ${data.debugCode}`);
+          setMessage(data.message || `Your verification code is: ${data.debugCode}`);
         }
         
         // Log debug info if available

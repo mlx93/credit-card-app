@@ -25,7 +25,7 @@ export async function GET() {
         
         // Try to send a test email
         const result = await resend.emails.send({
-          from: 'CardCycle <onboarding@resend.dev>',
+          from: 'CardCycle <noreply@cardcycle.app>',
           to: 'test@resend.dev', // Resend's test email
           subject: 'CardCycle Email Test',
           html: '<p>This is a test email from CardCycle</p>'
