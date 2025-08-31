@@ -335,6 +335,8 @@ export interface Database {
           plaidItemId: string
           creditCardId: string | null
           transactionId: string
+          accountid: string | null
+          plaidtransactionid: string | null
           amount: number
           isoCurrencyCode: string | null
           date: string
@@ -353,6 +355,8 @@ export interface Database {
           plaidItemId: string
           creditCardId?: string | null
           transactionId: string
+          accountid?: string | null
+          plaidtransactionid?: string | null
           amount: number
           isoCurrencyCode?: string | null
           date: string
@@ -371,6 +375,8 @@ export interface Database {
           plaidItemId?: string
           creditCardId?: string | null
           transactionId?: string
+          accountid?: string | null
+          plaidtransactionid?: string | null
           amount?: number
           isoCurrencyCode?: string | null
           date?: string

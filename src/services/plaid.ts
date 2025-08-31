@@ -1165,8 +1165,8 @@ class PlaidServiceImpl implements PlaidService {
 
         const transactionData = {
           amount: adjustedAmount,
-          plaidTransactionId: transaction.transaction_id,
-          accountId: transaction.account_id,
+          accountid: transaction.account_id,
+          plaidtransactionid: transaction.transaction_id,
           isoCurrencyCode: transaction.iso_currency_code,
           date: new Date(transaction.date).toISOString(),
           authorizedDate: transaction.authorized_date 

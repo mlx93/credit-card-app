@@ -18,7 +18,7 @@ async function debugTransactionLinking() {
     // 1. Check how many transactions exist total
     const { data: allTransactions, error: transError } = await supabase
       .from('transactions')
-      .select('id, name, amount, date, creditCardId, accountId')
+      .select('id, name, amount, date, creditCardId, accountid, plaidtransactionid, transactionId')
       .limit(20);
     
     if (transError) {
@@ -39,7 +39,9 @@ async function debugTransactionLinking() {
     if (unlinkedTransactions.length > 0) {
       console.log('🔍 Sample unlinked transactions:');
       unlinkedTransactions.slice(0, 5).forEach(t => {
-        console.log(`  - ${t.name}: $${t.amount} (accountId: ${t.accountId}, creditCardId: ${t.creditCardId})`);
+        console.log(`  - ${t.name}: $${t.amount}`);
+        console.log(`    accountid: ${t.accountid}, creditCardId: ${t.creditCardId}`);
+        console.log(`    plaidtransactionid: ${t.plaidtransactionid}, transactionId: ${t.transactionId}`);
       });
       console.log();
     }
