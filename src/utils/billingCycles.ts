@@ -268,6 +268,8 @@ async function createOrUpdateCycle(
       .insert({
         id: crypto.randomUUID(),
         creditCardId: creditCard.id,
+        creditcardname: creditCard.name,
+        transactioncount: cycleTransactions?.length || 0,
         startDate: cycleStart.toISOString(),
         endDate: cycleEnd.toISOString(),
         statementBalance,
@@ -301,6 +303,8 @@ async function createOrUpdateCycle(
     const { data: updatedCycle, error: updateError } = await supabaseAdmin
       .from('billing_cycles')
       .update({
+        creditcardname: creditCard.name,
+        transactioncount: cycleTransactions?.length || 0,
         statementBalance,
         minimumPayment,
         dueDate: dueDate?.toISOString() || null,
