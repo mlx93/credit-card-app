@@ -40,10 +40,14 @@ export const authOptions: NextAuthOptions = {
             .single();
 
           if (!existingUser) {
+            // Generate a UUID for the new user
+            const userId = crypto.randomUUID();
+            
             // Create new user with UUID
             const { data: newUser, error } = await supabase
               .from('users')
               .insert({
+                id: userId,
                 email: user.email,
                 name: user.name,
                 image: user.image,
