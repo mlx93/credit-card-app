@@ -48,11 +48,24 @@ export default function EmailSignIn() {
       const data = await response.json();
 
       if (response.ok) {
+        // Debug: Check if we got a debug code (development only)
+        if (data.debugCode) {
+          console.log('Debug code:', data.debugCode);
+          setMessage(`Debug mode: Your code is ${data.debugCode}`);
+        }
+        
+        // Log debug info if available
+        if (data.debug) {
+          console.log('Debug info:', data.debug);
+        }
+        
         setStepTransition(true);
         setTimeout(() => {
           setStep('code');
           setTimeLeft(180); // Reset timer
-          setMessage('Check your email for a 6-digit verification code');
+          if (!data.debugCode) {
+            setMessage('Check your email for a 6-digit verification code');
+          }
           setStepTransition(false);
           // Auto-focus first input
           setTimeout(() => inputRefs.current[0]?.focus(), 100);

@@ -109,10 +109,13 @@ export async function POST(request: NextRequest) {
       
       console.log('✅ Email sent successfully!');
       console.log('Email ID:', emailResult.data?.id);
+      console.log('Email response:', JSON.stringify(emailResult, null, 2));
       console.log('Verification code email sent to:', email);
-    } catch (emailError) {
+    } catch (emailError: any) {
       console.error('❌ Failed to send email:', emailError);
       console.error('Email error details:', JSON.stringify(emailError, null, 2));
+      console.error('Error message:', emailError?.message);
+      console.error('Error response:', emailError?.response?.data);
       
       // Check if it's an API key issue
       if (!process.env.RESEND_API_KEY) {
@@ -136,9 +139,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Temporary: Add debug info to response
     return NextResponse.json({ 
       success: true, 
-      message: 'Verification code sent to your email' 
+      message: 'Verification code sent to your email',
+      debug: {
+        codeStored: !dbError,
+        emailConfigured: !!resend,
+        environment: process.env.VERCEL_ENV || process.env.NODE_ENV
+      }
     });
 
   } catch (error: any) {
