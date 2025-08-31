@@ -11,6 +11,16 @@ interface LoadingOverlayProps {
 
 export function LoadingOverlay({ isVisible, message = "Connecting to your bank", subMessage = "This may take a few moments..." }: LoadingOverlayProps) {
   const [dots, setDots] = useState('');
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (isVisible) {
+      setIsAnimating(true);
+    } else {
+      const timeout = setTimeout(() => setIsAnimating(false), 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [isVisible]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -22,15 +32,21 @@ export function LoadingOverlay({ isVisible, message = "Connecting to your bank",
     return () => clearInterval(interval);
   }, [isVisible]);
 
-  if (!isVisible) return null;
+  if (!isAnimating) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
+      isVisible ? 'opacity-100' : 'opacity-0'
+    }`}>
       {/* Backdrop with blur effect */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+      <div className={`absolute inset-0 bg-black/60 backdrop-blur-md transition-all duration-300 ${
+        isVisible ? 'opacity-100' : 'opacity-0'
+      }`} />
       
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center px-4">
+      <div className={`relative z-10 flex flex-col items-center justify-center px-4 transition-all duration-300 transform ${
+        isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+      }`}>
         {/* Card stack animation */}
         <div className="relative mb-8">
           <div className="absolute inset-0 flex items-center justify-center">

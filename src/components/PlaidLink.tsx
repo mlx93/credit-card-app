@@ -81,7 +81,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
   useEffect(() => {
     if (linkToken && ready && open) {
       console.log('Opening Plaid Link with token:', linkToken.substring(0, 20) + '...');
-      open();
+      // Small delay to ensure loading overlay is visible before Plaid modal opens
+      setTimeout(() => {
+        open();
+      }, 500);
     }
   }, [linkToken, ready, open]);
 
@@ -110,7 +113,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         console.log('Link token received, setting state...');
         setLoadingMessage('Opening Plaid');
         setLoadingSubMessage('Redirecting to secure banking portal...');
-        setLinkToken(data.link_token);
+        // Brief delay to show the loading animation before opening
+        setTimeout(() => {
+          setLinkToken(data.link_token);
+        }, 300);
         // The useEffect will handle opening the link
       } else {
         console.error('Failed to get link token:', data.error);
@@ -134,19 +140,16 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
       <button
         onClick={handleClick}
         disabled={loading || !session}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+        className={`w-full font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 transform focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
+          loading 
+            ? 'bg-indigo-400 cursor-not-allowed opacity-75' 
+            : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02]'
+        }`}
       >
-        {loading ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Connecting...</span>
-          </>
-        ) : (
-          <>
-            <CreditCard className="h-4 w-4" />
-            <span>Connect Credit Card with Plaid</span>
-          </>
-        )}
+        <CreditCard className="h-4 w-4 text-white" />
+        <span className="text-white">
+          {loading ? 'Connecting...' : 'Connect Credit Card with Plaid'}
+        </span>
       </button>
     </>
   );
