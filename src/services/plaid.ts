@@ -295,6 +295,13 @@ class PlaidServiceImpl implements PlaidService {
       console.error('Error code:', error.error_code);
       console.error('Error type:', error.error_type);
       console.error('Display message:', error.display_message);
+      console.error('HTTP status:', error.status || error.response?.status);
+      console.error('Response data:', error.response?.data);
+      console.error('Request details:', {
+        accessToken: accessToken ? `${accessToken.substring(0, 10)}...` : 'null',
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      });
       console.error('=== END PLAID TRANSACTION ERROR ===');
       return []; // Return empty array on error
     }
@@ -1010,6 +1017,14 @@ class PlaidServiceImpl implements PlaidService {
 
   async syncTransactions(plaidItemRecord: any, accessToken: string): Promise<void> {
     console.log('🚀 TRANSACTION SYNC METHOD CALLED!', { itemId: plaidItemRecord.itemId, hasAccessToken: !!accessToken });
+    
+    // Validate access token format
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) {
+      throw new Error(`Invalid access token: ${accessToken ? 'too short' : 'missing'}`);
+    }
+    
+    console.log(`✅ Access token validation passed: ${accessToken.substring(0, 10)}...${accessToken.substring(accessToken.length - 4)}`);
+    
     try {
       console.log(`=== TRANSACTION SYNC START for itemId: ${plaidItemRecord.itemId} ===`);
       console.log(`✅ Using passed plaidItem record - no DB lookup needed`);
@@ -1043,6 +1058,22 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`Calculated end date: ${endDate.toISOString()}`);
       console.log(`Requesting range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
       console.log(`Expected ${isCapitalOneItem ? 'days' : 'months'} back: ${isCapitalOneItem ? 90 : Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))}`);
+      
+      // Validate date range
+      const now = new Date();
+      const maxPastDate = new Date();
+      maxPastDate.setFullYear(maxPastDate.getFullYear() - 2); // 2 years max
+      
+      if (startDate < maxPastDate) {
+        console.warn(`⚠️ Start date ${startDate.toISOString().split('T')[0]} is more than 2 years ago, may cause 400 error`);
+      }
+      
+      if (endDate > now) {
+        console.warn(`⚠️ End date ${endDate.toISOString().split('T')[0]} is in the future, may cause 400 error`);
+        endDate.setTime(now.getTime()); // Cap at current time
+        console.log(`🔧 Adjusted end date to current time: ${endDate.toISOString().split('T')[0]}`);
+      }
+      
       console.log(`=== END DATE RANGE DEBUG ===`);
 
       const transactions = await this.getTransactions(
