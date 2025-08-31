@@ -143,6 +143,21 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
       if (billingCyclesRes.ok) {
         const { billingCycles: cycles } = await billingCyclesRes.json();
+        
+        // Debug: Log what we receive from API
+        const amexCycles = cycles.filter((c: any) => 
+          c.creditCardName?.toLowerCase().includes('platinum')
+        );
+        console.log('🔍 DASHBOARD RECEIVED FROM API:', {
+          totalCycles: cycles.length,
+          amexCycles: amexCycles.length,
+          amexCycleIds: amexCycles.slice(0, 5).map((c: any) => ({
+            id: c.id?.substring(0, 8),
+            startDate: c.startDate,
+            endDate: c.endDate
+          }))
+        });
+        
         setBillingCycles(cycles);
       }
 
@@ -421,6 +436,17 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
   const displayCards = isLoggedIn ? creditCards : mockCards;
   const displayCycles = isLoggedIn ? billingCycles : mockCycles;
+  
+  // Debug: Log what we're actually passing to components
+  if (isLoggedIn && billingCycles.length > 0) {
+    const amexCycles = displayCycles.filter((c: any) => 
+      c.creditCardName?.toLowerCase().includes('platinum')
+    );
+    console.log('🔍 DASHBOARD PASSING TO COMPONENT:', {
+      totalCycles: displayCycles.length,
+      amexCycles: amexCycles.length
+    });
+  }
   
   // Calculate actual current month spending from transactions
   const totalSpendThisMonth = (() => {
