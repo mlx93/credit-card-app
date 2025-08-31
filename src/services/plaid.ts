@@ -873,11 +873,13 @@ class PlaidServiceImpl implements PlaidService {
     try {
       console.log(`=== TRANSACTION SYNC START for itemId: ${itemId} ===`);
       
-      const plaidItem = await prisma.plaidItem.findUnique({
-        where: { itemId },
-      });
+      const { data: plaidItem, error: plaidItemError } = await supabaseAdmin
+        .from('plaid_items')
+        .select('*')
+        .eq('itemId', itemId)
+        .single();
 
-      if (!plaidItem) {
+      if (plaidItemError || !plaidItem) {
         console.error(`No Plaid item found for itemId: ${itemId}`);
         throw new Error('Plaid item not found');
       }
@@ -948,9 +950,15 @@ class PlaidServiceImpl implements PlaidService {
       let creditCardFoundCount = 0;
       
       for (const transaction of transactions) {
-        const creditCard = await prisma.creditCard.findUnique({
-          where: { accountId: transaction.account_id },
-        });
+        const { data: creditCard, error: creditCardError } = await supabaseAdmin
+          .from('credit_cards')
+          .select('*')
+          .eq('accountId', transaction.account_id)
+          .single();
+
+        if (creditCardError && creditCardError.code !== 'PGRST116') {
+          console.error('Error fetching credit card:', creditCardError);
+        }
 
         // Debug transaction to credit card association
         if (!creditCard) {
@@ -965,9 +973,15 @@ class PlaidServiceImpl implements PlaidService {
           creditCardFoundCount++;
         }
 
-        const existingTransaction = await prisma.transaction.findUnique({
-          where: { transactionId: transaction.transaction_id },
-        });
+        const { data: existingTransaction, error: existingTransactionError } = await supabaseAdmin
+          .from('transactions')
+          .select('*')
+          .eq('transactionId', transaction.transaction_id)
+          .single();
+
+        if (existingTransactionError && existingTransactionError.code !== 'PGRST116') {
+          console.error('Error checking existing transaction:', existingTransactionError);
+        }
 
         // For Capital One credit cards, handle transaction sign properly
         // Plaid convention: positive = charges, negative = payments
@@ -997,9 +1011,9 @@ class PlaidServiceImpl implements PlaidService {
         const transactionData = {
           amount: adjustedAmount,
           isoCurrencyCode: transaction.iso_currency_code,
-          date: new Date(transaction.date),
+          date: new Date(transaction.date).toISOString(),
           authorizedDate: transaction.authorized_date 
-            ? new Date(transaction.authorized_date) 
+            ? new Date(transaction.authorized_date).toISOString()
             : null,
           name: transaction.name,
           merchantName: transaction.merchant_name,
@@ -1010,21 +1024,31 @@ class PlaidServiceImpl implements PlaidService {
         };
 
         if (existingTransaction) {
-          await prisma.transaction.update({
-            where: { id: existingTransaction.id },
-            data: transactionData,
-          });
-          console.log(`Updated transaction: ${transaction.name} (${transaction.amount})`);
+          const { error: updateError } = await supabaseAdmin
+            .from('transactions')
+            .update(transactionData)
+            .eq('id', existingTransaction.id);
+
+          if (updateError) {
+            console.error('Failed to update transaction:', updateError);
+          } else {
+            console.log(`Updated transaction: ${transaction.name} (${transaction.amount})`);
+          }
         } else {
-          await prisma.transaction.create({
-            data: {
+          const { error: createError } = await supabaseAdmin
+            .from('transactions')
+            .insert({
               ...transactionData,
               transactionId: transaction.transaction_id,
               plaidItemId: plaidItem.id,
               creditCardId: creditCard?.id || null,
-            },
-          });
-          console.log(`Created transaction: ${transaction.name} (${transaction.amount})`);
+            });
+
+          if (createError) {
+            console.error('Failed to create transaction:', createError);
+          } else {
+            console.log(`Created transaction: ${transaction.name} (${transaction.amount})`);
+          }
         }
         
         processedCount++;
@@ -1047,11 +1071,13 @@ class PlaidServiceImpl implements PlaidService {
 
   async createUpdateLinkToken(userId: string, itemId: string): Promise<string> {
     // Get the access token from the database
-    const plaidItem = await prisma.plaidItem.findUnique({
-      where: { itemId },
-    });
+    const { data: plaidItem, error: plaidItemError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('*')
+      .eq('itemId', itemId)
+      .single();
 
-    if (!plaidItem || plaidItem.userId !== userId) {
+    if (plaidItemError || !plaidItem || plaidItem.userId !== userId) {
       throw new Error('Plaid item not found or unauthorized');
     }
 
@@ -1104,11 +1130,13 @@ class PlaidServiceImpl implements PlaidService {
   private async storeHistoricalStatement(statement: any, accountId: string, plaidItemId: string): Promise<void> {
     try {
       // Find the credit card
-      const creditCard = await prisma.creditCard.findUnique({
-        where: { accountId: accountId }
-      });
+      const { data: creditCard, error: creditCardError } = await supabaseAdmin
+        .from('credit_cards')
+        .select('*')
+        .eq('accountId', accountId)
+        .single();
       
-      if (!creditCard) {
+      if (creditCardError || !creditCard) {
         console.log('No credit card found for statement, skipping');
         return;
       }
@@ -1117,26 +1145,35 @@ class PlaidServiceImpl implements PlaidService {
       const statementDate = new Date(statement.statement_date);
       const cycleEndBuffer = 5; // Allow 5 day buffer for matching cycle end dates
       
-      const matchingCycle = await prisma.billingCycle.findFirst({
-        where: {
-          creditCardId: creditCard.id,
-          endDate: {
-            gte: new Date(statementDate.getTime() - cycleEndBuffer * 24 * 60 * 60 * 1000),
-            lte: new Date(statementDate.getTime() + cycleEndBuffer * 24 * 60 * 60 * 1000)
-          }
-        }
-      });
+      const startBuffer = new Date(statementDate.getTime() - cycleEndBuffer * 24 * 60 * 60 * 1000);
+      const endBuffer = new Date(statementDate.getTime() + cycleEndBuffer * 24 * 60 * 60 * 1000);
+      
+      const { data: matchingCycle, error: cycleError } = await supabaseAdmin
+        .from('billing_cycles')
+        .select('*')
+        .eq('creditCardId', creditCard.id)
+        .gte('endDate', startBuffer.toISOString())
+        .lte('endDate', endBuffer.toISOString())
+        .single();
+
+      if (cycleError && cycleError.code !== 'PGRST116') {
+        console.error('Error finding matching billing cycle:', cycleError);
+      }
 
       if (matchingCycle) {
         // Update existing billing cycle with statement data
-        await prisma.billingCycle.update({
-          where: { id: matchingCycle.id },
-          data: {
+        const { error: updateError } = await supabaseAdmin
+          .from('billing_cycles')
+          .update({
             statementBalance: Math.abs(statement.closing_balance || 0),
             minimumPayment: statement.minimum_payment_amount || 0,
-            dueDate: statement.payment_due_date ? new Date(statement.payment_due_date) : null
-          }
-        });
+            dueDate: statement.payment_due_date ? new Date(statement.payment_due_date).toISOString() : null
+          })
+          .eq('id', matchingCycle.id);
+
+        if (updateError) {
+          console.error('Failed to update billing cycle with statement data:', updateError);
+        }
         
         console.log(`✅ Updated billing cycle ${matchingCycle.id} with statement data:`, {
           statementBalance: Math.abs(statement.closing_balance || 0),
@@ -1187,16 +1224,27 @@ class PlaidServiceImpl implements PlaidService {
         syncDetails.accountSync.success = true;
         
         // Count accounts updated
-        const updatedAccounts = await prisma.creditCard.findMany({
-          where: { 
-            plaidItem: { itemId },
-            updatedAt: { gte: new Date(Date.now() - 60000) } // Updated in last minute
-          }
-        });
-        syncDetails.accountSync.accountsUpdated = updatedAccounts.length;
+        // First get the plaid item
+        const { data: plaidItemForUpdate, error: plaidItemUpdateError } = await supabaseAdmin
+          .from('plaid_items')
+          .select('id')
+          .eq('itemId', itemId)
+          .single();
+
+        const oneMinuteAgo = new Date(Date.now() - 60000);
+        const { data: updatedAccounts, error: updatedAccountsError } = await supabaseAdmin
+          .from('credit_cards')
+          .select('*')
+          .eq('plaidItemId', plaidItemForUpdate?.id || '')
+          .gte('updatedAt', oneMinuteAgo.toISOString());
+
+        if (updatedAccountsError) {
+          console.error('Error fetching updated accounts:', updatedAccountsError);
+        }
+        syncDetails.accountSync.accountsUpdated = (updatedAccounts || []).length;
         
         // Check specifically for open dates set
-        const accountsWithOpenDates = updatedAccounts.filter(acc => acc.openDate);
+        const accountsWithOpenDates = (updatedAccounts || []).filter(acc => acc.openDate);
         syncDetails.openDateExtraction.openDatesSet = accountsWithOpenDates.length;
         syncDetails.openDateExtraction.success = accountsWithOpenDates.length > 0;
         
@@ -1215,15 +1263,18 @@ class PlaidServiceImpl implements PlaidService {
         syncDetails.transactionSync.success = true;
         
         // Count transactions updated
-        const recentTransactions = await prisma.transaction.findMany({
-          where: { 
-            plaidItem: { itemId },
-            updatedAt: { gte: new Date(Date.now() - 60000) } // Updated in last minute
-          }
-        });
-        syncDetails.transactionSync.transactionsUpdated = recentTransactions.length;
+        const { data: recentTransactions, error: recentTransactionsError } = await supabaseAdmin
+          .from('transactions')
+          .select('*')
+          .eq('plaidItemId', plaidItemForUpdate?.id || '')
+          .gte('updatedAt', oneMinuteAgo.toISOString());
+
+        if (recentTransactionsError) {
+          console.error('Error fetching recent transactions:', recentTransactionsError);
+        }
+        syncDetails.transactionSync.transactionsUpdated = (recentTransactions || []).length;
         
-        console.log(`✅ Transaction sync completed: ${recentTransactions.length} transactions updated`);
+        console.log(`✅ Transaction sync completed: ${(recentTransactions || []).length} transactions updated`);
         
       } catch (transactionSyncError) {
         syncDetails.transactionSync.error = transactionSyncError.message;
@@ -1233,30 +1284,45 @@ class PlaidServiceImpl implements PlaidService {
       // Step 4: Handle edge cases where Plaid doesn't provide origination_date
       console.log('🔧 Step 4: Handling edge cases for missing origination dates...');
       
-      const cardsWithoutOpenDates = await prisma.creditCard.findMany({
-        where: { 
-          plaidItem: { itemId, userId },
-          openDate: null
-        },
-        include: { plaidItem: true }
-      });
+      // Get plaid item first for the nested query
+      const { data: plaidItemForCards, error: plaidItemForCardsError } = await supabaseAdmin
+        .from('plaid_items')
+        .select('id')
+        .eq('itemId', itemId)
+        .eq('userId', userId)
+        .single();
 
-      if (cardsWithoutOpenDates.length > 0) {
-        console.log(`⚠️ Found ${cardsWithoutOpenDates.length} cards without open dates, applying intelligent defaults...`);
+      const { data: cardsWithoutOpenDates, error: cardsWithoutOpenDatesError } = await supabaseAdmin
+        .from('credit_cards')
+        .select('*, plaid_items!inner(*)')
+        .eq('plaidItemId', plaidItemForCards?.id || '')
+        .is('openDate', null);
+
+      if (cardsWithoutOpenDatesError) {
+        console.error('Error fetching cards without open dates:', cardsWithoutOpenDatesError);
+      }
+
+      if ((cardsWithoutOpenDates || []).length > 0) {
+        console.log(`⚠️ Found ${(cardsWithoutOpenDates || []).length} cards without open dates, applying intelligent defaults...`);
         
-        for (const card of cardsWithoutOpenDates) {
+        for (const card of (cardsWithoutOpenDates || [])) {
           let estimatedOpenDate: Date;
           const now = new Date();
           
           // Use transaction-based estimation for all cards (most reliable approach)
-          const cardTransactions = await prisma.transaction.findMany({
-            where: { creditCardId: card.id },
-            orderBy: { date: 'asc' },
-            take: 1
-          });
+          const { data: cardTransactions, error: cardTransactionsError } = await supabaseAdmin
+            .from('transactions')
+            .select('*')
+            .eq('creditCardId', card.id)
+            .order('date', { ascending: true })
+            .limit(1);
+
+          if (cardTransactionsError) {
+            console.error('Error fetching card transactions:', cardTransactionsError);
+          }
           
-          if (cardTransactions.length > 0) {
-            const earliestTransactionDate = new Date(cardTransactions[0].date);
+          if ((cardTransactions || []).length > 0) {
+            const earliestTransactionDate = new Date(cardTransactions![0].date);
             // Set open date 3 weeks (21 days) before earliest transaction
             estimatedOpenDate = new Date(earliestTransactionDate);
             estimatedOpenDate.setDate(estimatedOpenDate.getDate() - 21);
@@ -1268,10 +1334,14 @@ class PlaidServiceImpl implements PlaidService {
             console.log(`🛡️ No transactions found for ${card.name}, using 1-year fallback: ${estimatedOpenDate.toDateString()}`);
           }
 
-          await prisma.creditCard.update({
-            where: { id: card.id },
-            data: { openDate: estimatedOpenDate }
-          });
+          const { error: updateCardError } = await supabaseAdmin
+            .from('credit_cards')
+            .update({ openDate: estimatedOpenDate.toISOString() })
+            .eq('id', card.id);
+
+          if (updateCardError) {
+            console.error('Failed to update credit card open date:', updateCardError);
+          }
           
           syncDetails.openDateExtraction.openDatesSet++;
         }
@@ -1285,33 +1355,62 @@ class PlaidServiceImpl implements PlaidService {
       // Step 5: Final validation
       console.log('🔍 Step 5: Final validation of sync results...');
       
-      const plaidItem = await prisma.plaidItem.findUnique({
-        where: { itemId },
-        include: {
-          accounts: {
-            include: {
-              transactions: {
-                take: 5,
-                orderBy: { date: 'desc' }
-              }
-            }
-          }
-        }
-      });
+      // Get plaid item with related credit cards and their recent transactions
+      const { data: plaidItem, error: finalPlaidItemError } = await supabaseAdmin
+        .from('plaid_items')
+        .select('*')
+        .eq('itemId', itemId)
+        .single();
 
-      if (!plaidItem) {
+      if (finalPlaidItemError || !plaidItem) {
         syncDetails.validation.error = 'Plaid item not found after sync';
         return { success: false, details: syncDetails };
       }
 
+      // Get credit cards for this plaid item
+      const { data: accounts, error: accountsError } = await supabaseAdmin
+        .from('credit_cards')
+        .select('*')
+        .eq('plaidItemId', plaidItem.id);
+
+      if (accountsError) {
+        console.error('Error fetching accounts for validation:', accountsError);
+      }
+
+      // Get recent transactions for each credit card
+      const accountsWithTransactions = [];
+      for (const account of (accounts || [])) {
+        const { data: recentTransactions, error: transactionError } = await supabaseAdmin
+          .from('transactions')
+          .select('*')
+          .eq('creditCardId', account.id)
+          .order('date', { ascending: false })
+          .limit(5);
+
+        if (transactionError) {
+          console.error('Error fetching recent transactions for validation:', transactionError);
+        }
+
+        accountsWithTransactions.push({
+          ...account,
+          transactions: recentTransactions || []
+        });
+      }
+
+      // Add accounts to plaid item for compatibility
+      const plaidItemWithAccounts = {
+        ...plaidItem,
+        accounts: accountsWithTransactions
+      };
+
       // Validation checks
       const validationResults = {
         itemFound: !!plaidItem,
-        accountsFound: plaidItem.accounts?.length || 0,
-        accountsWithOpenDates: plaidItem.accounts?.filter(acc => acc.openDate)?.length || 0,
-        accountsWithBalances: plaidItem.accounts?.filter(acc => acc.balanceCurrent !== null)?.length || 0,
-        accountsWithTransactions: plaidItem.accounts?.filter(acc => acc.transactions?.length > 0)?.length || 0,
-        totalTransactions: plaidItem.accounts?.reduce((sum, acc) => sum + (acc.transactions?.length || 0), 0) || 0
+        accountsFound: plaidItemWithAccounts.accounts?.length || 0,
+        accountsWithOpenDates: plaidItemWithAccounts.accounts?.filter(acc => acc.openDate)?.length || 0,
+        accountsWithBalances: plaidItemWithAccounts.accounts?.filter(acc => acc.balanceCurrent !== null)?.length || 0,
+        accountsWithTransactions: plaidItemWithAccounts.accounts?.filter(acc => acc.transactions?.length > 0)?.length || 0,
+        totalTransactions: plaidItemWithAccounts.accounts?.reduce((sum, acc) => sum + (acc.transactions?.length || 0), 0) || 0
       };
 
       console.log('📊 Validation results:', validationResults);
