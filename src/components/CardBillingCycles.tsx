@@ -785,11 +785,6 @@ function CardContent({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-gray-900">{cardName}</h3>
-                {isCapitalOneCard(cardName) && (
-                  <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-md font-medium">
-                    90d
-                  </span>
-                )}
               </div>
               {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
             </div>
