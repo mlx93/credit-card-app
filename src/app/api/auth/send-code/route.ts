@@ -7,16 +7,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Initialize Resend with API key
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-
-// Debug logging
-console.log('=== EMAIL CONFIGURATION CHECK ===');
-console.log('- RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
-console.log('- RESEND_API_KEY preview:', process.env.RESEND_API_KEY?.substring(0, 10) + '...');
-console.log('- Resend initialized:', !!resend);
-
 export async function POST(request: NextRequest) {
+  // Initialize Resend inside the function for Vercel serverless
+  const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+  
+  // Debug logging
+  console.log('=== EMAIL CONFIGURATION CHECK ===');
+  console.log('- RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
+  console.log('- RESEND_API_KEY preview:', process.env.RESEND_API_KEY?.substring(0, 10) + '...');
+  console.log('- Resend initialized:', !!resend);
   try {
     const { email } = await request.json();
     
@@ -40,6 +39,8 @@ export async function POST(request: NextRequest) {
 
     // Store verification code in database
     // First try the verification_tokens table, if it fails, use users table as fallback
+    let codeStoredSuccessfully = false;
+    
     const { error: dbError } = await supabase
       .from('verification_tokens')
       .upsert({
@@ -68,7 +69,13 @@ export async function POST(request: NextRequest) {
         console.error('Users table error:', userError);
         // Continue anyway - we'll still try to send the email
         console.log('WARNING: Could not store verification code in database');
+      } else {
+        codeStoredSuccessfully = true;
+        console.log('Code stored in users table successfully');
       }
+    } else {
+      codeStoredSuccessfully = true;
+      console.log('Code stored in verification_tokens table successfully');
     }
 
     // Send email with verification code
@@ -144,7 +151,7 @@ export async function POST(request: NextRequest) {
       success: true, 
       message: 'Verification code sent to your email',
       debug: {
-        codeStored: !dbError,
+        codeStored: codeStoredSuccessfully,
         emailConfigured: !!resend,
         environment: process.env.VERCEL_ENV || process.env.NODE_ENV
       }
