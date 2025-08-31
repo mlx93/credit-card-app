@@ -4,6 +4,11 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
 
+// In-memory store for tracking recent webhook processing
+// This prevents duplicate processing when multiple webhooks arrive simultaneously
+const recentWebhooks = new Map<string, number>();
+const WEBHOOK_DEDUP_WINDOW = 10000; // 10 seconds
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -14,6 +19,27 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Plaid webhook error:', error);
       return NextResponse.json({ error: 'Webhook error' }, { status: 400 });
+    }
+
+    // Create a unique key for this webhook
+    const webhookKey = `${webhook_type}-${webhook_code}-${item_id}`;
+    const now = Date.now();
+    
+    // Check if we've processed this webhook recently
+    const lastProcessed = recentWebhooks.get(webhookKey);
+    if (lastProcessed && (now - lastProcessed) < WEBHOOK_DEDUP_WINDOW) {
+      console.log(`⚠️ Duplicate webhook detected (${webhookKey}), skipping processing. Last processed ${now - lastProcessed}ms ago.`);
+      return NextResponse.json({ received: true, deduplicated: true });
+    }
+    
+    // Mark this webhook as processed
+    recentWebhooks.set(webhookKey, now);
+    
+    // Clean up old entries
+    for (const [key, timestamp] of recentWebhooks.entries()) {
+      if (now - timestamp > WEBHOOK_DEDUP_WINDOW * 2) {
+        recentWebhooks.delete(key);
+      }
     }
 
     switch (webhook_type) {

@@ -129,23 +129,40 @@ class PlaidServiceImpl implements PlaidService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // Retry logic with exponential backoff
+  // Retry logic with exponential backoff - more aggressive for rate limits
   private async retryWithBackoff<T>(
     operation: () => Promise<T>,
-    maxRetries: number = 3,
-    baseDelay: number = 1000
+    maxRetries: number = 5,  // Increased from 3 to 5
+    baseDelay: number = 2000  // Increased from 1000ms to 2000ms
   ): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await operation();
       } catch (error: any) {
         // Check if it's a rate limit error (429)
-        if (error.response?.status === 429 && attempt < maxRetries) {
-          const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
-          console.log(`⏱️ Rate limit hit, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        if (error.response?.status === 429) {
+          if (attempt >= maxRetries) {
+            console.error(`⚠️ Max retries (${maxRetries}) exceeded for rate-limited request`);
+            throw error;
+          }
+          
+          // More aggressive backoff: 2^attempt * baseDelay + jitter
+          const jitter = Math.random() * 1000; // Add 0-1000ms random jitter
+          const delay = (baseDelay * Math.pow(2, attempt)) + jitter;
+          console.log(`⏱️ Rate limit hit (429), waiting ${Math.round(delay)}ms before retry ${attempt}/${maxRetries}`);
+          console.log(`   Plaid rate limit message: ${error.response?.data?.error_message || 'No message'}`);
           await this.delay(delay);
           continue;
         }
+        
+        // For other errors, still retry but with less aggressive backoff
+        if (attempt < maxRetries && error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+          const delay = baseDelay * attempt;
+          console.log(`🔄 Connection error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          await this.delay(delay);
+          continue;
+        }
+        
         throw error;
       }
     }
@@ -199,8 +216,8 @@ class PlaidServiceImpl implements PlaidService {
           plaidClient.transactionsGet(request)
         );
         
-        // Add delay between requests to prevent rate limiting
-        await this.delay(500); // 500ms between transaction requests
+        // Add longer delay between requests to prevent rate limiting
+        await this.delay(1500); // Increased to 1.5 seconds between transaction requests
         const chunkTransactions = response.data.transactions;
         
         console.log(`Chunk result: ${chunkTransactions.length} transactions (total available in period: ${response.data.total_transactions})`);
@@ -372,10 +389,10 @@ class PlaidServiceImpl implements PlaidService {
     console.log(`🔄 Starting syncAccounts for itemId: ${itemId}`);
     
     const liabilitiesData = await this.getLiabilities(accessToken);
-    await this.delay(300); // Throttle between API calls
+    await this.delay(1000); // Increased delay to 1 second between API calls
     
     const balancesData = await this.getBalances(accessToken);
-    await this.delay(300); // Throttle between API calls
+    await this.delay(1000); // Increased delay to 1 second between API calls
     
     const accountsData = await this.getAccounts(accessToken);
 
@@ -415,14 +432,36 @@ class PlaidServiceImpl implements PlaidService {
           (a: any) => a.account_id === account.account_id
         );
 
-        const { data: existingCard, error: existingCardError } = await supabaseAdmin
+        // Check for existing cards - use first() instead of single() to handle duplicates
+        const { data: existingCards, error: existingCardError } = await supabaseAdmin
           .from('credit_cards')
           .select('*')
           .eq('accountId', account.account_id)
-          .single();
+          .order('createdAt', { ascending: true }); // Get oldest first
 
-        if (existingCardError && existingCardError.code !== 'PGRST116') {
-          console.error('Error checking existing credit card:', existingCardError);
+        if (existingCardError) {
+          console.error('Error checking existing credit cards:', existingCardError);
+        }
+
+        // If there are duplicates, log a warning and use the first one
+        const existingCard = existingCards?.[0] || null;
+        if (existingCards && existingCards.length > 1) {
+          console.warn(`⚠️ Found ${existingCards.length} duplicate cards for account ${account.account_id}. Using the oldest one.`);
+          // Clean up duplicates (keep only the first/oldest)
+          const duplicateIds = existingCards.slice(1).map(card => card.id);
+          console.log(`Cleaning up duplicate card IDs: ${duplicateIds.join(', ')}`);
+          
+          // Delete duplicate cards
+          const { error: deleteError } = await supabaseAdmin
+            .from('credit_cards')
+            .delete()
+            .in('id', duplicateIds);
+          
+          if (deleteError) {
+            console.error('Failed to delete duplicate cards:', deleteError);
+          } else {
+            console.log(`✅ Deleted ${duplicateIds.length} duplicate cards`);
+          }
         }
 
         // Get earliest transaction for transaction-based open date fallback
@@ -857,6 +896,18 @@ class PlaidServiceImpl implements PlaidService {
             console.error('Failed to update credit card:', updateError);
           }
         } else {
+          // Double-check that no card was created by another concurrent process
+          const { data: recheckCard } = await supabaseAdmin
+            .from('credit_cards')
+            .select('id')
+            .eq('accountId', account.account_id)
+            .single();
+          
+          if (recheckCard) {
+            console.log(`ℹ️ Card was created by concurrent process for ${account.name}, skipping creation`);
+            continue; // Skip to next account
+          }
+
           const { error: createError } = await supabaseAdmin
             .from('credit_cards')
             .insert({
@@ -941,6 +992,10 @@ class PlaidServiceImpl implements PlaidService {
     try {
       console.log(`=== TRANSACTION SYNC START for itemId: ${plaidItemRecord.itemId} ===`);
       console.log(`✅ Using passed plaidItem record - no DB lookup needed`);
+      
+      // Add initial delay to avoid rate limiting if called too soon after other API calls
+      console.log('⏳ Adding pre-sync delay to respect rate limits...');
+      await this.delay(2000); // 2 second delay before starting transaction sync
       
       // Determine if this is Capital One using institution name (no API call needed)
       const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
