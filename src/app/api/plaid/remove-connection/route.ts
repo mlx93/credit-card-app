@@ -48,6 +48,23 @@ export async function DELETE(request: NextRequest) {
       // Continue with local cleanup even if Plaid removal fails
     }
 
+    // Clear manual credit limits for all cards associated with this connection
+    // This ensures that when users reconnect, they start fresh without old manual overrides
+    const { error: clearLimitsError } = await supabaseAdmin
+      .from('credit_cards')
+      .update({
+        isManualLimit: false,
+        manualCreditLimit: null,
+        updatedAt: new Date().toISOString()
+      })
+      .eq('plaidItemId', plaidItem.id);
+    
+    if (clearLimitsError) {
+      console.warn('Failed to clear manual credit limits (continuing with deletion):', clearLimitsError.message);
+    } else {
+      console.log('Cleared manual credit limits for cards in this connection');
+    }
+
     // Remove from local database (cascading deletes will handle related data)
     const { error: deleteError } = await supabaseAdmin
       .from('plaid_items')

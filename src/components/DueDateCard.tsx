@@ -25,6 +25,8 @@ interface CreditCardInfo {
   mask: string;
   balanceCurrent: number;
   balanceLimit: number;
+  manualCreditLimit?: number | null;
+  isManualLimit?: boolean;
   lastStatementBalance?: number;
   nextPaymentDueDate?: Date;
   minimumPaymentAmount?: number;
@@ -231,9 +233,18 @@ export function DueDateCard({
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
   
-  // Handle cards with no limit or invalid limits - be more permissive with Capital One
-  const hasValidLimit = card.balanceLimit && card.balanceLimit > 0 && isFinite(card.balanceLimit) && !isNaN(card.balanceLimit);
-  const utilization = hasValidLimit ? Math.abs(card.balanceCurrent) / card.balanceLimit * 100 : 0;
+  // Determine credit limit logic
+  const isManualLimit = card.isManualLimit || false;
+  const hasValidPlaidLimit = card.balanceLimit && card.balanceLimit > 0 && isFinite(card.balanceLimit) && !isNaN(card.balanceLimit);
+  
+  // Effective limit: if valid Plaid limit exists, it always takes precedence
+  // Otherwise, use manual limit if available
+  const effectiveLimit = hasValidPlaidLimit ? card.balanceLimit : (isManualLimit ? card.manualCreditLimit : null);
+  const hasValidEffectiveLimit = effectiveLimit && effectiveLimit > 0 && isFinite(effectiveLimit) && !isNaN(effectiveLimit);
+  const utilization = hasValidEffectiveLimit ? Math.abs(card.balanceCurrent) / effectiveLimit * 100 : 0;
+  
+  // Editing is ONLY allowed when there's NO valid Plaid limit (regardless of manual limit status)
+  const allowEditing = !hasValidPlaidLimit;
   
   // Debug log for Capital One cards
   if (card.name?.toLowerCase().includes('capital one') || card.name?.toLowerCase().includes('quicksilver') || card.name?.toLowerCase().includes('venture')) {
@@ -292,7 +303,7 @@ export function DueDateCard({
   };
 
   const startEditingLimit = () => {
-    setLimitInput(card.balanceLimit ? card.balanceLimit.toString() : '');
+    setLimitInput(effectiveLimit ? effectiveLimit.toString() : '');
     setEditingLimit(true);
   };
 
@@ -311,12 +322,11 @@ export function DueDateCard({
 
     setUpdatingLimit(true);
     try {
-      const response = await fetch('/api/user/credit-cards/update-limit', {
+      const response = await fetch(`/api/cards/${card.id}/manual-limit`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          cardId: card.id, 
-          creditLimit: limit 
+          manualCreditLimit: limit 
         })
       });
 
@@ -327,8 +337,12 @@ export function DueDateCard({
         
         // Update the card data locally to avoid page reload
         if (data.card) {
-          // Create updated card object with new limit
-          const updatedCard = { ...card, balanceLimit: data.card.balanceLimit };
+          // Create updated card object with new manual limit
+          const updatedCard = { 
+            ...card, 
+            manualCreditLimit: data.card.manualCreditLimit,
+            isManualLimit: data.card.isManualLimit
+          };
           
           // If parent component provides an update callback, use it
           // Otherwise fall back to page reload for now
@@ -336,13 +350,18 @@ export function DueDateCard({
             // Store the update in sessionStorage so parent can pick it up
             sessionStorage.setItem(`creditLimit_${card.id}`, JSON.stringify({
               cardId: card.id,
-              newLimit: data.card.balanceLimit,
+              manualCreditLimit: data.card.manualCreditLimit,
+              isManualLimit: data.card.isManualLimit,
               timestamp: Date.now()
             }));
             
             // Trigger a custom event that the parent can listen to
             window.dispatchEvent(new CustomEvent('creditLimitUpdated', {
-              detail: { cardId: card.id, newLimit: data.card.balanceLimit }
+              detail: { 
+                cardId: card.id, 
+                manualCreditLimit: data.card.manualCreditLimit,
+                isManualLimit: data.card.isManualLimit
+              }
             }));
           }
         }
@@ -544,24 +563,45 @@ export function DueDateCard({
         <div className="flex justify-between items-center text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
           <div className="flex items-center gap-2">
-            {hasValidLimit && utilization > 0 ? (
-              <span>{formatPercentage(utilization)}</span>
-            ) : hasValidLimit && utilization === 0 ? (
-              <span>0%</span>
+            {hasValidEffectiveLimit && utilization > 0 ? (
+              <>
+                <span>{formatPercentage(utilization)}</span>
+                {hasValidPlaidLimit ? (
+                  <span className="text-xs text-green-600 ml-1">(Plaid)</span>
+                ) : isManualLimit ? (
+                  <span className="text-xs text-blue-600 ml-1">(Manual)</span>
+                ) : null}
+              </>
+            ) : hasValidEffectiveLimit && utilization === 0 ? (
+              <>
+                <span>0%</span>
+                {hasValidPlaidLimit ? (
+                  <span className="text-xs text-green-600 ml-1">(Plaid)</span>
+                ) : isManualLimit ? (
+                  <span className="text-xs text-blue-600 ml-1">(Manual)</span>
+                ) : null}
+              </>
             ) : (
               <>
                 <span className="text-gray-500 italic">
-                  {card.balanceLimit === null || card.balanceLimit === undefined ? 'Unknown Limit' : 
+                  {hasValidPlaidLimit ? 'Plaid Limit Available' :
+                   isManualLimit ? 'Manual Limit Not Set' :
+                   card.balanceLimit === null || card.balanceLimit === undefined ? 'Unknown Limit' : 
                    isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid Limit' : 'No Limit'}
                 </span>
-                {!editingLimit && (
+                {allowEditing && !editingLimit && (
                   <button
                     onClick={startEditingLimit}
                     className="text-blue-500 hover:text-blue-700 p-1 rounded"
-                    title="Set credit limit manually"
+                    title={isManualLimit ? "Edit manual credit limit" : "Set credit limit manually"}
                   >
                     <Edit3 className="h-3 w-3" />
                   </button>
+                )}
+                {!allowEditing && hasValidPlaidLimit && (
+                  <span className="text-xs text-gray-500 ml-2">
+                    🔒 Managed by Plaid
+                  </span>
                 )}
               </>
             )}
@@ -597,12 +637,14 @@ export function DueDateCard({
               </button>
             </div>
             <p className="text-xs text-blue-600">
-              💡 Enter your credit limit manually for Capital One, Amex, or other cards where limits aren't automatically detected.
+              💡 {hasValidPlaidLimit ? 'This limit is managed by Plaid and cannot be edited.' :
+                  isManualLimit ? 'Update your manual credit limit.' : 
+                  'Enter your credit limit manually for Capital One, Amex, or other cards where limits aren\'t automatically detected.'}
             </p>
           </div>
         )}
 
-        {hasValidLimit && (
+        {hasValidEffectiveLimit && (
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className={`h-2 rounded-full ${

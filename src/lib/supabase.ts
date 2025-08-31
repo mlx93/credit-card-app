@@ -197,6 +197,8 @@ export interface Database {
           balanceCurrent: number | null
           balanceAvailable: number | null
           balanceLimit: number | null
+          manualCreditLimit: number | null
+          isManualLimit: boolean
           isoCurrencyCode: string | null
           lastStatementIssueDate: string | null
           lastStatementBalance: number | null
@@ -219,6 +221,8 @@ export interface Database {
           balanceCurrent?: number | null
           balanceAvailable?: number | null
           balanceLimit?: number | null
+          manualCreditLimit?: number | null
+          isManualLimit?: boolean
           isoCurrencyCode?: string | null
           lastStatementIssueDate?: string | null
           lastStatementBalance?: number | null
@@ -241,6 +245,8 @@ export interface Database {
           balanceCurrent?: number | null
           balanceAvailable?: number | null
           balanceLimit?: number | null
+          manualCreditLimit?: number | null
+          isManualLimit?: boolean
           isoCurrencyCode?: string | null
           lastStatementIssueDate?: string | null
           lastStatementBalance?: number | null
