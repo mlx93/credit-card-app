@@ -1,6 +1,7 @@
 import { NextAuthOptions } from 'next-auth';
 import { SupabaseAdapter } from '@next-auth/supabase-adapter';
 import GoogleProvider from 'next-auth/providers/google';
+import EmailProvider from 'next-auth/providers/email';
 
 export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
@@ -15,6 +16,18 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+    EmailProvider({
+      server: process.env.EMAIL_SERVER,
+      from: process.env.EMAIL_FROM,
+      // For testing - log verification URLs to console
+      sendVerificationRequest: async ({ identifier: email, url, provider }) => {
+        console.log('=== EMAIL VERIFICATION ===');
+        console.log('Email:', email);
+        console.log('Verification URL:', url);
+        console.log('========================');
+        // In production, you'd send the actual email here
+      },
     }),
   ],
   callbacks: {
