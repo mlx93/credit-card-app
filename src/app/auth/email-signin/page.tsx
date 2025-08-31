@@ -1,16 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { signIn } from 'next-auth/react';
+import { CreditCard } from 'lucide-react';
 
 export default function EmailSignIn() {
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [stepTransition, setStepTransition] = useState(false);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Timer for code expiration
   useEffect(() => {
@@ -43,9 +48,15 @@ export default function EmailSignIn() {
       const data = await response.json();
 
       if (response.ok) {
-        setStep('code');
-        setTimeLeft(180); // Reset timer
-        setMessage('Check your email for a 6-digit verification code');
+        setStepTransition(true);
+        setTimeout(() => {
+          setStep('code');
+          setTimeLeft(180); // Reset timer
+          setMessage('Check your email for a 6-digit verification code');
+          setStepTransition(false);
+          // Auto-focus first input
+          setTimeout(() => inputRefs.current[0]?.focus(), 100);
+        }, 300);
       } else {
         setError(data.error || 'Failed to send verification code');
       }
@@ -64,15 +75,22 @@ export default function EmailSignIn() {
     try {
       const result = await signIn('email-code', {
         email,
-        code,
+        code: code.join(''),
         redirect: false,
       });
 
       if (result?.error) {
         setError('Invalid or expired verification code');
+        // Shake animation for error
+        setCode(['', '', '', '', '', '']);
+        setTimeout(() => inputRefs.current[0]?.focus(), 100);
       } else if (result?.ok) {
-        // Successfully signed in
-        window.location.href = '/dashboard';
+        // Success animation
+        setIsSuccess(true);
+        setMessage('Authentication successful!');
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1500);
       }
     } catch (err) {
       setError('Failed to verify code. Please try again.');
@@ -89,20 +107,33 @@ export default function EmailSignIn() {
       <div className="absolute bottom-0 -right-4 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-1000"></div>
       
       <div className="relative w-full max-w-md">
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+        <div className={`backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl transition-all duration-300 ${
+          stepTransition ? 'scale-95 opacity-50' : 'scale-100 opacity-100'
+        }`}>
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <span className="text-2xl">📧</span>
+            <div className={`w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg transition-all duration-500 ${
+              isSuccess ? 'bg-gradient-to-r from-green-500 to-emerald-500 scale-110' : ''
+            }`}>
+              {isSuccess ? (
+                <span className="text-2xl animate-bounce">✓</span>
+              ) : step === 'email' ? (
+                <span className="text-2xl">📧</span>
+              ) : (
+                <CreditCard className="h-8 w-8 text-white" />
+              )}
             </div>
             <h1 className="text-2xl font-semibold text-white mb-2">
               {step === 'email' ? 'Sign in with Email' : 'Enter Verification Code'}
             </h1>
             <p className="text-slate-300 text-sm">
-              {step === 'email' 
-                ? "We'll send you a secure 6-digit code" 
-                : `Code sent to ${email}`
-              }
+              {isSuccess ? (
+                <span className="text-green-400 font-medium">Welcome to CardCycle! 🎉</span>
+              ) : step === 'email' ? (
+                "We'll send you a secure 6-digit code"
+              ) : (
+                `Code sent to ${email.replace(/(.{2})(.*)(@.*)/, '$1***$3')}`
+              )}
             </p>
           </div>
 
@@ -130,8 +161,16 @@ export default function EmailSignIn() {
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                  <p className="text-red-400 text-sm text-center">{error}</p>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 animate-pulse">
+                  <div className="flex items-center justify-center space-x-2">
+                    <span className="text-red-400 text-lg">⚠️</span>
+                    <p className="text-red-400 text-sm font-medium">{error}</p>
+                  </div>
+                  {error.includes('Invalid or expired') && (
+                    <p className="text-red-300 text-xs text-center mt-1">
+                      Please request a new code or check your email
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -182,48 +221,117 @@ export default function EmailSignIn() {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label htmlFor="code" className="text-slate-300 text-sm font-medium">
+              <div className="space-y-3">
+                <label className="text-slate-300 text-sm font-medium text-center block">
                   Verification Code
                 </label>
-                <div className="relative group">
-                  <input
-                    id="code"
-                    name="code"
-                    type="text"
-                    required
-                    maxLength={6}
-                    className="w-full px-4 py-6 bg-white/5 border border-white/10 rounded-2xl text-white text-center text-3xl font-mono tracking-[0.5em] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200 hover:bg-white/10 hover:border-white/20"
-                    placeholder="000000"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  />
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/0 to-purple-500/0 group-hover:from-indigo-500/5 group-hover:to-purple-500/5 transition-all duration-200 pointer-events-none"></div>
+                <div className={`flex justify-center space-x-3 ${error ? 'animate-pulse' : ''}`}>
+                  {code.map((digit, index) => (
+                    <div key={index} className="relative group">
+                      <input
+                        ref={(el) => (inputRefs.current[index] = el)}
+                        type="text"
+                        maxLength={1}
+                        className={`w-12 h-16 bg-white/10 border-2 rounded-xl text-white text-center text-2xl font-mono focus:outline-none transition-all duration-200 ${
+                          digit ? 'border-indigo-400/60 bg-indigo-500/10' : 'border-white/20'
+                        } focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 hover:bg-white/15 hover:border-white/30`}
+                        aria-label={`Digit ${index + 1} of 6`}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={digit}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          if (value.length <= 1) {
+                            const newCode = [...code];
+                            newCode[index] = value;
+                            setCode(newCode);
+                            setError(''); // Clear error on input
+                            
+                            // Auto-focus next input
+                            if (value && index < 5) {
+                              inputRefs.current[index + 1]?.focus();
+                            }
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Handle backspace
+                          if (e.key === 'Backspace' && !code[index] && index > 0) {
+                            inputRefs.current[index - 1]?.focus();
+                          }
+                          // Handle paste
+                          if (e.key === 'v' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault();
+                            navigator.clipboard.readText().then((text) => {
+                              const pastedCode = text.replace(/\D/g, '').slice(0, 6).split('');
+                              const newCode = [...pastedCode, ...new Array(6 - pastedCode.length).fill('')];
+                              setCode(newCode);
+                              const lastFilledIndex = pastedCode.length - 1;
+                              if (lastFilledIndex >= 0 && lastFilledIndex < 5) {
+                                inputRefs.current[lastFilledIndex + 1]?.focus();
+                              }
+                            });
+                          }
+                        }}
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <div className={`absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/0 to-purple-500/0 group-hover:from-indigo-500/5 group-hover:to-purple-500/5 transition-all duration-200 pointer-events-none ${
+                        digit ? 'from-indigo-500/5 to-purple-500/5' : ''
+                      }`}></div>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-slate-400 text-xs text-center mt-2">
+                <p className="text-slate-400 text-xs text-center">
                   Enter the 6-digit code from your email
                 </p>
               </div>
 
               {message && (
-                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-                  <p className="text-green-400 text-sm text-center">{message}</p>
+                <div className={`border rounded-xl p-3 transition-all duration-300 ${
+                  isSuccess 
+                    ? 'bg-green-500/10 border-green-500/20 scale-105' 
+                    : 'bg-blue-500/10 border-blue-500/20'
+                }`}>
+                  <div className="flex items-center justify-center space-x-2">
+                    <span className={`text-lg ${isSuccess ? 'text-green-400' : 'text-blue-400'}`}>
+                      {isSuccess ? '🎉' : '📧'}
+                    </span>
+                    <p className={`text-sm font-medium ${isSuccess ? 'text-green-400' : 'text-blue-400'}`}>
+                      {message}
+                    </p>
+                  </div>
                 </div>
               )}
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                  <p className="text-red-400 text-sm text-center">{error}</p>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 animate-pulse">
+                  <div className="flex items-center justify-center space-x-2">
+                    <span className="text-red-400 text-lg">⚠️</span>
+                    <p className="text-red-400 text-sm font-medium">{error}</p>
+                  </div>
+                  {error.includes('Invalid or expired') && (
+                    <p className="text-red-300 text-xs text-center mt-1">
+                      Please request a new code or check your email
+                    </p>
+                  )}
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={loading || code.length !== 6 || timeLeft <= 0}
-                className="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium rounded-2xl shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-purple-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 group"
+                disabled={loading || code.join('').length !== 6 || timeLeft <= 0 || isSuccess}
+                className={`w-full py-4 font-medium rounded-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:cursor-not-allowed transform transition-all duration-200 group ${
+                  isSuccess 
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/25' 
+                    : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:shadow-xl hover:from-indigo-600 hover:to-purple-600 hover:scale-[1.02] disabled:opacity-50'
+                }`}
               >
                 <span className="flex items-center justify-center space-x-2">
-                  {loading ? (
+                  {isSuccess ? (
+                    <>
+                      <div className="w-4 h-4 text-white animate-bounce">✓</div>
+                      <span>Success!</span>
+                    </>
+                  ) : loading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       <span>Verifying...</span>
@@ -243,23 +351,29 @@ export default function EmailSignIn() {
                   type="button"
                   onClick={() => {
                     setLoading(true);
-                    handleSendCode({ preventDefault: () => {} } as any);
+                    handleSendCode({ preventDefault: () => {} } as React.FormEvent);
                   }}
-                  disabled={loading}
-                  className="py-3 text-slate-300 hover:text-white font-medium rounded-xl hover:bg-white/5 transition-all duration-200 disabled:opacity-50"
+                  disabled={loading || isSuccess}
+                  className="py-3 text-slate-300 hover:text-white font-medium rounded-xl hover:bg-white/5 transition-all duration-200 disabled:opacity-50 group"
                 >
-                  📧 Resend Code
+                  <span className="flex items-center justify-center space-x-2">
+                    <span>📧</span>
+                    <span>Resend Code</span>
+                    <span className="opacity-60 group-hover:opacity-100 transition-opacity">{timeLeft < 120 ? '' : '(Available soon)'}</span>
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setStep('email');
-                    setCode('');
+                    setCode(['', '', '', '', '', '']);
                     setError('');
                     setMessage('');
                     setTimeLeft(180);
+                    setIsSuccess(false);
                   }}
-                  className="py-3 text-slate-400 hover:text-slate-300 text-sm rounded-xl hover:bg-white/5 transition-all duration-200"
+                  disabled={isSuccess}
+                  className="py-3 text-slate-400 hover:text-slate-300 text-sm rounded-xl hover:bg-white/5 transition-all duration-200 disabled:opacity-50"
                 >
                   ← Use Different Email
                 </button>

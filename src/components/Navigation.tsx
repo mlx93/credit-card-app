@@ -29,7 +29,7 @@ export function Navigation() {
           <div className="flex items-center space-x-8">
             <Link href="/" className="flex items-center space-x-2">
               <CreditCard className="h-6 w-6 text-indigo-600" />
-              <span className="font-bold text-gray-900">Credit Card Manager</span>
+              <span className="font-bold text-gray-900">CardCycle</span>
             </Link>
             
             <div className="hidden md:flex space-x-6">
