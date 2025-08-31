@@ -25,11 +25,8 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     signIn: async ({ user, account, profile }) => {
-      console.log('SignIn callback triggered:', { 
-        userId: user.id, 
-        userEmail: user.email,
-        provider: account?.provider 
-      });
+      // Let NextAuth handle all user creation in next_auth schema
+      // No manual syncing to avoid conflicts
       return true;
     },
   },

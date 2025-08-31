@@ -2,6 +2,33 @@ import { createClient } from '@supabase/supabase-js'
 
 // Database type definitions based on Prisma schema
 export interface Database {
+  next_auth: {
+    Tables: {
+      users: {
+        Row: {
+          id: string
+          email: string
+          emailVerified: string | null
+          name: string | null
+          image: string | null
+        }
+        Insert: {
+          id?: string
+          email: string
+          emailVerified?: string | null
+          name?: string | null
+          image?: string | null
+        }
+        Update: {
+          id?: string
+          email?: string
+          emailVerified?: string | null
+          name?: string | null
+          image?: string | null
+        }
+      }
+    }
+  }
   public: {
     Tables: {
       users: {
