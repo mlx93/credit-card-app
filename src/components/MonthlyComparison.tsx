@@ -51,22 +51,10 @@ export function MonthlyComparison({ comparisons, isLoggedIn = false }: MonthlyCo
             <div className="relative flex items-center justify-between">
               {/* Left Side - Category and Amounts */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="font-semibold text-gray-900 truncate">
+                <div className="mb-2">
+                  <h3 className="font-semibold text-gray-900 truncate mb-3">
                     {item.category}
                   </h3>
-                  <div className="h-1 flex-1 bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        isIncrease ? 'bg-gradient-to-r from-red-400 to-red-500' : 
-                        'bg-gradient-to-r from-green-400 to-green-500'
-                      }`}
-                      style={{ 
-                        width: `${Math.min(Math.abs(item.change), 100)}%`,
-                        opacity: isZero ? 0 : 0.6
-                      }}
-                    />
-                  </div>
                 </div>
                 
                 <div className="flex items-center gap-4 text-sm">

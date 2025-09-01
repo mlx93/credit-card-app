@@ -210,53 +210,48 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="relative bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl shadow-sm border border-green-100 hover:shadow-md transition-shadow duration-200">
-            <div className="flex items-center">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center mr-4 shadow-lg">
-                <TrendingUp className="h-6 w-6 text-white" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+          <div className="relative bg-gradient-to-br from-green-50 to-emerald-50 p-4 md:p-6 rounded-xl shadow-sm border border-green-100 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-start sm:items-center">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center mr-3 md:mr-4 shadow-lg flex-shrink-0">
+                <TrendingUp className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-green-700 uppercase tracking-wider whitespace-nowrap">Total This Month</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs md:text-sm font-semibold text-green-700 uppercase tracking-wider leading-tight">Total This Month</p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 break-words">
                   {loading ? '...' : formatCurrency(displayData.totalSpendThisMonth)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="relative bg-gradient-to-br from-blue-50 to-cyan-50 p-6 rounded-xl shadow-sm border border-blue-100 hover:shadow-md transition-shadow duration-200">
-            <div className="flex items-center">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center mr-4 shadow-lg">
-                <BarChart3 className="h-6 w-6 text-white" />
+          <div className="relative bg-gradient-to-br from-blue-50 to-cyan-50 p-4 md:p-6 rounded-xl shadow-sm border border-blue-100 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-start sm:items-center">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center mr-3 md:mr-4 shadow-lg flex-shrink-0">
+                <BarChart3 className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-blue-700 uppercase tracking-wider">Avg per Day</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs md:text-sm font-semibold text-blue-700 uppercase tracking-wider leading-tight">Avg per Day</p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 break-words">
                   {loading ? '...' : formatCurrency(avgPerDay)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-sm border border-purple-100 hover:shadow-md transition-shadow duration-200">
-            <div className="flex items-center">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center mr-4 shadow-lg">
-                <PieChart className="h-6 w-6 text-white" />
+          <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 p-4 md:p-6 rounded-xl shadow-sm border border-purple-100 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-start sm:items-center">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center mr-3 md:mr-4 shadow-lg flex-shrink-0">
+                <PieChart className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-purple-700 uppercase tracking-wider whitespace-nowrap">Top Category</p>
-                <p className={`font-bold text-gray-900 ${
-                  topCategory.length > 15 ? 'text-lg' : 
-                  topCategory.length > 10 ? 'text-xl' : 
-                  'text-2xl'
+                <p className="text-xs md:text-sm font-semibold text-purple-700 uppercase tracking-wider leading-tight">Top Category</p>
+                <p className={`font-bold text-gray-900 break-words leading-tight ${
+                  topCategory.length > 15 ? 'text-base md:text-lg' : 
+                  topCategory.length > 10 ? 'text-lg md:text-xl' : 
+                  'text-lg md:text-2xl'
                 }`}
                   title={topCategory}
-                  style={{ 
-                    wordBreak: 'break-word',
-                    overflowWrap: 'break-word',
-                    lineHeight: '1.1'
-                  }}
                 >
                   {loading ? '...' : topCategory}
                 </p>
@@ -264,14 +259,14 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
             </div>
           </div>
 
-          <div className="relative bg-gradient-to-br from-indigo-50 to-violet-50 p-6 rounded-xl shadow-sm border border-indigo-100 hover:shadow-md transition-shadow duration-200">
-            <div className="flex items-center">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mr-4 shadow-lg">
-                <Calendar className="h-6 w-6 text-white" />
+          <div className="relative bg-gradient-to-br from-indigo-50 to-violet-50 p-4 md:p-6 rounded-xl shadow-sm border border-indigo-100 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-start sm:items-center">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mr-3 md:mr-4 shadow-lg flex-shrink-0">
+                <Calendar className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-indigo-700 uppercase tracking-wider">Transactions</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs md:text-sm font-semibold text-indigo-700 uppercase tracking-wider leading-tight">Transactions</p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900">
                   {loading ? '...' : displayData.transactionCount}
                 </p>
               </div>
@@ -279,31 +274,8 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
           </div>
         </div>
 
-        <div className="mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Spending Trend</h2>
-            {loading ? (
-              <p className="text-gray-500">Loading chart data...</p>
-            ) : (
-              <SpendingChart data={displayData.monthlySpend} />
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Category Breakdown</h2>
-            {loading ? (
-              <p className="text-gray-500">Loading category data...</p>
-            ) : displayData.categories?.length > 0 ? (
-              <CategoryBreakdown categories={displayData.categories} />
-            ) : isLoggedIn ? (
-              <p className="text-gray-500 text-center">No transaction data found. Connect a credit card to get started.</p>
-            ) : (
-              <CategoryBreakdown categories={displayData.categories} />
-            )}
-          </div>
-
+        {/* First Row: Spending By Card + Monthly Spending Trend */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Spending by Card</h2>
             {loading ? (
@@ -336,10 +308,33 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
               </div>
             )}
           </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Spending Trend</h2>
+            {loading ? (
+              <p className="text-gray-500">Loading chart data...</p>
+            ) : (
+              <SpendingChart data={displayData.monthlySpend} />
+            )}
+          </div>
         </div>
 
+        {/* Second Row: Category Breakdown + Monthly Comparison */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Category Breakdown</h2>
+            {loading ? (
+              <p className="text-gray-500">Loading category data...</p>
+            ) : displayData.categories?.length > 0 ? (
+              <CategoryBreakdown categories={displayData.categories} />
+            ) : isLoggedIn ? (
+              <p className="text-gray-500 text-center">No transaction data found. Connect a credit card to get started.</p>
+            ) : (
+              <CategoryBreakdown categories={displayData.categories} />
+            )}
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Comparison</h2>
             {loading ? (
               <p className="text-gray-500">Loading comparison data...</p>
@@ -350,9 +345,6 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
               />
             )}
           </div>
-
-          {/* Empty placeholder to maintain grid layout */}
-          <div></div>
         </div>
 
         {/* APR Cost Calculator - Expandable Section */}
