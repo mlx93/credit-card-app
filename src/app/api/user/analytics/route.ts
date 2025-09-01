@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     const currentMonthStart = startOfMonth(now);
     const currentMonthEnd = endOfMonth(now);
     
-    const last3MonthsStart = startOfMonth(subMonths(now, 3));
+    const last12MonthsStart = startOfMonth(subMonths(now, 11));
 
     // Get user's plaid items first
     const { data: plaidItems, error: plaidError } = await supabaseAdmin
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
         credit_cards!inner(name, mask)
       `)
       .in('plaidItemId', plaidItemIds)
-      .gte('date', last3MonthsStart.toISOString())
+      .gte('date', last12MonthsStart.toISOString())
       .lte('date', currentMonthEnd.toISOString())
       .order('date', { ascending: false });
 
@@ -156,7 +156,7 @@ export async function GET(request: Request) {
     }, 0);
 
     const monthlySpend = [];
-    for (let i = 11; i >= 0; i--) {
+    for (let i = 0; i <= 11; i++) {
       const monthStart = startOfMonth(subMonths(now, i));
       const monthEnd = endOfMonth(subMonths(now, i));
       
