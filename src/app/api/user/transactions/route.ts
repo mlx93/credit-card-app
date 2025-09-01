@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         *,
         credit_cards!inner(name, mask)
       `)
-      .in('plaiditemid', plaidItemIds)
+      .in('plaidItemId', plaidItemIds)
       .order('date', { ascending: false })
       .limit(limit);
 

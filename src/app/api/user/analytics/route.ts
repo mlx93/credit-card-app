@@ -46,7 +46,7 @@ export async function GET() {
         *,
         credit_cards(name)
       `)
-      .in('plaiditemid', plaidItemIds)
+      .in('plaidItemId', plaidItemIds)
       .gte('date', last3MonthsStart.toISOString())
       .lte('date', currentMonthEnd.toISOString())
       .order('date', { ascending: false });

@@ -30,7 +30,7 @@ export async function GET() {
     const { data: creditCards, error: cardsError } = await supabaseAdmin
       .from('credit_cards')
       .select('*')
-      .in('plaiditemid', plaidItemIds)
+      .in('plaidItemId', plaidItemIds)
       .order('createdAt', { ascending: false });
 
     if (cardsError) {
@@ -54,14 +54,14 @@ export async function GET() {
     if (creditCardIds.length > 0) {
       const { data: transactions, error: transactionError } = await supabaseAdmin
         .from('transactions')
-        .select('creditcardid')
-        .in('creditcardid', creditCardIds)
-        .not('creditcardid', 'is', null);
+        .select('creditCardId')
+        .in('creditCardId', creditCardIds)
+        .not('creditCardId', 'is', null);
 
       if (!transactionError && transactions) {
         transactions.forEach(t => {
-          const count = transactionCounts.get(t.creditcardid) || 0;
-          transactionCounts.set(t.creditcardid, count + 1);
+          const count = transactionCounts.get(t.creditCardId) || 0;
+          transactionCounts.set(t.creditCardId, count + 1);
         });
       }
     }
@@ -82,7 +82,7 @@ export async function GET() {
     // Combine all data
     const formattedCreditCards = (creditCards || []).map(card => ({
       ...card,
-      plaidItem: plaidItemMap.get(card.plaiditemid) || null,
+      plaidItem: plaidItemMap.get(card.plaidItemId) || null,
       aprs: aprMap.get(card.id) || [],
       _count: {
         transactions: transactionCounts.get(card.id) || 0,
