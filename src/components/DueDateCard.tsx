@@ -609,10 +609,28 @@ export function DueDateCard({
             {hasValidEffectiveLimit && utilization > 0 ? (
               <>
                 <span>{formatPercentage(utilization)}</span>
+                {allowEditing && !editingLimit && (
+                  <button
+                    onClick={startEditingLimit}
+                    className="text-blue-500 hover:text-blue-700 p-1 rounded ml-2"
+                    title={isManualLimit ? "Edit manual credit limit" : "Set credit limit manually"}
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </button>
+                )}
               </>
             ) : hasValidEffectiveLimit && utilization === 0 ? (
               <>
                 <span>0%</span>
+                {allowEditing && !editingLimit && (
+                  <button
+                    onClick={startEditingLimit}
+                    className="text-blue-500 hover:text-blue-700 p-1 rounded ml-2"
+                    title={isManualLimit ? "Edit manual credit limit" : "Set credit limit manually"}
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -633,18 +651,18 @@ export function DueDateCard({
                     <Edit3 className="h-3 w-3" />
                   </button>
                 )}
-                {/* Debug: Show edit status for troubleshooting */}
-                {(card.name?.includes('Platinum') || card.name?.includes('Quicksilver')) && (
-                  <span className="text-xs text-red-500 ml-2">
-                    Edit: {allowEditing ? 'YES' : 'NO'} | Mode: {editingLimit ? 'EDITING' : 'VIEW'}
-                  </span>
-                )}
-                {!allowEditing && hasValidPlaidLimit && (
-                  <span className="text-xs text-gray-500 ml-2">
-                    🔒 Managed by Plaid
-                  </span>
-                )}
               </>
+            )}
+            {/* Debug: Show edit status for troubleshooting */}
+            {(card.name?.includes('Platinum') || card.name?.includes('Quicksilver')) && (
+              <span className="text-xs text-red-500 ml-2">
+                Edit: {allowEditing ? 'YES' : 'NO'} | Mode: {editingLimit ? 'EDITING' : 'VIEW'}
+              </span>
+            )}
+            {!allowEditing && hasValidPlaidLimit && (
+              <span className="text-xs text-gray-500 ml-2">
+                🔒 Managed by Plaid
+              </span>
             )}
           </div>
         </div>
