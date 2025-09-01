@@ -163,7 +163,7 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
                 <TrendingUp className="h-6 w-6 text-white" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-green-700 uppercase tracking-wider">Total This Month</p>
+                <p className="text-sm font-semibold text-green-700 uppercase tracking-wider whitespace-nowrap">Total This Month</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {loading ? '...' : formatCurrency(displayData.totalSpendThisMonth)}
                 </p>
@@ -191,12 +191,19 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
                 <PieChart className="h-6 w-6 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-purple-700 uppercase tracking-wider">Top Category</p>
-                <p className={`font-bold text-gray-900 truncate ${
+                <p className="text-sm font-semibold text-purple-700 uppercase tracking-wider whitespace-nowrap">Top Category</p>
+                <p className={`font-bold text-gray-900 ${
                   topCategory.length > 15 ? 'text-lg' : 
                   topCategory.length > 10 ? 'text-xl' : 
                   'text-2xl'
-                }`}>
+                }`}
+                  title={topCategory}
+                  style={{ 
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                    lineHeight: '1.1'
+                  }}
+                >
                   {loading ? '...' : topCategory}
                 </p>
               </div>
