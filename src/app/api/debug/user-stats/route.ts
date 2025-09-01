@@ -35,16 +35,16 @@ export async function GET() {
           id,
           email,
           name,
-          created_at,
+          createdAt,
           plaid_items(id)
         `)
-        .order('created_at', { ascending: false })
+        .order('createdAt', { ascending: false })
         .limit(20),
       // Simple users query without relationships
       supabaseAdmin
         .from('users')
-        .select('id, email, name, created_at')
-        .order('created_at', { ascending: false })
+        .select('id, email, name, createdAt')
+        .order('createdAt', { ascending: false })
         .limit(20),
       // Get plaid items with user info
       supabaseAdmin
@@ -123,7 +123,7 @@ export async function GET() {
           id: user.id,
           email: user.email,
           name: user.name,
-          createdAt: user.created_at,
+          createdAt: user.createdAt,
           plaidItems: userPlaidItems.length,
           plaidItemsDetail: userPlaidItems,
           isCurrentUser: user.id === session.user.id
