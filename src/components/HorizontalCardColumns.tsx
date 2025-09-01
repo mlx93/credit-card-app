@@ -190,7 +190,11 @@ export function HorizontalCardColumns({
   onOrderChange 
 }: HorizontalCardColumnsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  // Initialize with all cards expanded by default
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(() => {
+    // On initial render, expand all cards
+    return new Set(cards.map(card => card.id));
+  });
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -227,10 +231,8 @@ export function HorizontalCardColumns({
         onOrderChange?.(cardIds);
       }
       
-      // Auto-expand ALL cards by default to show billing cycles
-      const cardsToExpand = new Set<string>(cardIds);
-      console.log('📋 Expanding all cards by default:', Array.from(cardsToExpand));
-      setExpandedCards(cardsToExpand);
+      // Cards are already expanded by default in the initial state
+      // No need to set them again here
     } else {
       console.log('⏭️ Skipping card order initialization:', {
         cardOrderLength: cardOrder.length,
@@ -313,7 +315,7 @@ export function HorizontalCardColumns({
       {/* Premium gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-purple-50/30 to-pink-50/50 rounded-3xl"></div>
       
-      <div className="relative p-6">
+      <div className="relative p-3">
         <DndContext 
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -323,7 +325,7 @@ export function HorizontalCardColumns({
             items={cardOrder}
             strategy={horizontalListSortingStrategy}
           >
-            <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-premium min-h-[300px]">
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-premium min-h-[300px]">
               {orderedCards.map((card, index) => {
                 const colorIndex = getCardColorIndex(card.name, card.id);
                 return (

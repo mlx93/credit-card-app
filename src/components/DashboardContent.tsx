@@ -482,7 +482,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-none mx-auto px-4 py-6">
+      <div className="max-w-none mx-auto px-2 py-4">
         {/* Header with title and Quick Actions */}
         <div className="mb-3">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
