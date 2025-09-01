@@ -809,7 +809,7 @@ function CardContent({
                 });
                 onToggleExpand();
               }}
-              className="group relative inline-flex items-center text-sm text-gray-500 hover:text-gray-700 bg-gradient-to-r from-gray-50/80 to-white/90 hover:from-gray-100/90 hover:to-gray-50/80 px-3 py-2 rounded-lg border border-gray-100 hover:border-gray-200 transition-all duration-300 mb-3 ml-8 mr-8 shadow-sm hover:shadow-md backdrop-blur-sm"
+              className="group relative inline-flex items-center text-sm text-gray-500 hover:text-gray-700 bg-gradient-to-r from-gray-50/80 to-white/90 hover:from-gray-100/90 hover:to-gray-50/80 px-3 py-2 rounded-lg border border-gray-100 hover:border-gray-200 transition-all duration-300 mb-3 ml-6 mr-4 shadow-sm hover:shadow-md backdrop-blur-sm"
             >
               <div className={`flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 group-hover:from-gray-300 group-hover:to-gray-400 mr-2 transition-all duration-300 ${isExpanded ? 'rotate-90' : ''}`}>
                 <ChevronRight className="h-3 w-3 text-gray-600 group-hover:text-gray-700" />
