@@ -74,7 +74,12 @@ export async function GET() {
       totalTransactions: formattedTransactions.length,
       thisMonthCount: thisMonthTransactions.length,
       sampleTransaction: formattedTransactions[0],
-      availableFields: formattedTransactions[0] ? Object.keys(formattedTransactions[0]) : []
+      availableFields: formattedTransactions[0] ? Object.keys(formattedTransactions[0]) : [],
+      sampleTransactionWithCategory: formattedTransactions.find(t => t.category),
+      transactionsWithCategory: formattedTransactions.filter(t => t.category).length,
+      transactionsWithCreditCard: formattedTransactions.filter(t => t.creditCard?.name).length,
+      uniqueCategories: [...new Set(formattedTransactions.map(t => t.category).filter(Boolean))],
+      uniqueCreditCards: [...new Set(formattedTransactions.map(t => t.creditCard?.name).filter(Boolean))]
     });
 
     const totalSpendThisMonth = thisMonthTransactions.reduce((sum, t) => 
