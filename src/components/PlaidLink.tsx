@@ -207,15 +207,15 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
       <button
         onClick={handleClick}
         disabled={loading || !session}
-        className={`w-full font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 transform focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
+        className={`font-medium py-3 px-4 rounded-lg transition-all duration-200 inline-flex items-center justify-center space-x-2 transform focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
           loading 
             ? 'bg-indigo-400 cursor-not-allowed opacity-75' 
             : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02]'
         }`}
       >
         <CreditCard className="h-4 w-4 text-white" />
-        <span className="text-white">
-          {loading ? 'Connecting...' : 'Connect Credit Card with Plaid'}
+        <span className="text-white text-sm sm:text-base">
+          {loading ? 'Connecting...' : 'Connect Card'}
         </span>
       </button>
     </>

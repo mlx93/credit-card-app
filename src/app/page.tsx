@@ -5,28 +5,26 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Go to Dashboard button at the top */}
-          <div className="mb-12">
+        <div className="max-w-4xl mx-auto">
+          {/* Header with logo and dashboard button */}
+          <div className="flex justify-between items-center mb-8">
+            <div className="bg-white p-4 rounded-full shadow-lg">
+              <CreditCard className="h-16 w-16 text-indigo-600" />
+            </div>
             <Link 
               href="/dashboard"
-              className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 py-4 rounded-lg transition-colors text-lg shadow-lg"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors shadow-lg"
             >
               Go to Dashboard
             </Link>
           </div>
           
-          <div className="flex justify-center mb-8">
-            <div className="bg-white p-4 rounded-full shadow-lg">
-              <CreditCard className="h-16 w-16 text-indigo-600" />
-            </div>
-          </div>
-          
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Credit Card Manager
-          </h1>
-          
-          <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
+          <div className="text-center">
+            <h1 className="text-5xl font-bold text-gray-900 mb-6">
+              Credit Card Manager
+            </h1>
+            
+            <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
             Track your credit card spending, billing cycles, due dates, and APR costs. 
             Get insights across all your cards with secure Plaid integration.
           </p>
@@ -81,6 +79,7 @@ export default function Home() {
             >
               Start Managing Your Cards →
             </Link>
+          </div>
           </div>
         </div>
       </div>

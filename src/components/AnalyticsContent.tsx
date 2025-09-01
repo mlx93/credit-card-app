@@ -56,7 +56,10 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Analytics data received:', data);
         setAnalytics(data);
+      } else {
+        console.error('Analytics fetch failed:', response.status);
       }
     } catch (error) {
       console.error('Error fetching analytics:', error);
@@ -69,9 +72,16 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
     fetchAnalytics();
   }, [isLoggedIn]);
 
-  const displayData = isLoggedIn ? (analytics || mockData) : mockData;
-  const avgPerDay = displayData.totalSpendThisMonth / 30;
-  const topCategory = displayData.categories?.[0]?.name || (isLoggedIn ? '' : 'Dining');
+  const displayData = isLoggedIn ? (analytics || {
+    totalSpendThisMonth: 0,
+    monthlySpend: [],
+    categories: [],
+    cardSpending: [],
+    monthlyComparison: [],
+    transactionCount: 0,
+  }) : mockData;
+  const avgPerDay = displayData.totalSpendThisMonth ? displayData.totalSpendThisMonth / 30 : 0;
+  const topCategory = displayData.categories?.[0]?.name || (isLoggedIn ? 'N/A' : 'Dining');
 
   return (
     <div className="min-h-screen bg-gray-50">
