@@ -582,6 +582,11 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             </div>
           </div>
         </div>
+        
+        {/* Instruction text aligned with header metrics */}
+        <div className="mb-4">
+          <p className="text-gray-600 text-sm">Swipe horizontally to see all your cards • Expand to view billing cycles</p>
+        </div>
         </div>
 
         {!isLoggedIn && (
@@ -607,11 +612,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
         {/* Revolutionary Horizontal Card Layout */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-gray-600 mt-1">Swipe horizontally to see all your cards • Expand to view billing cycles</p>
-            </div>
-          </div>
           
           {loading ? (
             <div className="bg-white/50 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg p-12 text-center">
