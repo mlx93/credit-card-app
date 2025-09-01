@@ -1211,6 +1211,17 @@ class PlaidServiceImpl implements PlaidService {
           accountOwner: transaction.account_owner,
         };
 
+        // Debug: Log category info for sample transactions
+        if (Math.random() < 0.1) { // Log ~10% of transactions to avoid spam
+          console.log(`🏷️ CATEGORY DEBUG for ${transaction.name}:`, {
+            rawCategory: transaction.category,
+            extractedCategory: transaction.category?.[0] || null,
+            categoryId: transaction.category_id,
+            subcategory: transaction.category?.[1] || null,
+            hasCategory: !!transaction.category
+          });
+        }
+
         // Prepare transaction for upsert (create or update)
         const transactionForUpsert = {
           id: existingTransaction?.id || crypto.randomUUID(),

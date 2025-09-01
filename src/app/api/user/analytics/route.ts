@@ -105,7 +105,19 @@ export async function GET() {
 
     const categoryMap = new Map<string, number>();
     thisMonthTransactions.forEach(t => {
-      const category = t.category || 'Other';
+      // Use merchant name or transaction name as fallback if no category
+      let category = t.category;
+      if (!category) {
+        if (t.merchantName) {
+          category = `${t.merchantName} (Uncategorized)`;
+        } else if (t.name) {
+          // Extract meaningful part from transaction name
+          const cleanName = t.name.split(' ')[0] || t.name.substring(0, 20);
+          category = `${cleanName} (Uncategorized)`;
+        } else {
+          category = 'Other';
+        }
+      }
       categoryMap.set(category, (categoryMap.get(category) || 0) + Math.abs(t.amount));
     });
 
