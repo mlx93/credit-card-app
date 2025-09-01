@@ -16,15 +16,13 @@ export async function GET() {
     // Get comprehensive user statistics
     const [
       totalUsersResult,
-      usersWithPlaidItemsResult,
       totalPlaidItemsResult,
       totalCreditCardsResult,
       totalTransactionsResult,
       totalBillingCyclesResult,
-      recentUsersResult
+      allUsersResult
     ] = await Promise.all([
       supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('users').select('*, plaid_items!inner(id)', { count: 'exact', head: true }),
       supabaseAdmin.from('plaid_items').select('*', { count: 'exact', head: true }),
       supabaseAdmin.from('credit_cards').select('*', { count: 'exact', head: true }),
       supabaseAdmin.from('transactions').select('*', { count: 'exact', head: true }),
@@ -39,26 +37,27 @@ export async function GET() {
           plaid_items(id)
         `)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(20)
     ]);
     
     // Extract counts from results
     const totalUsers = totalUsersResult.count || 0;
-    const usersWithPlaidItems = usersWithPlaidItemsResult.count || 0;
     const totalPlaidItems = totalPlaidItemsResult.count || 0;
     const totalCreditCards = totalCreditCardsResult.count || 0;
     const totalTransactions = totalTransactionsResult.count || 0;
     const totalBillingCycles = totalBillingCyclesResult.count || 0;
-    const recentUsers = recentUsersResult.data || [];
+    const allUsers = allUsersResult.data || [];
+    
+    // Calculate users with connections properly by checking plaid_items array
+    const usersWithPlaidItems = allUsers.filter(user => user.plaid_items && user.plaid_items.length > 0).length;
     
     // Handle any errors
     if (totalUsersResult.error) console.error('Error counting users:', totalUsersResult.error);
-    if (usersWithPlaidItemsResult.error) console.error('Error counting users with plaid items:', usersWithPlaidItemsResult.error);
     if (totalPlaidItemsResult.error) console.error('Error counting plaid items:', totalPlaidItemsResult.error);
     if (totalCreditCardsResult.error) console.error('Error counting credit cards:', totalCreditCardsResult.error);
     if (totalTransactionsResult.error) console.error('Error counting transactions:', totalTransactionsResult.error);
     if (totalBillingCyclesResult.error) console.error('Error counting billing cycles:', totalBillingCyclesResult.error);
-    if (recentUsersResult.error) console.error('Error fetching recent users:', recentUsersResult.error);
+    if (allUsersResult.error) console.error('Error fetching users:', allUsersResult.error);
 
     // Get active vs inactive items
     const [activeItemsResult, errorItemsResult] = await Promise.all([
@@ -87,7 +86,8 @@ export async function GET() {
         avgTransactionsPerCard: totalCreditCards > 0 ? Math.round(totalTransactions / totalCreditCards) : 0,
         avgCyclesPerCard: totalCreditCards > 0 ? Math.round(totalBillingCycles / totalCreditCards) : 0
       },
-      recent: recentUsers.map(user => ({
+      allUsers: allUsers.map(user => ({
+        id: user.id,
         email: user.email,
         name: user.name,
         createdAt: user.created_at,
