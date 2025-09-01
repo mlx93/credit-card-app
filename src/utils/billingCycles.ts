@@ -13,7 +13,7 @@ function isCapitalOneCard(institutionName?: string, cardName?: string): boolean 
 }
 
 // Helper function to identify payment transactions based on transaction name
-function isPaymentTransaction(transactionName: string): boolean {
+export function isPaymentTransaction(transactionName: string): boolean {
   const lowerName = transactionName.toLowerCase();
   
   // Common payment indicators across different banks

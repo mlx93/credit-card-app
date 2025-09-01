@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { isPaymentTransaction } from '@/utils/billingCycles';
 
 export async function GET(request: Request) {
   try {
@@ -120,9 +121,15 @@ export async function GET(request: Request) {
       uniqueCreditCards: [...new Set(formattedTransactions.map(t => t.creditCard?.name).filter(Boolean))]
     });
 
-    const totalSpendThisMonth = thisMonthTransactions.reduce((sum, t) => 
-      sum + Math.abs(t.amount), 0
-    );
+    // Calculate total spend: exclude payment transactions, include charges and legitimate refunds
+    const totalSpendThisMonth = thisMonthTransactions.reduce((sum, t) => {
+      // Skip payment transactions regardless of sign
+      if (isPaymentTransaction(t.name)) {
+        return sum;
+      }
+      // Include all non-payment transactions (charges and refunds)
+      return sum + t.amount;
+    }, 0);
 
     const monthlySpend = [];
     for (let i = 3; i >= 0; i--) {
@@ -133,7 +140,14 @@ export async function GET(request: Request) {
         t.date >= monthStart && t.date <= monthEnd
       );
       
-      const amount = monthTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      const amount = monthTransactions.reduce((sum, t) => {
+        // Skip payment transactions
+        if (isPaymentTransaction(t.name)) {
+          return sum;
+        }
+        // Include charges and refunds
+        return sum + t.amount;
+      }, 0);
       
       monthlySpend.push({
         month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
@@ -143,6 +157,11 @@ export async function GET(request: Request) {
 
     const categoryMap = new Map<string, number>();
     thisMonthTransactions.forEach(t => {
+      // Skip payment transactions
+      if (isPaymentTransaction(t.name)) {
+        return;
+      }
+      
       // Use Plaid category, or merchant name as fallback
       let category = t.category;
       if (!category) {
@@ -155,7 +174,7 @@ export async function GET(request: Request) {
           category = 'Other';
         }
       }
-      categoryMap.set(category, (categoryMap.get(category) || 0) + Math.abs(t.amount));
+      categoryMap.set(category, (categoryMap.get(category) || 0) + t.amount);
     });
 
     const categories = Array.from(categoryMap.entries())
@@ -169,8 +188,12 @@ export async function GET(request: Request) {
 
     const cardSpendingMap = new Map<string, number>();
     thisMonthTransactions.forEach(t => {
+      // Skip payment transactions
+      if (isPaymentTransaction(t.name)) {
+        return;
+      }
       const cardName = t.creditCard?.name || 'Unknown Card';
-      cardSpendingMap.set(cardName, (cardSpendingMap.get(cardName) || 0) + Math.abs(t.amount));
+      cardSpendingMap.set(cardName, (cardSpendingMap.get(cardName) || 0) + t.amount);
     });
 
     const cardSpending = Array.from(cardSpendingMap.entries()).map(([name, amount], index) => ({
@@ -191,13 +214,21 @@ export async function GET(request: Request) {
     const lastMonthCategoryMap = new Map<string, number>();
     
     thisMonthTransactions.forEach(t => {
+      // Skip payment transactions
+      if (isPaymentTransaction(t.name)) {
+        return;
+      }
       const category = t.category || 'Other';
-      thisMonthCategoryMap.set(category, (thisMonthCategoryMap.get(category) || 0) + Math.abs(t.amount));
+      thisMonthCategoryMap.set(category, (thisMonthCategoryMap.get(category) || 0) + t.amount);
     });
 
     lastMonthTransactions.forEach(t => {
+      // Skip payment transactions
+      if (isPaymentTransaction(t.name)) {
+        return;
+      }
       const category = t.category || 'Other';
-      lastMonthCategoryMap.set(category, (lastMonthCategoryMap.get(category) || 0) + Math.abs(t.amount));
+      lastMonthCategoryMap.set(category, (lastMonthCategoryMap.get(category) || 0) + t.amount);
     });
 
     const monthlyComparison = Array.from(thisMonthCategoryMap.entries())
@@ -228,7 +259,7 @@ export async function GET(request: Request) {
       categories,
       cardSpending,
       monthlyComparison,
-      transactionCount: thisMonthTransactions.length,
+      transactionCount: thisMonthTransactions.filter(t => !isPaymentTransaction(t.name)).length,
       selectedMonth: `${activeMonthStart.getFullYear()}-${String(activeMonthStart.getMonth() + 1).padStart(2, '0')}`,
       availableMonths: Array.from(availableMonths).sort().reverse(),
     });
