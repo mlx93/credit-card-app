@@ -315,7 +315,7 @@ export function DueDateCard({
   const connectionStatus = card.plaidItem?.status || 'unknown';
   const hasConnectionIssue = ['error', 'expired', 'disconnected'].includes(connectionStatus);
   const lastSyncDaysAgo = card.plaidItem?.lastSyncAt ? 
-    Math.floor((new Date().getTime() - new Date(card.plaidItem.lastSyncAt).getTime()) / (1000 * 60 * 60 * 24)) : null;
+    Math.max(0, Math.floor((new Date().getTime() - new Date(card.plaidItem.lastSyncAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
   const isStale = lastSyncDaysAgo !== null && lastSyncDaysAgo > 14; // Consider stale if no sync in 14+ days (was 7 days)
   
   // Debug logging for staleness detection
