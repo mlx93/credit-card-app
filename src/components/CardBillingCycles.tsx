@@ -269,7 +269,16 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
                 )}
               </div>
             ) : (
-              <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)}</p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)}</p>
+                {paymentStatus === 'paid' && (
+                  <div className="w-3 h-3 rounded-full bg-green-100 flex items-center justify-center">
+                    <svg className="w-2 h-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
