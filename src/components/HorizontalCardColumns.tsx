@@ -63,6 +63,13 @@ interface SortableCardColumnProps {
   onSync?: (itemId: string) => void;
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
+  onCreditLimitUpdated?: (data: {
+    newLimit: number;
+    previousLimit: number | null;
+    plaidLimit: number | null;
+    newUtilization: number;
+    cardName: string;
+  }) => void;
   colorIndex: number;
   billingCycleGradient: string;
 }
@@ -75,6 +82,7 @@ function SortableCardColumn({
   onSync, 
   onReconnect, 
   onRemove, 
+  onCreditLimitUpdated,
   colorIndex,
   billingCycleGradient
 }: SortableCardColumnProps) {
@@ -348,6 +356,7 @@ export function HorizontalCardColumns({
                     onSync={onSync}
                     onReconnect={onReconnect}
                     onRemove={onRemove}
+                    onCreditLimitUpdated={onCreditLimitUpdated}
                     colorIndex={colorIndex}
                     billingCycleGradient={getBillingCycleGradient(colorIndex)}
                   />
