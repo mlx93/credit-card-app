@@ -247,7 +247,11 @@ export function DueDateCard({
   
   // Determine credit limit logic
   const isManualLimit = card.ismanuallimit || false;
-  const hasValidPlaidLimit = card.balanceLimit && card.balanceLimit > 0 && isFinite(card.balanceLimit) && !isNaN(card.balanceLimit);
+  const hasValidPlaidLimit = card.balanceLimit && 
+    card.balanceLimit > 0 && 
+    isFinite(card.balanceLimit) && 
+    !isNaN(card.balanceLimit) &&
+    card.balanceLimit !== Infinity;
   
   // Effective limit: if valid Plaid limit exists, it always takes precedence
   // Otherwise, use manual limit if available
@@ -257,6 +261,18 @@ export function DueDateCard({
   
   // Editing is ONLY allowed when there's NO valid Plaid limit (regardless of manual limit status)
   const allowEditing = !hasValidPlaidLimit;
+  
+  // Debug log for credit limit editing
+  if (card.name?.toLowerCase().includes('capital one') || card.name?.toLowerCase().includes('quicksilver') || !hasValidPlaidLimit) {
+    console.log(`💳 ${card.name} - Credit Limit Edit Status:`, {
+      plaidLimit: card.balanceLimit,
+      hasValidPlaidLimit,
+      isManualLimit,
+      manualLimit: card.manualcreditlimit,
+      allowEditing,
+      canEdit: allowEditing && !editingLimit
+    });
+  }
   
   // Debug log for Capital One cards
   if (card.name?.toLowerCase().includes('capital one') || card.name?.toLowerCase().includes('quicksilver') || card.name?.toLowerCase().includes('venture')) {
@@ -602,9 +618,11 @@ export function DueDateCard({
               <>
                 <span className="text-gray-500 italic">
                   {hasValidPlaidLimit ? 'Plaid Limit Available' :
-                   isManualLimit ? 'Manual Limit Not Set' :
-                   card.balanceLimit === null || card.balanceLimit === undefined ? 'Unknown Limit' : 
-                   isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid Limit' : 'No Limit'}
+                   isManualLimit ? 'Manual Limit Set' :
+                   card.balanceLimit === null || card.balanceLimit === undefined ? 'No Limit Available' : 
+                   card.balanceLimit === 0 ? 'Limit: $0' :
+                   card.balanceLimit === Infinity ? 'Infinite Limit' :
+                   isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid Limit' : 'No Limit Set'}
                 </span>
                 {allowEditing && !editingLimit && (
                   <button
