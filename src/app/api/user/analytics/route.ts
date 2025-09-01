@@ -5,6 +5,30 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { isPaymentTransaction } from '@/utils/billingCycles';
 
+// Helper function to format category names
+function formatCategoryName(category: string): string {
+  if (!category) return 'Other';
+  
+  // Handle Plaid's uppercase categories (e.g., FOOD_AND_DRINK -> Food & Drink)
+  let formatted = category
+    .replace(/_/g, ' ')  // Replace underscores with spaces
+    .toLowerCase()        // Convert to lowercase
+    .split(' ')          // Split into words
+    .map(word => {
+      // Capitalize first letter of each word
+      if (word === 'and' || word === 'or') return '&';
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+  
+  // Limit to 20 characters
+  if (formatted.length > 20) {
+    formatted = formatted.substring(0, 17) + '...';
+  }
+  
+  return formatted;
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -174,7 +198,10 @@ export async function GET(request: Request) {
           category = 'Other';
         }
       }
-      categoryMap.set(category, (categoryMap.get(category) || 0) + t.amount);
+      
+      // Format the category name (proper case, max 20 chars)
+      const formattedCategory = formatCategoryName(category);
+      categoryMap.set(formattedCategory, (categoryMap.get(formattedCategory) || 0) + t.amount);
     });
 
     const categories = Array.from(categoryMap.entries())
@@ -218,8 +245,20 @@ export async function GET(request: Request) {
       if (isPaymentTransaction(t.name)) {
         return;
       }
-      const category = t.category || 'Other';
-      thisMonthCategoryMap.set(category, (thisMonthCategoryMap.get(category) || 0) + t.amount);
+      
+      // Get and format category
+      let category = t.category;
+      if (!category) {
+        if (t.merchantName) {
+          category = t.merchantName;
+        } else if (t.name) {
+          category = t.name;
+        } else {
+          category = 'Other';
+        }
+      }
+      const formattedCategory = formatCategoryName(category);
+      thisMonthCategoryMap.set(formattedCategory, (thisMonthCategoryMap.get(formattedCategory) || 0) + t.amount);
     });
 
     lastMonthTransactions.forEach(t => {
@@ -227,8 +266,20 @@ export async function GET(request: Request) {
       if (isPaymentTransaction(t.name)) {
         return;
       }
-      const category = t.category || 'Other';
-      lastMonthCategoryMap.set(category, (lastMonthCategoryMap.get(category) || 0) + t.amount);
+      
+      // Get and format category
+      let category = t.category;
+      if (!category) {
+        if (t.merchantName) {
+          category = t.merchantName;
+        } else if (t.name) {
+          category = t.name;
+        } else {
+          category = 'Other';
+        }
+      }
+      const formattedCategory = formatCategoryName(category);
+      lastMonthCategoryMap.set(formattedCategory, (lastMonthCategoryMap.get(formattedCategory) || 0) + t.amount);
     });
 
     const monthlyComparison = Array.from(thisMonthCategoryMap.entries())
