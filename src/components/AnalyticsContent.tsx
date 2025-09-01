@@ -99,7 +99,7 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
     transactionCount: 0,
   }) : mockData;
   const avgPerDay = displayData.totalSpendThisMonth ? displayData.totalSpendThisMonth / 30 : 0;
-  const topCategory = displayData.categories?.[0]?.name || (isLoggedIn ? 'N/A' : 'Dining');
+  const topCategory = displayData.categories?.[0]?.name || (isLoggedIn ? '' : 'Dining');
 
   return (
     <div className="min-h-screen bg-gray-50">
