@@ -16,6 +16,8 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isAPRCalculatorOpen, setIsAPRCalculatorOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
 
   const mockData = {
     totalSpendThisMonth: 4250.67,
@@ -47,17 +49,28 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
     transactionCount: 65,
   };
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (month?: string) => {
     if (!isLoggedIn) return;
     
     try {
       setLoading(true);
-      const response = await fetch('/api/user/analytics');
+      const url = month 
+        ? `/api/user/analytics?month=${month}`
+        : '/api/user/analytics';
+      const response = await fetch(url);
       
       if (response.ok) {
         const data = await response.json();
         console.log('Analytics data received:', data);
         setAnalytics(data);
+        
+        // Update available months and selected month from API response
+        if (data.availableMonths) {
+          setAvailableMonths(data.availableMonths);
+        }
+        if (data.selectedMonth) {
+          setSelectedMonth(data.selectedMonth);
+        }
       } else {
         console.error('Analytics fetch failed:', response.status);
       }
@@ -66,6 +79,11 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleMonthChange = (month: string) => {
+    setSelectedMonth(month);
+    fetchAnalytics(month);
   };
 
   useEffect(() => {
@@ -87,13 +105,42 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Spending Analytics</h1>
-          <p className="text-gray-600 mt-2">
-            {isLoggedIn 
-              ? 'Detailed insights into your credit card spending patterns'
-              : 'Sign in to see your real spending analytics'
-            }
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Spending Analytics</h1>
+              <p className="text-gray-600 mt-2">
+                {isLoggedIn 
+                  ? 'Detailed insights into your credit card spending patterns'
+                  : 'Sign in to see your real spending analytics'
+                }
+              </p>
+            </div>
+            {isLoggedIn && availableMonths.length > 0 && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="month-picker" className="text-sm font-medium text-gray-700">
+                  Month:
+                </label>
+                <select
+                  id="month-picker"
+                  value={selectedMonth}
+                  onChange={(e) => handleMonthChange(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  disabled={loading}
+                >
+                  {availableMonths.map((month) => {
+                    const [year, monthNum] = month.split('-');
+                    const date = new Date(parseInt(year), parseInt(monthNum) - 1);
+                    const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    return (
+                      <option key={month} value={month}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
 
         {!isLoggedIn && (

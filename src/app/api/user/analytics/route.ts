@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     
@@ -12,6 +12,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const monthParam = searchParams.get('month'); // Format: "2025-08"
+    
     const now = new Date();
     const currentMonthStart = startOfMonth(now);
     const currentMonthEnd = endOfMonth(now);
@@ -65,9 +68,44 @@ export async function GET() {
       } : null
     }));
 
-    const thisMonthTransactions = formattedTransactions.filter(t => 
-      t.date >= currentMonthStart && t.date <= currentMonthEnd
+    // Determine which month to analyze
+    let activeMonthStart: Date;
+    let activeMonthEnd: Date;
+    
+    if (monthParam) {
+      // Use the specified month from the parameter
+      const [year, month] = monthParam.split('-').map(Number);
+      activeMonthStart = startOfMonth(new Date(year, month - 1));
+      activeMonthEnd = endOfMonth(new Date(year, month - 1));
+    } else {
+      // Default to current month
+      activeMonthStart = currentMonthStart;
+      activeMonthEnd = currentMonthEnd;
+    }
+    
+    let thisMonthTransactions = formattedTransactions.filter(t => 
+      t.date >= activeMonthStart && t.date <= activeMonthEnd
     );
+    
+    // If no month parameter was provided and current month has no transactions, 
+    // use the most recent month with data
+    if (!monthParam && thisMonthTransactions.length === 0 && formattedTransactions.length > 0) {
+      const mostRecentTransaction = formattedTransactions[0]; // Already sorted by date desc
+      const mostRecentDate = mostRecentTransaction.date;
+      
+      activeMonthStart = startOfMonth(mostRecentDate);
+      activeMonthEnd = endOfMonth(mostRecentDate);
+      
+      thisMonthTransactions = formattedTransactions.filter(t => 
+        t.date >= activeMonthStart && t.date <= activeMonthEnd
+      );
+      
+      console.log('📅 No current month transactions, using most recent month:', {
+        currentMonth: currentMonthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        activeMonth: activeMonthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        transactionCount: thisMonthTransactions.length
+      });
+    }
 
     // Debug logging to understand what data we have
     console.log('🔍 ANALYTICS DEBUG:', {
@@ -142,9 +180,9 @@ export async function GET() {
       color: ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500'][index % 4],
     }));
 
-    // Calculate monthly comparison data
-    const lastMonthStart = startOfMonth(subMonths(now, 1));
-    const lastMonthEnd = endOfMonth(subMonths(now, 1));
+    // Calculate monthly comparison data (compare with previous month)
+    const lastMonthStart = startOfMonth(subMonths(activeMonthStart, 1));
+    const lastMonthEnd = endOfMonth(subMonths(activeMonthStart, 1));
     
     const lastMonthTransactions = formattedTransactions.filter(t => 
       t.date >= lastMonthStart && t.date <= lastMonthEnd
@@ -178,6 +216,13 @@ export async function GET() {
       .sort((a, b) => b.thisMonth - a.thisMonth)
       .slice(0, 5);
 
+    // Get list of available months with data for the dropdown
+    const availableMonths = new Set<string>();
+    formattedTransactions.forEach(t => {
+      const monthKey = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}`;
+      availableMonths.add(monthKey);
+    });
+    
     return NextResponse.json({
       totalSpendThisMonth,
       monthlySpend,
@@ -185,6 +230,8 @@ export async function GET() {
       cardSpending,
       monthlyComparison,
       transactionCount: thisMonthTransactions.length,
+      selectedMonth: `${activeMonthStart.getFullYear()}-${String(activeMonthStart.getMonth() + 1).padStart(2, '0')}`,
+      availableMonths: Array.from(availableMonths).sort().reverse(),
     });
   } catch (error) {
     console.error('Error fetching analytics:', error);
