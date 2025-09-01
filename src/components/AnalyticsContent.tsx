@@ -116,28 +116,33 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
               </p>
             </div>
             {isLoggedIn && availableMonths.length > 0 && (
-              <div className="flex items-center gap-2">
-                <label htmlFor="month-picker" className="text-sm font-medium text-gray-700">
-                  Month:
-                </label>
-                <select
-                  id="month-picker"
-                  value={selectedMonth}
-                  onChange={(e) => handleMonthChange(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  disabled={loading}
-                >
-                  {availableMonths.map((month) => {
-                    const [year, monthNum] = month.split('-');
-                    const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-                    const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                    return (
-                      <option key={month} value={month}>
-                        {label}
-                      </option>
-                    );
-                  })}
-                </select>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                  Viewing
+                </span>
+                <div className="relative">
+                  <select
+                    id="month-picker"
+                    value={selectedMonth}
+                    onChange={(e) => handleMonthChange(e.target.value)}
+                    className="appearance-none pl-4 pr-10 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 hover:from-blue-100 hover:to-indigo-100 cursor-pointer shadow-sm"
+                    disabled={loading}
+                  >
+                    {availableMonths.map((month) => {
+                      const [year, monthNum] = month.split('-');
+                      const date = new Date(parseInt(year), parseInt(monthNum) - 1);
+                      const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                      return (
+                        <option key={month} value={month}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <ChevronDown className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -152,11 +157,13 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="relative bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl shadow-sm border border-green-100 hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-green-600 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total This Month</p>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center mr-4 shadow-lg">
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-green-700 uppercase tracking-wider">Total This Month</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {loading ? '...' : formatCurrency(displayData.totalSpendThisMonth)}
                 </p>
@@ -164,11 +171,13 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="relative bg-gradient-to-br from-blue-50 to-cyan-50 p-6 rounded-xl shadow-sm border border-blue-100 hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center">
-              <BarChart3 className="h-8 w-8 text-blue-600 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Avg per Day</p>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center mr-4 shadow-lg">
+                <BarChart3 className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-blue-700 uppercase tracking-wider">Avg per Day</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {loading ? '...' : formatCurrency(avgPerDay)}
                 </p>
@@ -176,23 +185,31 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-sm border border-purple-100 hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center">
-              <PieChart className="h-8 w-8 text-purple-600 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Top Category</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center mr-4 shadow-lg">
+                <PieChart className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-purple-700 uppercase tracking-wider">Top Category</p>
+                <p className={`font-bold text-gray-900 truncate ${
+                  topCategory.length > 15 ? 'text-lg' : 
+                  topCategory.length > 10 ? 'text-xl' : 
+                  'text-2xl'
+                }`}>
                   {loading ? '...' : topCategory}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="relative bg-gradient-to-br from-indigo-50 to-violet-50 p-6 rounded-xl shadow-sm border border-indigo-100 hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-indigo-600 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Transactions</p>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mr-4 shadow-lg">
+                <Calendar className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-indigo-700 uppercase tracking-wider">Transactions</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {loading ? '...' : displayData.transactionCount}
                 </p>

@@ -208,7 +208,7 @@ export async function GET(request: Request) {
       .map(([name, amount]) => ({
         name,
         amount,
-        percentage: totalSpendThisMonth > 0 ? (amount / totalSpendThisMonth) * 100 : 0,
+        percentage: totalSpendThisMonth > 0 ? Math.round((amount / totalSpendThisMonth) * 100) : 0,
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 6);
