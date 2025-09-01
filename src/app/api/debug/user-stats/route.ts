@@ -3,7 +3,27 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-export async function GET() {
+// Helper function to mask sensitive data in production
+function maskSensitiveData(data: any, isProduction: boolean, userEmail?: string) {
+  if (!isProduction) return data;
+  
+  return {
+    ...data,
+    allUsers: data.allUsers?.map((user: any) => ({
+      ...user,
+      id: user.id.substring(0, 8) + '...',
+      email: user.email === userEmail ? user.email : user.email.replace(/(.{2}).*@(.*)/, '$1***@$2'),
+      plaidItemsDetail: user.plaidItemsDetail?.map((item: any) => ({
+        ...item,
+        id: item.id.substring(0, 8) + '...',
+        userId: item.userId.substring(0, 8) + '...'
+      }))
+    })),
+    debug: process.env.NODE_ENV === 'production' ? null : data.debug
+  };
+}
+
+export async function GET(request: Request) {
   try {
     console.log('📊 USER STATS ENDPOINT CALLED');
     
@@ -11,6 +31,26 @@ export async function GET() {
     
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // SECURITY: Only allow admin users or the app owner to access this endpoint
+    const adminEmails = ['mylesethan93@gmail.com']; // Replace with your admin emails
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isAdmin = adminEmails.includes(session.user.email || '');
+    
+    if (!isDevelopment && !isAdmin) {
+      console.log('🚫 Unauthorized access attempt to user-stats by:', session.user.email);
+      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    // Additional security: Check for specific environment variable
+    const debugAccessKey = process.env.ADMIN_DEBUG_KEY;
+    const { searchParams } = new URL(request.url);
+    const providedKey = searchParams.get('key');
+    
+    if (process.env.NODE_ENV === 'production' && debugAccessKey && providedKey !== debugAccessKey) {
+      console.log('🚫 Invalid debug key provided by:', session.user.email);
+      return NextResponse.json({ error: 'Forbidden: Invalid access key' }, { status: 403 });
     }
 
     // Get comprehensive user statistics
@@ -143,9 +183,13 @@ export async function GET() {
 
     console.log('📊 USER STATS:', stats);
     
+    // Apply data masking for security
+    const isProduction = process.env.NODE_ENV === 'production';
+    const maskedStats = maskSensitiveData(stats, isProduction, session.user.email);
+    
     return NextResponse.json({ 
       message: 'User statistics retrieved',
-      stats
+      stats: maskedStats
     });
   } catch (error) {
     console.error('📊 USER STATS ERROR:', error);
