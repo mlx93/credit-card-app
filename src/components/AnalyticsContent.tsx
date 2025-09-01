@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TrendingUp, PieChart, BarChart3, Calendar, ChevronDown, ChevronUp, Calculator } from 'lucide-react';
+import { TrendingUp, PieChart, BarChart3, Calendar, ChevronDown, ChevronUp, Calculator, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { SpendingChart } from '@/components/SpendingChart';
 import { CategoryBreakdown } from '@/components/CategoryBreakdown';
@@ -147,6 +147,60 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
             )}
           </div>
         </div>
+
+        {/* Fancy Loading Overlay */}
+        {loading && (
+          <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-40 flex items-center justify-center transition-all duration-300">
+            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-8 max-w-sm w-full mx-4 transform scale-100 transition-transform duration-300">
+              <div className="text-center">
+                {/* Animated Loading Icon */}
+                <div className="relative mb-6">
+                  <div className="w-20 h-20 mx-auto relative">
+                    {/* Multiple spinning rings for depth */}
+                    <div className="absolute inset-0 rounded-full border-4 border-blue-100"></div>
+                    <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 animate-spin"></div>
+                    <div className="absolute inset-2 rounded-full border-2 border-transparent border-r-blue-300 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '3s' }}></div>
+                    
+                    {/* Inner pulsing dot */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Loading Text */}
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Loading Analytics</h3>
+                <p className="text-gray-600 text-sm mb-4">Fetching your spending data...</p>
+                
+                {/* Modern Progress Bar */}
+                <div className="relative w-full bg-gradient-to-r from-gray-100 to-gray-200 rounded-full h-2 mb-4 overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full transform -translate-x-full animate-pulse"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent rounded-full transform -translate-x-full animate-bounce" style={{ animationDuration: '2s' }}></div>
+                </div>
+                
+                {/* Animated Status Text */}
+                <div className="flex items-center justify-center space-x-2 text-blue-600 text-sm font-medium">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="animate-pulse">Processing data</span>
+                </div>
+                
+                {/* Decorative elements */}
+                <div className="flex justify-center space-x-1 mt-4">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="w-1 h-6 bg-gradient-to-t from-blue-300 to-blue-500 rounded-full animate-pulse"
+                      style={{ 
+                        animationDelay: `${i * 0.15}s`,
+                        animationDuration: '1.5s'
+                      }}
+                    ></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {!isLoggedIn && (
           <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
