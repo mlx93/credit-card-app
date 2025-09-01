@@ -52,6 +52,8 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
   const fetchAnalytics = async (month?: string) => {
     if (!isLoggedIn) return;
     
+    const startTime = Date.now();
+    
     try {
       setLoading(true);
       const url = month 
@@ -77,7 +79,13 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
-      setLoading(false);
+      // Ensure loading appears for at least 500ms
+      const elapsed = Date.now() - startTime;
+      const remainingTime = Math.max(0, 500 - elapsed);
+      
+      setTimeout(() => {
+        setLoading(false);
+      }, remainingTime);
     }
   };
 
