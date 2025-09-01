@@ -143,15 +143,14 @@ export async function GET(request: Request) {
 
     const categoryMap = new Map<string, number>();
     thisMonthTransactions.forEach(t => {
-      // Use merchant name or transaction name as fallback if no category
+      // Use Plaid category, or merchant name as fallback
       let category = t.category;
       if (!category) {
         if (t.merchantName) {
-          category = `${t.merchantName} (Uncategorized)`;
+          category = t.merchantName;
         } else if (t.name) {
-          // Extract meaningful part from transaction name
-          const cleanName = t.name.split(' ')[0] || t.name.substring(0, 20);
-          category = `${cleanName} (Uncategorized)`;
+          // Use full transaction name if no merchant name
+          category = t.name;
         } else {
           category = 'Other';
         }

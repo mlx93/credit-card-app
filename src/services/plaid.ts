@@ -230,7 +230,10 @@ class PlaidServiceImpl implements PlaidService {
         const request: TransactionsGetRequest = {
           access_token: accessToken,
           start_date: currentStart.toISOString().split('T')[0],
-          end_date: currentEnd.toISOString().split('T')[0]
+          end_date: currentEnd.toISOString().split('T')[0],
+          options: {
+            include_personal_finance_category: true
+          }
         };
 
         // Use retry logic for rate limit handling
@@ -1194,6 +1197,24 @@ class PlaidServiceImpl implements PlaidService {
           continue;
         }
 
+        // Use personal finance category if available, fall back to legacy category
+        let categoryName = null;
+        let categoryId = null;
+        let subcategory = null;
+        
+        if (transaction.personal_finance_category) {
+          // New personal finance category structure
+          categoryName = transaction.personal_finance_category.primary;
+          categoryId = transaction.personal_finance_category.detailed;
+          // Use detailed as subcategory for more specificity
+          subcategory = transaction.personal_finance_category.detailed;
+        } else if (transaction.category && transaction.category.length > 0) {
+          // Fall back to legacy category structure
+          categoryName = transaction.category[0];
+          categoryId = transaction.category_id;
+          subcategory = transaction.category[1] || null;
+        }
+        
         const transactionData = {
           amount: adjustedAmount,
           accountid: transaction.account_id,
@@ -1205,20 +1226,21 @@ class PlaidServiceImpl implements PlaidService {
             : null,
           name: transaction.name,
           merchantName: transaction.merchant_name,
-          category: transaction.category?.[0] || null,
-          categoryId: transaction.category_id,
-          subcategory: transaction.category?.[1] || null,
+          category: categoryName,
+          categoryId: categoryId,
+          subcategory: subcategory,
           accountOwner: transaction.account_owner,
         };
 
         // Debug: Log category info for sample transactions
         if (Math.random() < 0.1) { // Log ~10% of transactions to avoid spam
           console.log(`🏷️ CATEGORY DEBUG for ${transaction.name}:`, {
-            rawCategory: transaction.category,
-            extractedCategory: transaction.category?.[0] || null,
-            categoryId: transaction.category_id,
-            subcategory: transaction.category?.[1] || null,
-            hasCategory: !!transaction.category
+            personalFinanceCategory: transaction.personal_finance_category,
+            legacyCategory: transaction.category,
+            extractedCategory: categoryName,
+            categoryId: categoryId,
+            subcategory: subcategory,
+            hasCategory: !!categoryName
           });
         }
 
