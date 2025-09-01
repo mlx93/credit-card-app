@@ -484,7 +484,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-none mx-auto px-9 py-4">
         {/* Header with title and Quick Actions */}
-        <div className="mb-3">
+        <div className="mb-3 max-w-5xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-1">Credit Card Dashboard</h1>
@@ -621,15 +621,17 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
               <p className="text-gray-600">Loading your credit cards...</p>
             </div>
           ) : displayCards.length > 0 ? (
-            <HorizontalCardColumns
-              cards={displayCards}
-              cycles={displayCycles}
-              onSync={handleCardSync}
-              onReconnect={handleCardReconnect}
-              onRemove={handleCardRemove}
-              initialCardOrder={sharedCardOrder}
-              onOrderChange={setSharedCardOrder}
-            />
+            <div className="relative -mx-7">
+              <HorizontalCardColumns
+                cards={displayCards}
+                cycles={displayCycles}
+                onSync={handleCardSync}
+                onReconnect={handleCardReconnect}
+                onRemove={handleCardRemove}
+                initialCardOrder={sharedCardOrder}
+                onOrderChange={setSharedCardOrder}
+              />
+            </div>
           ) : isLoggedIn ? (
             <div className="bg-white/50 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg p-12 text-center">
               <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
