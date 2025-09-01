@@ -1,5 +1,5 @@
 import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/utils/format';
-import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical, Edit3, Check, X } from 'lucide-react';
+import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical, Edit3, Check, X, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import {
   DndContext,
@@ -241,9 +241,29 @@ export function DueDateCard({
   const [editingLimit, setEditingLimit] = useState(false);
   const [limitInput, setLimitInput] = useState('');
   const [updatingLimit, setUpdatingLimit] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successPopupData, setSuccessPopupData] = useState<{
+    newLimit: number;
+    previousLimit: number | null;
+    plaidLimit: number | null;
+    newUtilization: number;
+    cardName: string;
+  } | null>(null);
   const daysUntilDue = card.nextPaymentDueDate ? getDaysUntil(card.nextPaymentDueDate) : null;
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
+  
+  // Auto-close success popup after 5 seconds
+  useEffect(() => {
+    if (showSuccessPopup) {
+      const timer = setTimeout(() => {
+        setShowSuccessPopup(false);
+        setSuccessPopupData(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessPopup]);
   
   // Determine credit limit logic
   const isManualLimit = card.ismanuallimit || false;
@@ -363,6 +383,11 @@ export function DueDateCard({
       if (response.ok && data.success) {
         console.log('✅ Credit limit updated successfully:', data.message);
         
+        // Calculate previous limit and new utilization for popup
+        const previousLimit = isManualLimit ? card.manualcreditlimit : null;
+        const plaidLimit = hasValidPlaidLimit ? card.balanceLimit : null;
+        const newUtilization = limit ? (Math.abs(card.balanceCurrent) / limit) * 100 : 0;
+        
         // Update the card data locally to avoid page reload
         if (data.card) {
           // Create updated card object with new manual limit
@@ -397,8 +422,15 @@ export function DueDateCard({
         setEditingLimit(false);
         setLimitInput('');
         
-        // Show success message
-        alert(data.message || 'Credit limit updated successfully');
+        // Show success popup instead of alert
+        setSuccessPopupData({
+          newLimit: limit!,
+          previousLimit,
+          plaidLimit,
+          newUtilization,
+          cardName: card.name
+        });
+        setShowSuccessPopup(true);
         
       } else {
         console.error('Failed to update credit limit:', data.error);
@@ -706,6 +738,63 @@ export function DueDateCard({
           </div>
         )}
       </div>
+
+      {/* Success Popup */}
+      {showSuccessPopup && successPopupData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowSuccessPopup(false)}
+          />
+          
+          {/* Popup */}
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 max-w-sm w-full mx-4 transform transition-all duration-200 scale-100">
+            {/* Success Icon and Header */}
+            <div className="text-center mb-4">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-3">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-1">Credit Limit Updated!</h3>
+              <p className="text-sm text-gray-600">{successPopupData.cardName}</p>
+            </div>
+            
+            {/* Main Info */}
+            <div className="bg-green-50 rounded-xl p-4 mb-4 border border-green-100">
+              <div className="text-center">
+                <p className="text-sm text-green-700 font-medium mb-1">New Credit Limit</p>
+                <p className="text-2xl font-bold text-green-800">{formatCurrency(successPopupData.newLimit)}</p>
+                <p className="text-sm text-green-600 mt-1">
+                  Utilization: {formatPercentage(successPopupData.newUtilization)}
+                </p>
+              </div>
+            </div>
+            
+            {/* Previous Info */}
+            {(successPopupData.previousLimit || successPopupData.plaidLimit) && (
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs text-gray-600 space-y-1">
+                {successPopupData.previousLimit && (
+                  <p>Previous manual limit: {formatCurrency(successPopupData.previousLimit)}</p>
+                )}
+                {successPopupData.plaidLimit && (
+                  <p>Plaid detected limit: {formatCurrency(successPopupData.plaidLimit)}</p>
+                )}
+                {!successPopupData.previousLimit && (
+                  <p>First time setting manual limit</p>
+                )}
+              </div>
+            )}
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setShowSuccessPopup(false)}
+              className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
