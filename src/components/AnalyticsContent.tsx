@@ -18,6 +18,7 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
   const [isAPRCalculatorOpen, setIsAPRCalculatorOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  const [isMonthlySpendExpanded, setIsMonthlySpendExpanded] = useState(false);
 
   const mockData = {
     totalSpendThisMonth: 4250.67,
@@ -318,11 +319,37 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Spending Trend</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Monthly Spending Trend</h2>
+              {!loading && displayData.monthlySpend?.length > (displayData.cardSpending?.length || 2) && (
+                <button
+                  onClick={() => setIsMonthlySpendExpanded(!isMonthlySpendExpanded)}
+                  className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200"
+                >
+                  {isMonthlySpendExpanded ? (
+                    <>
+                      <span>Show Recent Months</span>
+                      <ChevronUp className="h-4 w-4" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Show Older Months</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
             {loading ? (
               <p className="text-gray-500">Loading chart data...</p>
             ) : (
-              <SpendingChart data={displayData.monthlySpend} />
+              <SpendingChart 
+                data={
+                  isMonthlySpendExpanded 
+                    ? displayData.monthlySpend 
+                    : displayData.monthlySpend?.slice(0, displayData.cardSpending?.length || 2)
+                } 
+              />
             )}
           </div>
         </div>
