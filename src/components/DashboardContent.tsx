@@ -482,7 +482,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-none mx-auto px-8 py-6">
+      <div className="max-w-none mx-auto px-4 py-6">
         {/* Header with title and Quick Actions */}
         <div className="mb-3">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -543,7 +543,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         </div>
         
         {/* Header Metrics - utilizing more horizontal space */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 max-w-6xl">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
               <TrendingUp className="h-7 w-7 text-green-600 mr-3" />

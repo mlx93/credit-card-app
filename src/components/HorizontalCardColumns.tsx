@@ -227,73 +227,9 @@ export function HorizontalCardColumns({
         onOrderChange?.(cardIds);
       }
       
-      // Auto-expand cards with current or recently closed cycles
-      const cardsToExpand = new Set<string>();
-      const today = new Date();
-      
-      cardIds.forEach(cardId => {
-        const card = cards.find(c => c.id === cardId);
-        const cardCycles = getCardCycles(cardId);
-        
-        console.log(`🔍 Card expansion check for ${card?.name}:`, {
-          cardId,
-          cycleCount: cardCycles.length,
-          cycles: cardCycles.map(c => ({
-            start: c.startDate,
-            end: c.endDate,
-            hasStatement: !!(c.statementBalance && c.statementBalance > 0),
-            statementBalance: c.statementBalance
-          }))
-        });
-        
-        // Check if card has current ongoing cycle
-        const hasCurrentCycle = cardCycles.some(cycle => {
-          const start = new Date(cycle.startDate);
-          const end = new Date(cycle.endDate);
-          const isCurrent = today >= start && today <= end;
-          
-          if (isCurrent) {
-            console.log(`✅ Found current cycle for ${card?.name}:`, {
-              start: start.toDateString(),
-              end: end.toDateString(),
-              today: today.toDateString()
-            });
-          }
-          
-          return isCurrent;
-        });
-        
-        // Check if card has recently closed cycle (with statement balance)
-        const hasRecentClosedCycle = cardCycles.some(cycle => {
-          const end = new Date(cycle.endDate);
-          const hasStatement = cycle.statementBalance && cycle.statementBalance > 0;
-          const endedBeforeToday = end < today;
-          const isRecentClosed = hasStatement && endedBeforeToday;
-          
-          if (isRecentClosed) {
-            console.log(`✅ Found recent closed cycle for ${card?.name}:`, {
-              end: end.toDateString(),
-              statementBalance: cycle.statementBalance,
-              today: today.toDateString()
-            });
-          }
-          
-          return isRecentClosed;
-        });
-        
-        console.log(`Card expansion decision for ${card?.name}:`, {
-          hasCurrentCycle,
-          hasRecentClosedCycle,
-          willExpand: hasCurrentCycle || hasRecentClosedCycle
-        });
-        
-        // Expand cards that have current cycles or recently closed cycles
-        if (hasCurrentCycle || hasRecentClosedCycle) {
-          cardsToExpand.add(cardId);
-        }
-      });
-      
-      console.log('📋 Final cards to expand:', Array.from(cardsToExpand));
+      // Auto-expand ALL cards by default to show billing cycles
+      const cardsToExpand = new Set<string>(cardIds);
+      console.log('📋 Expanding all cards by default:', Array.from(cardsToExpand));
       setExpandedCards(cardsToExpand);
     } else {
       console.log('⏭️ Skipping card order initialization:', {
