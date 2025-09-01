@@ -44,7 +44,7 @@ export async function GET() {
       .from('transactions')
       .select(`
         *,
-        credit_cards(name)
+        credit_cards!inner(name, mask)
       `)
       .in('plaidItemId', plaidItemIds)
       .gte('date', last3MonthsStart.toISOString())
@@ -60,7 +60,8 @@ export async function GET() {
       ...t,
       date: new Date(t.date),
       creditCard: t.credit_cards ? {
-        name: t.credit_cards.name
+        name: t.credit_cards.name,
+        mask: t.credit_cards.mask
       } : null
     }));
 

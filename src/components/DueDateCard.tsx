@@ -653,17 +653,6 @@ export function DueDateCard({
                 )}
               </>
             )}
-            {/* Debug: Show edit status for troubleshooting */}
-            {(card.name?.includes('Platinum') || card.name?.includes('Quicksilver')) && (
-              <span className="text-xs text-red-500 ml-2">
-                Edit: {allowEditing ? 'YES' : 'NO'} | Mode: {editingLimit ? 'EDITING' : 'VIEW'}
-              </span>
-            )}
-            {!allowEditing && hasValidPlaidLimit && (
-              <span className="text-xs text-gray-500 ml-2">
-                🔒 Managed by Plaid
-              </span>
-            )}
           </div>
         </div>
         
