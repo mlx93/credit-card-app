@@ -608,32 +608,41 @@ export function DueDateCard({
           <div className="flex items-center gap-2">
             {hasValidEffectiveLimit && utilization > 0 ? (
               <>
-                <span>{formatPercentage(utilization)}</span>
                 {allowEditing && !editingLimit && (
                   <button
                     onClick={startEditingLimit}
-                    className="text-blue-500 hover:text-blue-700 p-1 rounded ml-2"
+                    className="text-blue-500 hover:text-blue-700 p-1 rounded"
                     title={isManualLimit ? "Edit manual credit limit" : "Set credit limit manually"}
                   >
                     <Edit3 className="h-3 w-3" />
                   </button>
                 )}
+                <span>{formatPercentage(utilization)}</span>
               </>
             ) : hasValidEffectiveLimit && utilization === 0 ? (
               <>
-                <span>0%</span>
                 {allowEditing && !editingLimit && (
                   <button
                     onClick={startEditingLimit}
-                    className="text-blue-500 hover:text-blue-700 p-1 rounded ml-2"
+                    className="text-blue-500 hover:text-blue-700 p-1 rounded"
                     title={isManualLimit ? "Edit manual credit limit" : "Set credit limit manually"}
                   >
                     <Edit3 className="h-3 w-3" />
                   </button>
                 )}
+                <span>0%</span>
               </>
             ) : (
               <>
+                {allowEditing && !editingLimit && (
+                  <button
+                    onClick={startEditingLimit}
+                    className="text-blue-500 hover:text-blue-700 p-1 rounded"
+                    title={isManualLimit ? "Edit manual credit limit" : "Set credit limit manually"}
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </button>
+                )}
                 <span className="text-gray-500 italic">
                   {hasValidPlaidLimit ? 'Plaid Limit Available' :
                    isManualLimit ? 'Manual Limit Set' :
@@ -642,15 +651,6 @@ export function DueDateCard({
                    card.balanceLimit === Infinity ? 'Infinite Limit' :
                    isNaN(card.balanceLimit) || !isFinite(card.balanceLimit) ? 'Invalid Limit' : 'No Limit Set'}
                 </span>
-                {allowEditing && !editingLimit && (
-                  <button
-                    onClick={startEditingLimit}
-                    className="text-blue-500 hover:text-blue-700 p-1 rounded ml-2"
-                    title={isManualLimit ? "Edit manual credit limit" : "Set credit limit manually"}
-                  >
-                    <Edit3 className="h-3 w-3" />
-                  </button>
-                )}
               </>
             )}
           </div>
