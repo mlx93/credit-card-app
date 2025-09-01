@@ -70,7 +70,6 @@ const paidOffColors = [
   'bg-teal-100 border-teal-300',
   'bg-red-100 border-red-300',
   'bg-gray-100 border-gray-300'
-  'bg-red-100 border-red-300 border-l-red-600'
 ];
 
 // Sortable Due Date Card Component
