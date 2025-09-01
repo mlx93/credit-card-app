@@ -20,7 +20,9 @@ export async function GET() {
       totalCreditCardsResult,
       totalTransactionsResult,
       totalBillingCyclesResult,
-      allUsersResult
+      allUsersResult,
+      usersSimpleResult,
+      plaidItemsDetailResult
     ] = await Promise.all([
       supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
       supabaseAdmin.from('plaid_items').select('*', { count: 'exact', head: true }),
@@ -37,7 +39,18 @@ export async function GET() {
           plaid_items(id)
         `)
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(20),
+      // Simple users query without relationships
+      supabaseAdmin
+        .from('users')
+        .select('id, email, name, created_at')
+        .order('created_at', { ascending: false })
+        .limit(20),
+      // Get plaid items with user info
+      supabaseAdmin
+        .from('plaid_items')
+        .select('id, userId, institutionName, status')
+        .limit(10)
     ]);
     
     // Extract counts from results
@@ -47,9 +60,26 @@ export async function GET() {
     const totalTransactions = totalTransactionsResult.count || 0;
     const totalBillingCycles = totalBillingCyclesResult.count || 0;
     const allUsers = allUsersResult.data || [];
+    const usersSimple = usersSimpleResult.data || [];
+    const plaidItemsDetail = plaidItemsDetailResult.data || [];
     
     // Calculate users with connections properly by checking plaid_items array
-    const usersWithPlaidItems = allUsers.filter(user => user.plaid_items && user.plaid_items.length > 0).length;
+    const usersWithPlaidItems = usersSimple.filter(user => {
+      const userPlaidItems = plaidItemsDetail.filter(item => item.userId === user.id);
+      return userPlaidItems.length > 0;
+    }).length;
+    
+    // Debug logging
+    console.log('🔍 DEBUG INFO:', {
+      allUsersCount: allUsers.length,
+      usersSimpleCount: usersSimple.length,
+      allUsersResult: allUsers,
+      usersSimpleResult: usersSimple,
+      plaidItemsDetail,
+      allUsersError: allUsersResult.error,
+      usersSimpleError: usersSimpleResult.error,
+      plaidItemsError: plaidItemsDetailResult.error
+    });
     
     // Handle any errors
     if (totalUsersResult.error) console.error('Error counting users:', totalUsersResult.error);
@@ -86,14 +116,29 @@ export async function GET() {
         avgTransactionsPerCard: totalCreditCards > 0 ? Math.round(totalTransactions / totalCreditCards) : 0,
         avgCyclesPerCard: totalCreditCards > 0 ? Math.round(totalBillingCycles / totalCreditCards) : 0
       },
-      allUsers: allUsers.map(user => ({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        createdAt: user.created_at,
-        plaidItems: user.plaid_items?.length || 0,
-        isCurrentUser: user.id === session.user.id
-      }))
+      allUsers: usersSimple.map(user => {
+        // Find matching plaid items for this user
+        const userPlaidItems = plaidItemsDetail.filter(item => item.userId === user.id);
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          createdAt: user.created_at,
+          plaidItems: userPlaidItems.length,
+          plaidItemsDetail: userPlaidItems,
+          isCurrentUser: user.id === session.user.id
+        };
+      }),
+      debug: {
+        allUsersFromRelationQuery: allUsers,
+        usersSimple: usersSimple,
+        plaidItemsDetail: plaidItemsDetail,
+        errors: {
+          allUsers: allUsersResult.error,
+          usersSimple: usersSimpleResult.error,
+          plaidItems: plaidItemsDetailResult.error
+        }
+      }
     };
 
     console.log('📊 USER STATS:', stats);
