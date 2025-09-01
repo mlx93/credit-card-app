@@ -585,7 +585,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         
         {/* Instruction text aligned with header metrics */}
         <div className="mb-4">
-          <p className="text-gray-600 text-sm">Swipe horizontally to see all your cards • Expand to view billing cycles</p>
+          <p className="text-gray-600 text-base">Swipe horizontally to see all your cards • Expand to view billing cycles</p>
         </div>
         </div>
 
