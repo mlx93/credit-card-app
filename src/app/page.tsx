@@ -6,6 +6,16 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto text-center">
+          {/* Go to Dashboard button at the top */}
+          <div className="mb-12">
+            <Link 
+              href="/dashboard"
+              className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 py-4 rounded-lg transition-colors text-lg shadow-lg"
+            >
+              Go to Dashboard
+            </Link>
+          </div>
+          
           <div className="flex justify-center mb-8">
             <div className="bg-white p-4 rounded-full shadow-lg">
               <CreditCard className="h-16 w-16 text-indigo-600" />
@@ -59,17 +69,18 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="space-y-4">
-            <Link 
-              href="/dashboard"
-              className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 py-4 rounded-lg transition-colors text-lg shadow-lg"
-            >
-              Go to Dashboard
-            </Link>
-            
+          <div className="mt-12 space-y-4">
             <div className="text-sm text-gray-500">
               <p>Connect your credit cards securely through Plaid</p>
             </div>
+            
+            {/* Secondary CTA */}
+            <Link 
+              href="/dashboard"
+              className="inline-block text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+            >
+              Start Managing Your Cards →
+            </Link>
           </div>
         </div>
       </div>
