@@ -482,7 +482,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-none mx-auto px-2 py-4">
+      <div className="max-w-none mx-auto px-9 py-4">
         {/* Header with title and Quick Actions */}
         <div className="mb-3">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -543,7 +543,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         </div>
         
         {/* Header Metrics - utilizing more horizontal space */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
               <TrendingUp className="h-7 w-7 text-green-600 mr-3" />
@@ -581,6 +582,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             </div>
           </div>
         </div>
+        </div>
 
         {!isLoggedIn && (
           <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -607,9 +609,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent">
-                Credit Card Dashboard
-              </h2>
               <p className="text-gray-600 mt-1">Swipe horizontally to see all your cards • Expand to view billing cycles</p>
             </div>
           </div>

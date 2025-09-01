@@ -68,6 +68,14 @@ export async function GET() {
       t.date >= currentMonthStart && t.date <= currentMonthEnd
     );
 
+    // Debug logging to understand what data we have
+    console.log('🔍 ANALYTICS DEBUG:', {
+      totalTransactions: formattedTransactions.length,
+      thisMonthCount: thisMonthTransactions.length,
+      sampleTransaction: formattedTransactions[0],
+      availableFields: formattedTransactions[0] ? Object.keys(formattedTransactions[0]) : []
+    });
+
     const totalSpendThisMonth = thisMonthTransactions.reduce((sum, t) => 
       sum + Math.abs(t.amount), 0
     );
