@@ -809,10 +809,21 @@ function CardContent({
                 });
                 onToggleExpand();
               }}
-              className="flex items-center text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 mb-2 ml-2 mr-2"
+              className="group relative flex items-center justify-between w-full text-sm text-gray-500 hover:text-gray-700 bg-gradient-to-r from-gray-50/80 to-white/90 hover:from-gray-100/90 hover:to-gray-50/80 px-4 py-3 rounded-xl border border-gray-100 hover:border-gray-200 transition-all duration-300 mb-3 mx-2 shadow-sm hover:shadow-md backdrop-blur-sm"
             >
-              {isExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}
-              {historical.length} older cycle{historical.length !== 1 ? 's' : ''}
+              <div className="flex items-center">
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 group-hover:from-gray-300 group-hover:to-gray-400 mr-3 transition-all duration-300 ${isExpanded ? 'rotate-90' : ''}`}>
+                  <ChevronRight className="h-3 w-3 text-gray-600 group-hover:text-gray-700" />
+                </div>
+                <span className="font-medium">
+                  {historical.length} older cycle{historical.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              
+              <div className="flex items-center text-xs text-gray-400 group-hover:text-gray-500">
+                <History className="h-3.5 w-3.5 mr-1" />
+                <span>{isExpanded ? 'Hide' : 'View'}</span>
+              </div>
             </button>
           )}
               </div>
