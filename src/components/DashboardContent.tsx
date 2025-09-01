@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2 } from 'lucide-react';
-import { formatCurrency } from '@/utils/format';
+import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2, CheckCircle } from 'lucide-react';
+import { formatCurrency, formatPercentage } from '@/utils/format';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard, DueDateCards } from '@/components/DueDateCard';
 import { HorizontalCardColumns } from '@/components/HorizontalCardColumns';
@@ -27,6 +27,14 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     linkToken: string;
     institutionName: string;
     itemId: string;
+  } | null>(null);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successPopupData, setSuccessPopupData] = useState<{
+    newLimit: number;
+    previousLimit: number | null;
+    plaidLimit: number | null;
+    newUtilization: number;
+    cardName: string;
   } | null>(null);
 
   // Create consistent default card ordering based on due dates and card names
@@ -320,6 +328,17 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   };
 
 
+  const handleCreditLimitUpdated = (data: {
+    newLimit: number;
+    previousLimit: number | null;
+    plaidLimit: number | null;
+    newUtilization: number;
+    cardName: string;
+  }) => {
+    setSuccessPopupData(data);
+    setShowSuccessPopup(true);
+  };
+
   const handleCardRemove = async (itemId: string) => {
     const confirmed = window.confirm(
       'Are you sure you want to remove this credit card connection? This will delete all associated data and cannot be undone.'
@@ -397,6 +416,18 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     // Check connection health after initial data load
     setTimeout(checkConnectionHealth, 1000);
   }, [isLoggedIn]);
+
+  // Auto-close success popup after 5 seconds
+  useEffect(() => {
+    if (showSuccessPopup) {
+      const timer = setTimeout(() => {
+        setShowSuccessPopup(false);
+        setSuccessPopupData(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessPopup]);
 
   // Listen for credit limit updates
   useEffect(() => {
@@ -628,6 +659,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 onSync={handleCardSync}
                 onReconnect={handleCardReconnect}
                 onRemove={handleCardRemove}
+                onCreditLimitUpdated={handleCreditLimitUpdated}
                 initialCardOrder={sharedCardOrder}
                 onOrderChange={setSharedCardOrder}
               />
@@ -669,6 +701,63 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             setUpdateFlow(null);
           }}
         />
+      )}
+
+      {/* Credit Limit Success Popup - Overlays entire Dashboard */}
+      {showSuccessPopup && successPopupData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowSuccessPopup(false)}
+          />
+          
+          {/* Popup */}
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 max-w-sm w-full mx-4 transform transition-all duration-200 scale-100">
+            {/* Success Icon and Header */}
+            <div className="text-center mb-4">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-3">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-1">Credit Limit Updated!</h3>
+              <p className="text-sm text-gray-600">{successPopupData.cardName}</p>
+            </div>
+            
+            {/* Main Info */}
+            <div className="bg-green-50 rounded-xl p-4 mb-4 border border-green-100">
+              <div className="text-center">
+                <p className="text-sm text-green-700 font-medium mb-1">New Credit Limit</p>
+                <p className="text-2xl font-bold text-green-800">{formatCurrency(successPopupData.newLimit)}</p>
+                <p className="text-sm text-green-600 mt-1">
+                  Utilization: {formatPercentage(successPopupData.newUtilization)}
+                </p>
+              </div>
+            </div>
+            
+            {/* Previous Info */}
+            {(successPopupData.previousLimit || successPopupData.plaidLimit) && (
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs text-gray-600 space-y-1">
+                {successPopupData.previousLimit && (
+                  <p>Previous manual limit: {formatCurrency(successPopupData.previousLimit)}</p>
+                )}
+                {successPopupData.plaidLimit && (
+                  <p>Plaid detected limit: {formatCurrency(successPopupData.plaidLimit)}</p>
+                )}
+                {!successPopupData.previousLimit && (
+                  <p>First time setting manual limit</p>
+                )}
+              </div>
+            )}
+            
+            {/* OK Button */}
+            <button
+              onClick={() => setShowSuccessPopup(false)}
+              className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            >
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

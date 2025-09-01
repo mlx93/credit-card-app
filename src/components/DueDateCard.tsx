@@ -46,6 +46,13 @@ interface DueDateCardProps {
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
   onSync?: (itemId: string) => void;
+  onCreditLimitUpdated?: (data: {
+    newLimit: number;
+    previousLimit: number | null;
+    plaidLimit: number | null;
+    newUtilization: number;
+    cardName: string;
+  }) => void;
 }
 
 // Darker shades for Due Date cards to distinguish from Billing Cycles
@@ -78,7 +85,8 @@ function SortableDueDateCard({
   colorIndex = 0,
   onReconnect,
   onRemove,
-  onSync
+  onSync,
+  onCreditLimitUpdated
 }: DueDateCardProps) {
   const {
     attributes,
@@ -103,6 +111,7 @@ function SortableDueDateCard({
         onReconnect={onReconnect}
         onRemove={onRemove}
         onSync={onSync}
+        onCreditLimitUpdated={onCreditLimitUpdated}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
@@ -117,9 +126,16 @@ interface DueDateCardsProps {
   onSync?: (itemId: string) => void;
   onOrderChange?: (cardOrder: string[]) => void;
   initialCardOrder?: string[];
+  onCreditLimitUpdated?: (data: {
+    newLimit: number;
+    previousLimit: number | null;
+    plaidLimit: number | null;
+    newUtilization: number;
+    cardName: string;
+  }) => void;
 }
 
-export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChange, initialCardOrder }: DueDateCardsProps) {
+export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChange, initialCardOrder, onCreditLimitUpdated }: DueDateCardsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
 
   // Initialize card order only once when component mounts or when cards first become available
@@ -219,6 +235,7 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChan
                 onReconnect={onReconnect}
                 onRemove={onRemove}
                 onSync={onSync}
+                onCreditLimitUpdated={onCreditLimitUpdated}
               />
             );
           })}
@@ -234,6 +251,7 @@ export function DueDateCard({
   onReconnect, 
   onRemove, 
   onSync,
+  onCreditLimitUpdated,
   dragHandleProps 
 }: DueDateCardProps & { dragHandleProps?: any }) {
   const [syncing, setSyncing] = useState(false);
@@ -241,29 +259,10 @@ export function DueDateCard({
   const [editingLimit, setEditingLimit] = useState(false);
   const [limitInput, setLimitInput] = useState('');
   const [updatingLimit, setUpdatingLimit] = useState(false);
-  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-  const [successPopupData, setSuccessPopupData] = useState<{
-    newLimit: number;
-    previousLimit: number | null;
-    plaidLimit: number | null;
-    newUtilization: number;
-    cardName: string;
-  } | null>(null);
   const daysUntilDue = card.nextPaymentDueDate ? getDaysUntil(card.nextPaymentDueDate) : null;
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
   
-  // Auto-close success popup after 5 seconds
-  useEffect(() => {
-    if (showSuccessPopup) {
-      const timer = setTimeout(() => {
-        setShowSuccessPopup(false);
-        setSuccessPopupData(null);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessPopup]);
   
   // Determine credit limit logic
   const isManualLimit = card.ismanuallimit || false;
@@ -314,8 +313,11 @@ export function DueDateCard({
   // Connection status logic
   const connectionStatus = card.plaidItem?.status || 'unknown';
   const hasConnectionIssue = ['error', 'expired', 'disconnected'].includes(connectionStatus);
-  const lastSyncDaysAgo = card.plaidItem?.lastSyncAt ? 
-    Math.max(0, Math.floor((new Date().getTime() - new Date(card.plaidItem.lastSyncAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
+  const lastSyncTime = card.plaidItem?.lastSyncAt ? new Date(card.plaidItem.lastSyncAt) : null;
+  const lastSyncDaysAgo = lastSyncTime ? 
+    Math.max(0, Math.floor((new Date().getTime() - lastSyncTime.getTime()) / (1000 * 60 * 60 * 24))) : null;
+  const lastSyncHoursAgo = lastSyncTime ? 
+    Math.max(0, Math.floor((new Date().getTime() - lastSyncTime.getTime()) / (1000 * 60 * 60))) : null;
   const isStale = lastSyncDaysAgo !== null && lastSyncDaysAgo > 14; // Consider stale if no sync in 14+ days (was 7 days)
   
   // Debug logging for staleness detection
@@ -422,15 +424,16 @@ export function DueDateCard({
         setEditingLimit(false);
         setLimitInput('');
         
-        // Show success popup instead of alert
-        setSuccessPopupData({
-          newLimit: limit!,
-          previousLimit,
-          plaidLimit,
-          newUtilization,
-          cardName: card.name
-        });
-        setShowSuccessPopup(true);
+        // Call callback to show popup at Dashboard level
+        if (onCreditLimitUpdated) {
+          onCreditLimitUpdated({
+            newLimit: limit!,
+            previousLimit,
+            plaidLimit,
+            newUtilization,
+            cardName: card.name
+          });
+        }
         
       } else {
         console.error('Failed to update credit limit:', data.error);
@@ -483,8 +486,11 @@ export function DueDateCard({
                 <p className="text-xs text-gray-500">
                   {hasConnectionIssue ? (
                     <span className="text-red-600">Connection: {connectionStatus}</span>
-                  ) : lastSyncDaysAgo !== null ? (
-                    <span>Last sync: {lastSyncDaysAgo === 0 ? 'Today' : `${lastSyncDaysAgo}d ago`}</span>
+                  ) : lastSyncDaysAgo !== null && lastSyncHoursAgo !== null ? (
+                    <span>Last sync: {lastSyncDaysAgo === 0 ? 
+                      (lastSyncHoursAgo === 0 ? 'Just now' : `${lastSyncHoursAgo}h ago`) : 
+                      `${lastSyncDaysAgo}d ago`
+                    }</span>
                   ) : (
                     <span>Never synced</span>
                   )}
@@ -738,63 +744,6 @@ export function DueDateCard({
           </div>
         )}
       </div>
-
-      {/* Success Popup */}
-      {showSuccessPopup && successPopupData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-            onClick={() => setShowSuccessPopup(false)}
-          />
-          
-          {/* Popup */}
-          <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 max-w-sm w-full mx-4 transform transition-all duration-200 scale-100">
-            {/* Success Icon and Header */}
-            <div className="text-center mb-4">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-3">
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-1">Credit Limit Updated!</h3>
-              <p className="text-sm text-gray-600">{successPopupData.cardName}</p>
-            </div>
-            
-            {/* Main Info */}
-            <div className="bg-green-50 rounded-xl p-4 mb-4 border border-green-100">
-              <div className="text-center">
-                <p className="text-sm text-green-700 font-medium mb-1">New Credit Limit</p>
-                <p className="text-2xl font-bold text-green-800">{formatCurrency(successPopupData.newLimit)}</p>
-                <p className="text-sm text-green-600 mt-1">
-                  Utilization: {formatPercentage(successPopupData.newUtilization)}
-                </p>
-              </div>
-            </div>
-            
-            {/* Previous Info */}
-            {(successPopupData.previousLimit || successPopupData.plaidLimit) && (
-              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs text-gray-600 space-y-1">
-                {successPopupData.previousLimit && (
-                  <p>Previous manual limit: {formatCurrency(successPopupData.previousLimit)}</p>
-                )}
-                {successPopupData.plaidLimit && (
-                  <p>Plaid detected limit: {formatCurrency(successPopupData.plaidLimit)}</p>
-                )}
-                {!successPopupData.previousLimit && (
-                  <p>First time setting manual limit</p>
-                )}
-              </div>
-            )}
-            
-            {/* Close Button */}
-            <button
-              onClick={() => setShowSuccessPopup(false)}
-              className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-            >
-              Got it!
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
   );

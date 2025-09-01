@@ -225,7 +225,7 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="mb-8">
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Spending Trend</h2>
             {loading ? (
@@ -234,7 +234,9 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
               <SpendingChart data={displayData.monthlySpend} />
             )}
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Category Breakdown</h2>
             {loading ? (
@@ -247,9 +249,7 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
               <CategoryBreakdown categories={displayData.categories} />
             )}
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Spending by Card</h2>
             {loading ? (
@@ -282,7 +282,9 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
               </div>
             )}
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Comparison</h2>
             {loading ? (
@@ -294,6 +296,9 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
               />
             )}
           </div>
+
+          {/* Empty placeholder to maintain grid layout */}
+          <div></div>
         </div>
 
         {/* APR Cost Calculator - Expandable Section */}

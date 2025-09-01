@@ -46,6 +46,13 @@ interface HorizontalCardColumnsProps {
   onRemove?: (itemId: string) => void;
   initialCardOrder?: string[];
   onOrderChange?: (cardOrder: string[]) => void;
+  onCreditLimitUpdated?: (data: {
+    newLimit: number;
+    previousLimit: number | null;
+    plaidLimit: number | null;
+    newUtilization: number;
+    cardName: string;
+  }) => void;
 }
 
 interface SortableCardColumnProps {
@@ -122,6 +129,7 @@ function SortableCardColumn({
               onSync={onSync}
               onReconnect={onReconnect}
               onRemove={onRemove}
+              onCreditLimitUpdated={onCreditLimitUpdated}
             />
 
             {/* Expand/Collapse Button - iOS Style */}
@@ -187,7 +195,8 @@ export function HorizontalCardColumns({
   onReconnect, 
   onRemove, 
   initialCardOrder, 
-  onOrderChange 
+  onOrderChange,
+  onCreditLimitUpdated 
 }: HorizontalCardColumnsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
   // Initialize with all cards expanded by default
