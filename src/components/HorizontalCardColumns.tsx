@@ -289,15 +289,16 @@ export function HorizontalCardColumns({
   };
 
   const getBillingCycleGradient = (colorIndex: number): string => {
+    // Lighter gradients that match the due date card colors
     const gradients = [
-      'from-blue-300 to-blue-500',      // blue
-      'from-green-300 to-green-500',    // green
-      'from-purple-300 to-purple-500',  // purple
-      'from-orange-300 to-orange-500',  // orange
-      'from-pink-300 to-pink-500',      // pink
-      'from-indigo-300 to-indigo-500',  // indigo
-      'from-teal-300 to-teal-500',      // teal
-      'from-red-300 to-red-500'         // red
+      'from-blue-200 to-blue-400',      // blue - matches due date card
+      'from-green-200 to-green-400',    // green - matches due date card
+      'from-purple-200 to-purple-400',  // purple - matches due date card
+      'from-orange-200 to-orange-400',  // orange - matches due date card
+      'from-pink-200 to-pink-400',      // pink - matches due date card
+      'from-indigo-200 to-indigo-400',  // indigo - matches due date card
+      'from-teal-200 to-teal-400',      // teal - matches due date card
+      'from-red-200 to-red-400'         // red - matches due date card
     ];
     return gradients[colorIndex % gradients.length];
   };

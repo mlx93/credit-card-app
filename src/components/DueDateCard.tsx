@@ -60,6 +60,19 @@ const cardColors = [
   'bg-red-100 border-red-300 border-l-red-600'
 ];
 
+// Alternative colors for paid off cards (avoiding green)
+const paidOffColors = [
+  'bg-blue-100 border-blue-300',
+  'bg-purple-100 border-purple-300',
+  'bg-orange-100 border-orange-300', 
+  'bg-pink-100 border-pink-300',
+  'bg-indigo-100 border-indigo-300',
+  'bg-teal-100 border-teal-300',
+  'bg-red-100 border-red-300',
+  'bg-gray-100 border-gray-300'
+  'bg-red-100 border-red-300 border-l-red-600'
+];
+
 // Sortable Due Date Card Component
 function SortableDueDateCard({
   card,
@@ -436,14 +449,22 @@ export function DueDateCard({
           {/* Due Date Box - Right Aligned */}
           <div className="flex-shrink-0">
             {isPaidOff ? (
-              <div className="relative px-4 py-3 rounded-xl border-2 border-green-400 bg-gradient-to-b from-green-50 to-green-100 shadow-md text-center min-w-[90px]">
-                <div className="flex flex-col items-center justify-center">
-                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center mb-1">
-                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <div 
+                className={`relative px-3 py-2 rounded-xl border shadow-sm text-center ${paidOffColors[colorIndex % paidOffColors.length]}`}
+                style={{
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
+                  minWidth: '90px',
+                  minHeight: '64px' // Match due date box height
+                }}
+              >
+                <div className="flex flex-col items-center justify-center h-full">
+                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mb-1">
+                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <p className="text-xs font-semibold text-green-700">All Paid</p>
+                  <p className="text-xs font-semibold text-gray-700">All Paid</p>
                 </div>
               </div>
             ) : card.nextPaymentDueDate ? (
