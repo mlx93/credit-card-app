@@ -156,7 +156,7 @@ export async function GET(request: Request) {
     }, 0);
 
     const monthlySpend = [];
-    for (let i = 3; i >= 0; i--) {
+    for (let i = 11; i >= 0; i--) {
       const monthStart = startOfMonth(subMonths(now, i));
       const monthEnd = endOfMonth(subMonths(now, i));
       
