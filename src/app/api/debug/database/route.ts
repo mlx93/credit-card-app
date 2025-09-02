@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireAdminWithSession } from '@/lib/adminSecurity';
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  // Security check - admin only
+  const { session, error: securityError } = await requireAdminWithSession(request, {
+    endpointName: 'debug/database',
+    requireDebugKey: true,
+    logAccess: true
+  });
+  if (securityError) return securityError;
 
-    // Get user's Plaid items
+  try {
+    // Get user's Plaid items (admin can see all data for debugging)
     const { data: plaidItems, error: plaidError } = await supabaseAdmin
       .from('plaid_items')
       .select('id, item_id, institution_name')

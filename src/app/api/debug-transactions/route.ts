@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireAdminAccess } from '@/lib/adminSecurity';
 
 // Payment detection function (copied from billingCycles.ts)
 function isPaymentTransaction(transactionName: string): boolean {
@@ -12,6 +13,13 @@ function isPaymentTransaction(transactionName: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-transactions',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     console.log('🔍 Debugging transaction data and billing cycle calculations...');
     
