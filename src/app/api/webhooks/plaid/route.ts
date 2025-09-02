@@ -3,18 +3,47 @@ import { plaidClient } from '@/lib/plaid';
 import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
+import crypto from 'crypto';
 
 // In-memory store for tracking recent webhook processing
 // This prevents duplicate processing when multiple webhooks arrive simultaneously
 const recentWebhooks = new Map<string, number>();
 const WEBHOOK_DEDUP_WINDOW = 10000; // 10 seconds
 
+function verifyPlaidWebhook(body: string, signature: string): boolean {
+  const webhookSecret = process.env.PLAID_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error('PLAID_WEBHOOK_SECRET not configured');
+    return false;
+  }
+
+  const expectedSignature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(body)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Get raw body for signature verification
+    const rawBody = await request.text();
+    const signature = request.headers.get('plaid-verification') || '';
+    
+    // Verify webhook signature for security
+    if (!verifyPlaidWebhook(rawBody, signature)) {
+      console.error('🚫 Invalid webhook signature - potential security threat');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const body = JSON.parse(rawBody);
     const { webhook_type, webhook_code, item_id, error } = body;
 
-    console.log('Plaid webhook received:', { webhook_type, webhook_code, item_id });
+    console.log('✅ Verified Plaid webhook received:', { webhook_type, webhook_code, item_id });
 
     if (error) {
       console.error('Plaid webhook error:', error);
