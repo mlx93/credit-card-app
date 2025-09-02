@@ -33,6 +33,9 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
+          console.log('🔐 Auth: Attempting to verify code for:', credentials.email);
+          console.log('🔐 Auth: Received code:', credentials.code);
+          
           // First try to get verification code from verification_tokens table
           let verification: any = null;
           let verifyError: any = null;
@@ -43,9 +46,13 @@ export const authOptions: NextAuthOptions = {
             .eq('identifier', credentials.email)
             .single();
             
+          console.log('🔐 Auth: verification_tokens query result:', { tokenData, tokenError });
+            
           if (!tokenError && tokenData) {
             verification = tokenData;
+            console.log('🔐 Auth: Found code in verification_tokens table');
           } else {
+            console.log('🔐 Auth: Checking users table fallback...');
             // Fallback: Check users table for verification code
             const { data: userData, error: userError } = await supabase
               .from('users')
@@ -53,25 +60,40 @@ export const authOptions: NextAuthOptions = {
               .eq('email', credentials.email)
               .single();
               
+            console.log('🔐 Auth: users table query result:', { userData, userError });
+              
             if (!userError && userData && userData.verificationCode) {
               verification = {
                 token: userData.verificationCode,
                 expires: userData.verificationExpires
               };
+              console.log('🔐 Auth: Found code in users table');
             }
           }
 
           if (!verification) {
-            console.log('No verification code found for:', credentials.email);
+            console.log('❌ Auth: No verification code found for:', credentials.email);
             return null;
           }
+
+          console.log('🔐 Auth: Verification data:', {
+            storedToken: verification.token,
+            submittedCode: credentials.code,
+            expires: verification.expires,
+            currentTime: new Date().toISOString(),
+            isExpired: new Date() > new Date(verification.expires)
+          });
 
           // Check if code matches and is not expired
           if (verification.token !== credentials.code || 
               new Date() > new Date(verification.expires)) {
-            console.log('Invalid or expired code for:', credentials.email);
+            console.log('❌ Auth: Invalid or expired code for:', credentials.email);
+            console.log('❌ Auth: Code match:', verification.token === credentials.code);
+            console.log('❌ Auth: Not expired:', new Date() <= new Date(verification.expires));
             return null;
           }
+          
+          console.log('✅ Auth: Code verified successfully!');
 
           // Code is valid! Get or create user
           const { data: existingUser } = await supabase
