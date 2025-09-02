@@ -5,7 +5,7 @@ import { plaidClient } from '@/lib/plaid';
 import { LinkTokenCreateRequest } from 'plaid';
 
 import { requireAdminAccess } from '@/lib/adminSecurity';
-export async function POST() {{
+export async function POST(request: NextRequest) {
   // Security check - admin only
   const securityError = await requireAdminAccess(request, {
     endpointName: 'debug-link-token-test',

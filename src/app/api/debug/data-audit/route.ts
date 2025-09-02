@@ -25,7 +25,7 @@ function isPaymentTransaction(transactionName: string): boolean {
   return paymentIndicators.some(indicator => lowerName.includes(indicator));
 }
 
-export async function POST() {{
+export async function POST(request: NextRequest) {
   // Security check - admin only
   const securityError = await requireAdminAccess(request, {
     endpointName: 'debug-data-audit',
