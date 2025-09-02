@@ -98,6 +98,15 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
   const cycleEnded = new Date(cycle.endDate) < today;
   const wasStatementPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
   
+  // Debug logging for payment status detection
+  console.log(`🔍 Payment status debug for ${cycle.creditCardName} ending ${cycle.endDate}:`, {
+    minimumPayment: cycle.minimumPayment,
+    statementBalance: cycle.statementBalance,
+    hasZeroBalance,
+    cycleEnded,
+    wasStatementPaidOff
+  });
+  
   if (hasZeroBalance && cycleEnded) {
     paymentStatus = 'paid';
     paymentAnalysis = 'Paid - card has $0 balance';
@@ -106,6 +115,7 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
   else if (wasStatementPaidOff && cycleEnded) {
     paymentStatus = 'paid';
     paymentAnalysis = 'Paid - statement balance was paid off';
+    console.log(`✅ Green checkmark applied to cycle ${cycle.creditCardName} ending ${cycle.endDate} - minimumPayment = ${cycle.minimumPayment}`);
   }
   // Only analyze cycles with statement balances when we have full data
   else if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {

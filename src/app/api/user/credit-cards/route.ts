@@ -142,9 +142,15 @@ export async function GET() {
         },
       };
       
-      // Apply payment detection to adjust statement balance
+      // Apply payment detection to adjust statement balance and minimum payment
       if (adjustedCard.lastStatementBalance) {
+        const originalStatementBalance = adjustedCard.lastStatementBalance;
         adjustedCard.lastStatementBalance = calculateRemainingStatementBalance(card);
+        
+        // If statement balance was reduced to 0, set minimum payment to 0 as well
+        if (originalStatementBalance > 0 && adjustedCard.lastStatementBalance === 0) {
+          adjustedCard.minimumPaymentAmount = 0;
+        }
       }
       
       return adjustedCard;

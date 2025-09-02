@@ -295,6 +295,7 @@ async function createOrUpdateCycle(
           const remainingStatementBalance = Math.max(0, originalStatementBalance - totalPayments);
           if (remainingStatementBalance === 0) {
             minimumPayment = 0;
+            console.log(`✅ Setting minimumPayment = 0 for ${creditCard.name} cycle ending ${cycleEnd.toDateString()}`);
           }
         }
       }
