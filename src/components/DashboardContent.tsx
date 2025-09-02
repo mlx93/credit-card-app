@@ -61,7 +61,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'mock-card-1',
       name: 'Chase Sapphire Preferred',
       mask: '1234',
-      balanceCurrent: -2450.75,
+      balanceCurrent: -2650.75, // Higher than statement balance (1850.25) + current spending
       balanceLimit: 15000,
       nextPaymentDueDate: '2025-08-15', // Due in future
       minimumPaymentAmount: 125.00,
@@ -70,7 +70,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'mock-card-2', 
       name: 'Capital One Venture',
       mask: '5678',
-      balanceCurrent: -895.42,
+      balanceCurrent: -895.42, // Matches current statement balance for this example
       balanceLimit: 10000,
       nextPaymentDueDate: '2025-09-20', // Due in future
       minimumPaymentAmount: 45.00,
@@ -79,7 +79,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'mock-card-3',
       name: 'American Express Gold',
       mask: '9012',
-      balanceCurrent: -1245.89,
+      balanceCurrent: -1545.89, // Higher than outstanding statement (1245.89) + new spending
       balanceLimit: 8000,
       nextPaymentDueDate: '2025-08-10', // Overdue (past due from August - a few weeks late)
       minimumPaymentAmount: 85.00,
@@ -87,10 +87,24 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   ];
 
   const mockCycles = [
-    // Current/Recent Cycles - Chase Sapphire Preferred (Active statement balance, due in future)
+    // OPEN/CURRENT Cycle - Chase Sapphire Preferred (ongoing, no statement balance yet)
+    {
+      id: 'cycle-current-1',
+      creditCardId: 'mock-card-1',
+      creditCardName: 'Chase Sapphire Preferred',
+      startDate: '2025-08-16',
+      endDate: '2025-09-15', // Currently open cycle
+      totalSpend: 800.50, // Current spending in open cycle
+      transactionCount: 12,
+      // No dueDate yet - cycle not closed
+      // No statementBalance yet - cycle still open
+      paymentStatus: 'current',
+    },
+    // CLOSED Cycle - Chase Sapphire Preferred (Active statement balance, due in future)
     {
       id: 'cycle-1',
       creditCardId: 'mock-card-1',
+      creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-07-16',
       endDate: '2025-08-15',
       totalSpend: 1850.25,

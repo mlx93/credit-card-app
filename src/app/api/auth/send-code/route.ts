@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       console.log('Attempting fallback to users table...');
       
       // Fallback: Store in users table temporarily
+      console.log('💾 Storing code in users table:', { email, code, expires });
       const { error: userError } = await supabase
         .from('users')
         .upsert({
@@ -64,6 +65,8 @@ export async function POST(request: NextRequest) {
         }, {
           onConflict: 'email'
         });
+        
+      console.log('💾 Users table upsert result:', { userError });
         
       if (userError) {
         console.error('Users table error:', userError);
