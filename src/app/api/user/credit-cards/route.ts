@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isPaymentTransaction } from '@/utils/billingCycles';
 
 export async function GET() {
   try {
@@ -49,19 +50,27 @@ export async function GET() {
       throw new Error(`Failed to fetch APRs: ${aprsError.message}`);
     }
 
-    // Get transaction counts for each credit card
+    // Get transactions for payment detection and counting
     const transactionCounts = new Map();
+    const transactionsByCard = new Map();
     if (creditCardIds.length > 0) {
       const { data: transactions, error: transactionError } = await supabaseAdmin
         .from('transactions')
-        .select('creditCardId')
+        .select('creditCardId, name, amount, date, authorizedDate')
         .in('creditCardId', creditCardIds)
-        .not('creditCardId', 'is', null);
+        .not('creditCardId', 'is', null)
+        .order('date', { ascending: false });
 
       if (!transactionError && transactions) {
         transactions.forEach(t => {
+          // Count transactions
           const count = transactionCounts.get(t.creditCardId) || 0;
           transactionCounts.set(t.creditCardId, count + 1);
+          
+          // Group transactions by card for payment detection
+          const cardTransactions = transactionsByCard.get(t.creditCardId) || [];
+          cardTransactions.push(t);
+          transactionsByCard.set(t.creditCardId, cardTransactions);
         });
       }
     }
@@ -79,15 +88,67 @@ export async function GET() {
       aprMap.set(apr.creditCardId, cardAprs);
     });
 
-    // Combine all data
-    const formattedCreditCards = (creditCards || []).map(card => ({
-      ...card,
-      plaidItem: plaidItemMap.get(card.plaidItemId) || null,
-      aprs: aprMap.get(card.id) || [],
-      _count: {
-        transactions: transactionCounts.get(card.id) || 0,
-      },
-    }));
+    // Helper function to detect payments and calculate remaining statement balance
+    function calculateRemainingStatementBalance(card: any): number {
+      const originalStatementBalance = Math.abs(card.lastStatementBalance || 0);
+      const currentBalance = Math.abs(card.balanceCurrent || 0);
+      
+      // If no statement balance or current balance >= statement balance, no payment detected
+      if (!originalStatementBalance || currentBalance >= originalStatementBalance) {
+        return originalStatementBalance;
+      }
+      
+      // Look for payment transactions since the last statement date
+      const cardTransactions = transactionsByCard.get(card.id) || [];
+      const lastStatementDate = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
+      
+      if (!lastStatementDate || cardTransactions.length === 0) {
+        return originalStatementBalance;
+      }
+      
+      const recentPayments = cardTransactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate > lastStatementDate && // After statement date
+               isPaymentTransaction(t.name) && // Is a payment transaction
+               t.amount < 0; // Payments are negative amounts
+      });
+      
+      if (recentPayments.length === 0) {
+        return originalStatementBalance;
+      }
+      
+      // Sum up payment amounts
+      const totalPayments = recentPayments.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      
+      console.log(`💳 Payment detected for ${card.name}:`, {
+        originalStatementBalance,
+        currentBalance,
+        totalPayments,
+        recentPayments: recentPayments.map(p => ({ name: p.name, amount: p.amount, date: p.date }))
+      });
+      
+      // Calculate remaining statement balance
+      return Math.max(0, originalStatementBalance - totalPayments);
+    }
+
+    // Combine all data and apply payment detection
+    const formattedCreditCards = (creditCards || []).map(card => {
+      const adjustedCard = {
+        ...card,
+        plaidItem: plaidItemMap.get(card.plaidItemId) || null,
+        aprs: aprMap.get(card.id) || [],
+        _count: {
+          transactions: transactionCounts.get(card.id) || 0,
+        },
+      };
+      
+      // Apply payment detection to adjust statement balance
+      if (adjustedCard.lastStatementBalance) {
+        adjustedCard.lastStatementBalance = calculateRemainingStatementBalance(card);
+      }
+      
+      return adjustedCard;
+    });
 
     const response = NextResponse.json({ creditCards: formattedCreditCards });
     

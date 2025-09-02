@@ -287,17 +287,14 @@ async function createOrUpdateCycle(
             recentPayments: recentPayments.map(p => ({ name: p.name, amount: p.amount, date: p.date }))
           });
           
-          // Calculate remaining statement balance after payments
-          const remainingStatementBalance = Math.max(0, originalStatementBalance - totalPayments);
-          statementBalance = remainingStatementBalance;
+          // Keep the original cycle balance (totalSpend) for display
+          // The payment detection is for card-level statement balance, not individual cycles
+          statementBalance = totalSpend > 0 ? totalSpend : Math.abs(creditCard.lastStatementBalance || 0);
           
-          // Adjust minimum payment proportionally
+          // Adjust minimum payment if statement was paid off
+          const remainingStatementBalance = Math.max(0, originalStatementBalance - totalPayments);
           if (remainingStatementBalance === 0) {
             minimumPayment = 0;
-          } else if (creditCard.minimumPaymentAmount) {
-            // Scale minimum payment proportionally to remaining balance
-            const paymentRatio = remainingStatementBalance / originalStatementBalance;
-            minimumPayment = Math.max(25, creditCard.minimumPaymentAmount * paymentRatio);
           }
         }
       }
