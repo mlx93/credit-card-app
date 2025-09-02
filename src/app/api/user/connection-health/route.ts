@@ -117,13 +117,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Restrict access to admin user only
-    if (session.user.email !== process.env.ADMIN_EMAIL) {
-      console.warn(`🚫 Non-admin user attempted to access connection health: ${session.user.email}`);
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
-
-    console.log(`🔍 Admin testing connection health for user: ${session.user.email}`);
+    console.log(`🔍 Testing connection health for user: ${session.user.email}`);
 
     // Get user's Plaid items
     const { data: plaidItems, error: plaidError } = await supabaseAdmin

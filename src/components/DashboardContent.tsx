@@ -359,7 +359,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         console.log('📊 Connection health data received:', healthData);
         setConnectionHealth(healthData);
       } else {
-        console.warn('Failed to fetch connection health data');
+        const errorText = await connectionHealthRes.text();
+        console.warn('Failed to fetch connection health data:', connectionHealthRes.status, errorText);
         setConnectionHealth(null);
       }
     } catch (error) {
