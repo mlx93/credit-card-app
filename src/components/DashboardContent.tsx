@@ -90,6 +90,19 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   ];
 
   const mockCycles = [
+    // OPEN/CURRENT Cycle - American Express Gold (ongoing, no statement balance yet) - TOP PRIORITY
+    {
+      id: 'cycle-current-3',
+      creditCardId: 'mock-card-3',
+      creditCardName: 'American Express Gold',
+      startDate: '2025-07-31',
+      endDate: '2025-08-30', // Currently open cycle
+      totalSpend: 300.00, // New spending since overdue payment
+      transactionCount: 8,
+      // No dueDate yet - cycle not closed
+      // No statementBalance yet - cycle still open
+      paymentStatus: 'current',
+    },
     // OPEN/CURRENT Cycle - Chase Sapphire Preferred (ongoing, no statement balance yet)
     {
       id: 'cycle-current-1',
@@ -153,19 +166,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       statementBalance: 891.34,
       paymentStatus: 'paid',
     },
-    // OPEN/CURRENT Cycle - American Express Gold (ongoing, no statement balance yet)
-    {
-      id: 'cycle-current-3',
-      creditCardId: 'mock-card-3',
-      creditCardName: 'American Express Gold',
-      startDate: '2025-07-31',
-      endDate: '2025-08-30', // Currently open cycle
-      totalSpend: 300.00, // New spending since overdue payment
-      transactionCount: 8,
-      // No dueDate yet - cycle not closed
-      // No statementBalance yet - cycle still open
-      paymentStatus: 'current',
-    },
     // OVERDUE Cycle - American Express Gold (Outstanding from August 2025 - 9 days late)
     {
       id: 'cycle-5',
@@ -177,7 +177,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       transactionCount: 19,
       dueDate: '2025-08-24', // Due 25 days after close (July 30 + 25 days) - 9 days overdue
       statementBalance: 1245.89,
-      paymentStatus: 'outstanding', // This makes it overdue, NO checkmark
+      paymentStatus: 'outstanding', // Red dot
     },
     {
       id: 'cycle-6',
@@ -189,7 +189,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       transactionCount: 14,
       dueDate: '2025-07-10',
       statementBalance: 987.45,
-      paymentStatus: 'paid',
+      paymentStatus: 'paid', // Checkmark
     },
     // Historical Cycles - Chase Sapphire Preferred
     {
