@@ -92,14 +92,20 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
   let paymentStatus: 'paid' | 'outstanding' | 'current' | 'due' = 'current';
   let paymentAnalysis = '';
   
-  // Check if card has $0 balance - if so, all completed cycles should be marked as paid
+  // Check payment status indicators
   const hasZeroBalance = card && Math.abs(card.balanceCurrent || 0) < 0.01;
   const today = new Date();
   const cycleEnded = new Date(cycle.endDate) < today;
+  const wasStatementPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
   
   if (hasZeroBalance && cycleEnded) {
     paymentStatus = 'paid';
     paymentAnalysis = 'Paid - card has $0 balance';
+  }
+  // Check if this specific cycle's statement was paid off (minimumPayment = 0)
+  else if (wasStatementPaidOff && cycleEnded) {
+    paymentStatus = 'paid';
+    paymentAnalysis = 'Paid - statement balance was paid off';
   }
   // Only analyze cycles with statement balances when we have full data
   else if (cycle.statementBalance && cycle.statementBalance > 0 && card && allCycles && allCycles.length > 0) {
