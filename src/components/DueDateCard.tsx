@@ -40,9 +40,35 @@ interface CreditCardInfo {
   };
 }
 
+interface ConnectionHealthData {
+  summary: {
+    totalConnections: number;
+    healthyConnections: number;
+    requiresAuth: number;
+    errorConnections: number;
+    overallHealth: string;
+  };
+  connections: {
+    plaidItemId: string;
+    itemId: string;
+    institutionName: string;
+    status: 'healthy' | 'requires_auth' | 'error' | 'unknown';
+    lastSuccessfulSync: string | null;
+    errorDetails: any;
+    apiConnectivity: {
+      accounts: boolean;
+      balances: boolean;
+      transactions: boolean;
+      liabilities: boolean;
+    };
+    recommendedAction: string;
+  }[];
+}
+
 interface DueDateCardProps {
   card: CreditCardInfo;
   colorIndex?: number;
+  connectionHealth?: ConnectionHealthData | null;
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
   onSync?: (itemId: string) => void;
@@ -248,6 +274,7 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChan
 export function DueDateCard({ 
   card, 
   colorIndex = 0, 
+  connectionHealth,
   onReconnect, 
   onRemove, 
   onSync,
@@ -263,6 +290,23 @@ export function DueDateCard({
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
   
+  // Get connection health for this specific card
+  const cardConnectionHealth = connectionHealth?.connections.find(
+    connection => connection.plaidItemId === card.plaidItem?.id
+  );
+  const connectionStatus = cardConnectionHealth?.status || 'unknown';
+  const lastSuccessfulSync = cardConnectionHealth?.lastSuccessfulSync;
+  const apiConnectivity = cardConnectionHealth?.apiConnectivity;
+  
+  // Connection status indicators
+  const hasConnectionIssue = connectionStatus === 'requires_auth' || connectionStatus === 'error';
+  const isStale = connectionStatus === 'unknown' || (lastSuccessfulSync && 
+    (new Date().getTime() - new Date(lastSuccessfulSync).getTime()) > 24 * 60 * 60 * 1000); // 24 hours
+  
+  // Calculate time since last sync
+  const lastSyncTime = lastSuccessfulSync ? new Date(lastSuccessfulSync) : null;
+  const lastSyncHoursAgo = lastSyncTime ? Math.floor((Date.now() - lastSyncTime.getTime()) / (1000 * 60 * 60)) : null;
+  const lastSyncDaysAgo = lastSyncHoursAgo ? Math.floor(lastSyncHoursAgo / 24) : null;
   
   // Determine credit limit logic
   const isManualLimit = card.ismanuallimit || false;
@@ -310,25 +354,17 @@ export function DueDateCard({
 
   const cardColorClass = cardColors[colorIndex % cardColors.length];
   
-  // Connection status logic
-  const connectionStatus = card.plaidItem?.status || 'unknown';
-  const hasConnectionIssue = ['error', 'expired', 'disconnected'].includes(connectionStatus);
-  const lastSyncTime = card.plaidItem?.lastSyncAt ? new Date(card.plaidItem.lastSyncAt) : null;
-  const lastSyncDaysAgo = lastSyncTime ? 
-    Math.max(0, Math.floor((new Date().getTime() - lastSyncTime.getTime()) / (1000 * 60 * 60 * 24))) : null;
-  const lastSyncHoursAgo = lastSyncTime ? 
-    Math.max(0, Math.floor((new Date().getTime() - lastSyncTime.getTime()) / (1000 * 60 * 60))) : null;
-  const isStale = lastSyncDaysAgo !== null && lastSyncDaysAgo > 14; // Consider stale if no sync in 14+ days (was 7 days)
-  
-  // Debug logging for staleness detection
+  // Debug logging for connection health
   if (card.name.includes('Bank of America') || card.name.includes('Customized Cash Rewards')) {
-    console.log('Bank of America staleness check:', {
+    console.log('Connection health check:', {
       cardName: card.name,
-      lastSyncAt: card.plaidItem?.lastSyncAt,
-      lastSyncDaysAgo,
-      isStale,
       connectionStatus,
-      hasConnectionIssue
+      hasConnectionIssue,
+      isStale,
+      lastSuccessfulSync,
+      lastSyncHoursAgo,
+      lastSyncDaysAgo,
+      apiConnectivity
     });
   }
 

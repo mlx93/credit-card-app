@@ -38,9 +38,35 @@ interface BillingCycle {
   statementBalance?: number;
 }
 
+interface ConnectionHealthData {
+  summary: {
+    totalConnections: number;
+    healthyConnections: number;
+    requiresAuth: number;
+    errorConnections: number;
+    overallHealth: string;
+  };
+  connections: {
+    plaidItemId: string;
+    itemId: string;
+    institutionName: string;
+    status: 'healthy' | 'requires_auth' | 'error' | 'unknown';
+    lastSuccessfulSync: string | null;
+    errorDetails: any;
+    apiConnectivity: {
+      accounts: boolean;
+      balances: boolean;
+      transactions: boolean;
+      liabilities: boolean;
+    };
+    recommendedAction: string;
+  }[];
+}
+
 interface HorizontalCardColumnsProps {
   cards: CreditCardInfo[];
   cycles: BillingCycle[];
+  connectionHealth?: ConnectionHealthData | null;
   onSync?: (itemId: string) => void;
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
@@ -58,6 +84,7 @@ interface HorizontalCardColumnsProps {
 interface SortableCardColumnProps {
   card: CreditCardInfo;
   cycles: BillingCycle[];
+  connectionHealth?: ConnectionHealthData | null;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onSync?: (itemId: string) => void;
@@ -77,6 +104,7 @@ interface SortableCardColumnProps {
 function SortableCardColumn({ 
   card, 
   cycles, 
+  connectionHealth,
   isExpanded, 
   onToggleExpand, 
   onSync, 
@@ -134,6 +162,7 @@ function SortableCardColumn({
             <DueDateCard
               card={card}
               colorIndex={colorIndex}
+              connectionHealth={connectionHealth}
               onSync={onSync}
               onReconnect={onReconnect}
               onRemove={onRemove}
@@ -199,6 +228,7 @@ function SortableCardColumn({
 export function HorizontalCardColumns({ 
   cards, 
   cycles, 
+  connectionHealth,
   onSync, 
   onReconnect, 
   onRemove, 
@@ -351,6 +381,7 @@ export function HorizontalCardColumns({
                     key={card.id}
                     card={card}
                     cycles={getCardCycles(card.id)}
+                    connectionHealth={connectionHealth}
                     isExpanded={expandedCards.has(card.id)}
                     onToggleExpand={() => toggleCardExpansion(card.id)}
                     onSync={onSync}

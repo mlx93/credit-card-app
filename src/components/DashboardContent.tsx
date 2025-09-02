@@ -18,6 +18,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [creditCards, setCreditCards] = useState<any[]>([]);
   const [billingCycles, setBillingCycles] = useState<any[]>([]);
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
+  const [connectionHealth, setConnectionHealth] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
@@ -279,7 +280,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
       
-      const [creditCardsRes, billingCyclesRes, transactionsRes] = await Promise.all([
+      const [creditCardsRes, billingCyclesRes, transactionsRes, connectionHealthRes] = await Promise.all([
         fetch('/api/user/credit-cards', {
           cache: 'no-store',
           headers: {
@@ -301,6 +302,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             'Pragma': 'no-cache'
           }
         }),
+        fetch('/api/user/connection-health', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
       ]);
 
       if (creditCardsRes.ok) {
@@ -342,6 +350,16 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       if (transactionsRes.ok) {
         const { transactions } = await transactionsRes.json();
         setCurrentMonthTransactions(transactions);
+      }
+
+      // Process connection health data
+      if (connectionHealthRes.ok) {
+        const healthData = await connectionHealthRes.json();
+        console.log('📊 Connection health data received:', healthData);
+        setConnectionHealth(healthData);
+      } else {
+        console.warn('Failed to fetch connection health data');
+        setConnectionHealth(null);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -636,7 +654,12 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   }, [isLoggedIn]);
 
   const displayCards = isLoggedIn ? creditCards : mockCards;
-  const displayCycles = isLoggedIn ? billingCycles : mockCycles;
+  const displayCycles = isLoggedIn ? billingCycles : mockCycles.map(cycle => ({
+    ...cycle,
+    startDate: new Date(cycle.startDate),
+    endDate: new Date(cycle.endDate),
+    dueDate: cycle.dueDate ? new Date(cycle.dueDate) : undefined
+  }));
   
   // Debug: Log what we're actually passing to components
   if (isLoggedIn && billingCycles.length > 0) {
@@ -826,6 +849,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
               <HorizontalCardColumns
                 cards={displayCards}
                 cycles={displayCycles}
+                connectionHealth={connectionHealth}
                 onSync={handleCardSync}
                 onReconnect={handleCardReconnect}
                 onRemove={handleCardRemove}
