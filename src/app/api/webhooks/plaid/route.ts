@@ -4,39 +4,55 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 // In-memory store for tracking recent webhook processing
 // This prevents duplicate processing when multiple webhooks arrive simultaneously
 const recentWebhooks = new Map<string, number>();
 const WEBHOOK_DEDUP_WINDOW = 10000; // 10 seconds
 
-function verifyPlaidWebhook(body: string, signature: string): boolean {
-  const webhookSecret = process.env.PLAID_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.error('PLAID_WEBHOOK_SECRET not configured');
+async function verifyPlaidWebhook(body: string, jwtToken: string): Promise<boolean> {
+  try {
+    // Get the verification key from Plaid
+    const response = await plaidClient.webhookVerificationKeyGet({});
+    const { key } = response.data;
+    
+    // Create public key from the JWK
+    const publicKey = `-----BEGIN PUBLIC KEY-----\n${key.x5c[0]}\n-----END PUBLIC KEY-----`;
+    
+    // Verify the JWT
+    const decoded = jwt.verify(jwtToken, publicKey, { algorithms: ['ES256'] }) as any;
+    
+    // Check webhook age (should not be older than 5 minutes)
+    const now = Math.floor(Date.now() / 1000);
+    if (now - decoded.iat > 300) {
+      console.error('Webhook is too old (older than 5 minutes)');
+      return false;
+    }
+    
+    // Verify body hash
+    const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
+    if (decoded.request_body_sha256 !== bodyHash) {
+      console.error('Webhook body hash mismatch');
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Webhook verification failed:', error);
     return false;
   }
-
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(body)
-    .digest('hex');
-
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  );
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Get raw body for signature verification
+    // Get raw body for JWT verification
     const rawBody = await request.text();
-    const signature = request.headers.get('plaid-verification') || '';
+    const jwtToken = request.headers.get('plaid-verification') || '';
     
-    // Verify webhook signature for security
-    if (!verifyPlaidWebhook(rawBody, signature)) {
-      console.error('🚫 Invalid webhook signature - potential security threat');
+    // Verify webhook JWT for security
+    if (!(await verifyPlaidWebhook(rawBody, jwtToken))) {
+      console.error('🚫 Invalid webhook JWT - potential security threat');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
