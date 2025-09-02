@@ -190,13 +190,8 @@ async function createOrUpdateCycle(
     return sum + t.amount;
   }, 0);
   
-  // For current cycles, use balance-based calculation to exclude pending transactions
+  // For current cycles, use transaction-based calculation from actual transactions in the cycle
   if (cycleEnd > today && !hasStatementBalance) {
-    // Current cycle: committed charges = current balance - statement balance
-    const currentBalance = Math.abs(creditCard.balanceCurrent || 0);
-    const statementBalance = Math.abs(creditCard.lastStatementBalance || 0);
-    const committedSpend = Math.max(0, currentBalance - statementBalance);
-    
     // Filter to only authorized transactions (exclude pending)
     const authorizedTransactions = cycleTransactions.filter((t: any) => 
       t.authorizedDate !== null
@@ -210,8 +205,10 @@ async function createOrUpdateCycle(
       return sum + t.amount; // Include charges (positive) and refunds (negative)
     }, 0);
     
-    // Use balance-based calculation for current cycles (excludes pending transactions)
-    totalSpend = committedSpend;
+    // Use transaction-based calculation for current cycles (from actual cycle transactions)
+    totalSpend = authorizedSpend;
+    
+    console.log(`📊 Current cycle spend for ${creditCard.name}: ${totalSpend} (${authorizedTransactions.length} authorized transactions in cycle)`);
   }
   
   // For closed cycles, only use the actual statement balance for the EXACT statement cycle
@@ -250,9 +247,49 @@ async function createOrUpdateCycle(
     const isStatementCycle = lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime();
     
     if (isStatementCycle) {
-      // This is the exact cycle that corresponds to the last statement - use actual statement balance
+      // This is the exact cycle that corresponds to the last statement
       statementBalance = creditCard.lastStatementBalance;
       minimumPayment = creditCard.minimumPaymentAmount;
+      
+      // Payment detection: If current balance is lower than statement balance,
+      // find recent payment transactions and subtract them from statement balance
+      const currentBalance = Math.abs(creditCard.balanceCurrent || 0);
+      const originalStatementBalance = Math.abs(creditCard.lastStatementBalance || 0);
+      
+      if (originalStatementBalance > 0 && currentBalance < originalStatementBalance) {
+        // Look for payment transactions since the last statement date
+        const statementDate = lastStatementDate;
+        const recentPayments = transactionsWithDates.filter(t => 
+          statementDate && t.date > statementDate && // After statement date
+          isPaymentTransaction(t.name) && // Is a payment transaction
+          t.amount < 0 // Payments are negative amounts
+        );
+        
+        // Sum up the payment amounts (they're negative, so we need to make them positive)
+        const totalPayments = recentPayments.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        
+        if (totalPayments > 0) {
+          console.log(`💳 Payment detected for ${creditCard.name}:`, {
+            currentBalance,
+            originalStatementBalance,
+            totalPayments,
+            recentPayments: recentPayments.map(p => ({ name: p.name, amount: p.amount, date: p.date }))
+          });
+          
+          // Calculate remaining statement balance after payments
+          const remainingStatementBalance = Math.max(0, originalStatementBalance - totalPayments);
+          statementBalance = remainingStatementBalance;
+          
+          // Adjust minimum payment proportionally
+          if (remainingStatementBalance === 0) {
+            minimumPayment = 0;
+          } else if (creditCard.minimumPaymentAmount) {
+            // Scale minimum payment proportionally to remaining balance
+            const paymentRatio = remainingStatementBalance / originalStatementBalance;
+            minimumPayment = Math.max(25, creditCard.minimumPaymentAmount * paymentRatio);
+          }
+        }
+      }
     } else {
       // This is a historical completed cycle - ALWAYS use calculated spend from transactions
       // Don't use the last statement balance for historical cycles
