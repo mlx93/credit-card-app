@@ -1,11 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { plaidClient } from '@/lib/plaid';
 import { supabaseAdmin } from '@/lib/supabase';
 import { decrypt } from '@/lib/encryption';
 
-export async function POST() {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function POST() {{
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-plaid-api-explorer',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     console.log('🔍 PLAID API EXPLORER ENDPOINT CALLED');
     

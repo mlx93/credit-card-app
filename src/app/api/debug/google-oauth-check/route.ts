@@ -1,6 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-google-oauth-check',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     const nextAuthUrl = process.env.NEXTAUTH_URL;

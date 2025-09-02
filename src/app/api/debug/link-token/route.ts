@@ -3,7 +3,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { plaidService } from '@/services/plaid';
 
-export async function POST(request: NextRequest) {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function POST(request: NextRequest) {{
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-link-token',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const session = await getServerSession(authOptions);
     

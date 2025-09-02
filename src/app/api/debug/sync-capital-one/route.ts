@@ -5,7 +5,15 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
 
-export async function POST(request: NextRequest) {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function POST(request: NextRequest) {{
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-sync-capital-one',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const session = await getServerSession(authOptions);
     

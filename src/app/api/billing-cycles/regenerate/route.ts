@@ -4,7 +4,15 @@ import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { calculateBillingCycles } from '@/utils/billingCycles';
 
-export async function POST(request: NextRequest) {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function POST(request: NextRequest) {{
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'billing-cycles-regenerate',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     console.log('🔄 BILLING CYCLES REGENERATION CALLED');
     

@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { plaidClient } from '@/lib/plaid';
 import { LinkTokenCreateRequest } from 'plaid';
 
+import { requireAdminAccess } from '@/lib/adminSecurity';
 interface TestConfiguration {
   name: string;
   description: string;
@@ -21,7 +22,14 @@ interface TestResult {
   duration: number;
 }
 
-export async function POST() {
+export async function POST() {{
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-test-link-token',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const session = await getServerSession(authOptions);
     
@@ -286,6 +294,13 @@ export async function POST() {
 }
 
 export async function GET() {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-test-link-token',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   return NextResponse.json({
     message: 'POST to this endpoint to run comprehensive link token tests',
     description: 'Tests various Plaid link token configurations to determine which product combinations work',

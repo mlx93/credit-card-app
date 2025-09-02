@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PlaidApi, Configuration, PlaidEnvironments } from 'plaid';
 
+import { requireAdminAccess } from '@/lib/adminSecurity';
 const plaidClient = new PlaidApi(
   new Configuration({
     basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
@@ -15,7 +16,14 @@ const plaidClient = new PlaidApi(
   })
 );
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-plaid-categories',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const session = await getServerSession(authOptions);
     

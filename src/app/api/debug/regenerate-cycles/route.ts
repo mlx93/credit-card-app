@@ -1,10 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { calculateBillingCycles } from '@/utils/billingCycles';
 
-export async function POST() {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function POST() {{
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-regenerate-cycles',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     console.log('🔄 REGENERATE CYCLES DEBUG ENDPOINT CALLED');
     

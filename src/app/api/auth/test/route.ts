@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-export async function GET() {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'auth-test',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

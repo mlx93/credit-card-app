@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
-export async function GET() {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-current-cards',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     // Get BOA card specifically for debugging
     const { data: boaCards, error } = await supabaseAdmin

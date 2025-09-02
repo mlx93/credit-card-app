@@ -3,7 +3,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getAllUserBillingCycles } from '@/utils/billingCycles';
 
-export async function GET() {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-api-response',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const session = await getServerSession(authOptions);
     

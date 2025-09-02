@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
+import { requireAdminAccess } from '@/lib/adminSecurity';
 // Helper function to identify payment transactions based on transaction name
 function isPaymentTransaction(transactionName: string): boolean {
   const lowerName = transactionName.toLowerCase();
@@ -24,7 +25,14 @@ function isPaymentTransaction(transactionName: string): boolean {
   return paymentIndicators.some(indicator => lowerName.includes(indicator));
 }
 
-export async function POST() {
+export async function POST() {{
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-data-repair',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     console.log('🔧 DATA REPAIR ENDPOINT CALLED');
     

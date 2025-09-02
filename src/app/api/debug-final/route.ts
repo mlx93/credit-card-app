@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
+import { requireAdminAccess } from '@/lib/adminSecurity';
 export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-final',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     console.log('🔍 Final debugging - checking actual cycle counts and payment status...');
     

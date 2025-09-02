@@ -1,9 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-export async function POST() {
+import { requireAdminAccess } from '@/lib/adminSecurity';
+export async function POST() {{
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-smart-fix-boa-cycles',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     console.log('🧠 SMART FIX BOA CYCLES ENDPOINT CALLED');
     
