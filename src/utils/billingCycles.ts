@@ -267,14 +267,40 @@ async function createOrUpdateCycle(
       const currentBalance = Math.abs(creditCard.balanceCurrent || 0);
       const originalStatementBalance = Math.abs(creditCard.lastStatementBalance || 0);
       
+      console.log(`🔍 Payment detection debug for ${creditCard.name}:`, {
+        currentBalance,
+        originalStatementBalance,
+        conditionMet: originalStatementBalance > 0 && currentBalance < originalStatementBalance,
+        statementDate: lastStatementDate?.toDateString(),
+        transactionCount: transactionsWithDates.length
+      });
+
       if (originalStatementBalance > 0 && currentBalance < originalStatementBalance) {
         // Look for payment transactions since the last statement date
         const statementDate = lastStatementDate;
+        
+        // Debug: Show ALL recent transactions first
+        const allRecentTransactions = transactionsWithDates.filter(t => 
+          statementDate && t.date > statementDate
+        );
+        
+        console.log(`📅 All transactions after ${statementDate?.toDateString()}:`, 
+          allRecentTransactions.map(t => ({
+            name: t.name,
+            amount: t.amount,
+            date: t.date.toDateString(),
+            isPayment: isPaymentTransaction(t.name),
+            isNegative: t.amount < 0
+          }))
+        );
+        
         const recentPayments = transactionsWithDates.filter(t => 
           statementDate && t.date > statementDate && // After statement date
           isPaymentTransaction(t.name) && // Is a payment transaction
           t.amount < 0 // Payments are negative amounts
         );
+        
+        console.log(`💰 Filtered payment transactions:`, recentPayments.length);
         
         // Sum up the payment amounts (they're negative, so we need to make them positive)
         const totalPayments = recentPayments.reduce((sum, t) => sum + Math.abs(t.amount), 0);
