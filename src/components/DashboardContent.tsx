@@ -95,8 +95,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'cycle-current-3',
       creditCardId: 'mock-card-3',
       creditCardName: 'American Express Gold',
-      startDate: '2025-07-31',
-      endDate: '2025-08-30', // Currently open cycle
+      startDate: '2025-08-07',
+      endDate: '2025-09-06', // Currently open cycle - pushed forward a week
       totalSpend: 300.00, // New spending since overdue payment
       transactionCount: 8,
       // No dueDate yet - cycle not closed
