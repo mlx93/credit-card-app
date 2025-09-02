@@ -84,7 +84,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       balanceCurrent: -1545.89, // Higher than outstanding statement (1245.89) + new spending
       balanceLimit: 8000,
       lastStatementBalance: -1245.89, // OVERDUE statement balance from July-Aug cycle
-      nextPaymentDueDate: '2025-08-10', // Overdue (past due from August - a few weeks late)
+      nextPaymentDueDate: '2025-08-30', // Overdue (3 days late - due Aug 30, today is Sep 2)
       minimumPaymentAmount: 85.00,
     },
   ];
@@ -158,24 +158,24 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'cycle-current-3',
       creditCardId: 'mock-card-3',
       creditCardName: 'American Express Gold',
-      startDate: '2025-08-11',
-      endDate: '2025-09-10', // Currently open cycle
+      startDate: '2025-08-31',
+      endDate: '2025-09-30', // Currently open cycle
       totalSpend: 300.00, // New spending since overdue payment
       transactionCount: 8,
       // No dueDate yet - cycle not closed
       // No statementBalance yet - cycle still open
       paymentStatus: 'current',
     },
-    // OVERDUE Cycle - American Express Gold (Outstanding from August 2025 - a few weeks late)
+    // OVERDUE Cycle - American Express Gold (Outstanding from August 2025 - 3 days late)
     {
       id: 'cycle-5',
       creditCardId: 'mock-card-3',
       creditCardName: 'American Express Gold',
-      startDate: '2025-07-10',
-      endDate: '2025-08-10',
+      startDate: '2025-07-30',
+      endDate: '2025-08-30',
       totalSpend: 1245.89,
       transactionCount: 19,
-      dueDate: '2025-08-10', // This is overdue (past due from August - a few weeks late)
+      dueDate: '2025-08-30', // This is overdue (3 days late - due Aug 30, today is Sep 2)
       statementBalance: 1245.89,
       paymentStatus: 'outstanding', // This makes it overdue, NO checkmark
     },
