@@ -78,6 +78,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   ];
 
   const mockCycles = [
+    // Current/Recent Cycles
     {
       id: '1',
       creditCardName: 'Chase Sapphire Preferred',
@@ -95,6 +96,99 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       totalSpend: 642.18,
       transactionCount: 15,
       dueDate: new Date('2024-03-10'),
+    },
+    // Historical Cycles - Chase Sapphire Preferred
+    {
+      id: '3',
+      creditCardName: 'Chase Sapphire Preferred',
+      startDate: new Date('2023-12-16'),
+      endDate: new Date('2024-01-15'),
+      totalSpend: 2134.67,
+      transactionCount: 28,
+      dueDate: new Date('2024-02-05'),
+    },
+    {
+      id: '4',
+      creditCardName: 'Chase Sapphire Preferred',
+      startDate: new Date('2023-11-16'),
+      endDate: new Date('2023-12-15'),
+      totalSpend: 3245.89,
+      transactionCount: 35,
+      dueDate: new Date('2024-01-05'),
+    },
+    {
+      id: '5',
+      creditCardName: 'Chase Sapphire Preferred',
+      startDate: new Date('2023-10-16'),
+      endDate: new Date('2023-11-15'),
+      totalSpend: 1789.45,
+      transactionCount: 21,
+      dueDate: new Date('2023-12-05'),
+    },
+    // Historical Cycles - Capital One Venture
+    {
+      id: '6',
+      creditCardName: 'Capital One Venture',
+      startDate: new Date('2023-12-20'),
+      endDate: new Date('2024-01-19'),
+      totalSpend: 891.34,
+      transactionCount: 18,
+      dueDate: new Date('2024-02-10'),
+    },
+    {
+      id: '7',
+      creditCardName: 'Capital One Venture',
+      startDate: new Date('2023-11-20'),
+      endDate: new Date('2023-12-19'),
+      totalSpend: 1456.78,
+      transactionCount: 24,
+      dueDate: new Date('2024-01-10'),
+    },
+    {
+      id: '8',
+      creditCardName: 'Capital One Venture',
+      startDate: new Date('2023-10-20'),
+      endDate: new Date('2023-11-19'),
+      totalSpend: 723.56,
+      transactionCount: 12,
+      dueDate: new Date('2023-12-10'),
+    },
+    {
+      id: '9',
+      creditCardName: 'Capital One Venture',
+      startDate: new Date('2023-09-20'),
+      endDate: new Date('2023-10-19'),
+      totalSpend: 1124.89,
+      transactionCount: 19,
+      dueDate: new Date('2023-11-10'),
+    },
+    // Additional Historical Cycles for More Data
+    {
+      id: '10',
+      creditCardName: 'Chase Sapphire Preferred',
+      startDate: new Date('2023-09-16'),
+      endDate: new Date('2023-10-15'),
+      totalSpend: 2567.12,
+      transactionCount: 31,
+      dueDate: new Date('2023-11-05'),
+    },
+    {
+      id: '11',
+      creditCardName: 'Chase Sapphire Preferred',
+      startDate: new Date('2023-08-16'),
+      endDate: new Date('2023-09-15'),
+      totalSpend: 1923.78,
+      transactionCount: 26,
+      dueDate: new Date('2023-10-05'),
+    },
+    {
+      id: '12',
+      creditCardName: 'Capital One Venture',
+      startDate: new Date('2023-08-20'),
+      endDate: new Date('2023-09-19'),
+      totalSpend: 834.45,
+      transactionCount: 16,
+      dueDate: new Date('2023-10-10'),
     },
   ];
 
