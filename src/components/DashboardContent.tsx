@@ -451,6 +451,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   };
 
   const handleCardSync = async (itemId: string) => {
+    console.log(`🎯 handleCardSync called with itemId: ${itemId}`);
     try {
       const response = await fetch('/api/sync', { 
         method: 'POST',
@@ -461,6 +462,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       if (response.ok) {
         const syncData = await response.json();
         console.log('Sync response data:', syncData);
+        console.log('Sync results detailed:', syncData.results?.map((r: any) => ({
+          itemId: r.itemId,
+          status: r.status,
+          requiresReconnection: r.requiresReconnection,
+          error: r.error,
+          canAutoReconnect: r.canAutoReconnect
+        })));
         
         // Check if sync was actually successful
         const hasErrors = syncData.results?.some((r: any) => r.status === 'error');
@@ -500,6 +508,34 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         // Add small delay to ensure database updates are complete before refreshing
         await new Promise(resolve => setTimeout(resolve, 1000));
         await fetchUserData(); // Refresh data after sync
+        
+        // Also refresh connection health specifically (it might have different timing)
+        console.log('🔄 Manually refreshing connection health after sync...');
+        try {
+          const healthRes = await fetch('/api/user/connection-health', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+          });
+          if (healthRes.ok) {
+            const healthData = await healthRes.json();
+            console.log('📊 Updated connection health after sync:', healthData);
+            setConnectionHealth(healthData);
+            
+            // Check if any connection still requires auth after sync
+            const needsReconnection = healthData.connections?.find(
+              (conn: any) => conn.itemId === itemId && conn.status === 'requires_auth'
+            );
+            
+            if (needsReconnection) {
+              console.log('⚠️ Connection still requires auth after sync, auto-triggering reconnection...');
+              // Auto-trigger reconnection since sync didn't fix the auth issue
+              await handleCardReconnect(itemId);
+              return; // Exit early, reconnection flow will handle the rest
+            }
+          }
+        } catch (healthError) {
+          console.warn('Failed to refresh connection health:', healthError);
+        }
       } else {
         console.error('Card sync failed:', response.status);
         const errorText = await response.text();
