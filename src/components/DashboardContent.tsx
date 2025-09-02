@@ -63,6 +63,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       mask: '1234',
       balanceCurrent: -2650.75, // Higher than statement balance (1850.25) + current spending
       balanceLimit: 15000,
+      lastStatementBalance: -1850.25, // Statement balance from closed cycle (due Aug 15)
       nextPaymentDueDate: '2025-08-15', // Due in future
       minimumPaymentAmount: 125.00,
     },
@@ -72,6 +73,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       mask: '5678',
       balanceCurrent: -895.42, // Matches current statement balance for this example
       balanceLimit: 10000,
+      lastStatementBalance: -642.18, // Statement balance from closed cycle (due Sep 20)
       nextPaymentDueDate: '2025-09-20', // Due in future
       minimumPaymentAmount: 45.00,
     },
@@ -81,6 +83,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       mask: '9012',
       balanceCurrent: -1545.89, // Higher than outstanding statement (1245.89) + new spending
       balanceLimit: 8000,
+      lastStatementBalance: -1245.89, // OVERDUE statement balance from July-Aug cycle
       nextPaymentDueDate: '2025-08-10', // Overdue (past due from August - a few weeks late)
       minimumPaymentAmount: 85.00,
     },
