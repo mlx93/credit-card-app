@@ -247,6 +247,12 @@ async function createOrUpdateCycle(
   let statementBalance = null;
   let minimumPayment = null;
   
+  console.log(`📊 Billing cycle processing for ${creditCard.name} ending ${cycleEnd.toDateString()}:`, {
+    hasStatementBalance,
+    cycleEnd: cycleEnd.toDateString(),
+    totalSpend
+  });
+  
   if (hasStatementBalance) {
     const lastStatementDate = creditCard.lastStatementIssueDate ? new Date(creditCard.lastStatementIssueDate) : null;
     
@@ -256,6 +262,16 @@ async function createOrUpdateCycle(
     const isWithinPaymentPeriod = dueDate && dueDate >= today;
     const isStatementCycle = (lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime()) ||
                            (isClosedCycle && isWithinPaymentPeriod && hasStatementBalance);
+
+    console.log(`🏦 Statement cycle identification for ${creditCard.name} cycle ending ${cycleEnd.toDateString()}:`, {
+      lastStatementDate: lastStatementDate?.toDateString(),
+      isClosedCycle,
+      isWithinPaymentPeriod,
+      hasStatementBalance,
+      isStatementCycle,
+      dueDate: dueDate?.toDateString(),
+      exactDateMatch: lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime()
+    });
     
     if (isStatementCycle) {
       // This is the exact cycle that corresponds to the last statement
