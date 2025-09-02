@@ -63,8 +63,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       mask: '1234',
       balanceCurrent: -2650.75, // Higher than statement balance (1850.25) + current spending
       balanceLimit: 15000,
-      lastStatementBalance: -1850.25, // Statement balance from closed cycle (due Aug 15)
-      nextPaymentDueDate: '2025-08-15', // Due in future
+      lastStatementBalance: -1850.25, // Statement balance from closed cycle (closed Aug 15)
+      nextPaymentDueDate: '2025-09-09', // Due 25 days after statement close (Aug 15 + 25 days)
       minimumPaymentAmount: 125.00,
     },
     {
@@ -73,8 +73,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       mask: '5678',
       balanceCurrent: -895.42, // Matches current statement balance for this example
       balanceLimit: 10000,
-      lastStatementBalance: -642.18, // Statement balance from closed cycle (due Sep 20)
-      nextPaymentDueDate: '2025-09-20', // Due in future
+      lastStatementBalance: -642.18, // Statement balance from closed cycle (closed Aug 20)
+      nextPaymentDueDate: '2025-09-14', // Due 25 days after statement close (Aug 20 + 25 days)
       minimumPaymentAmount: 45.00,
     },
     {
@@ -84,7 +84,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       balanceCurrent: -1545.89, // Higher than outstanding statement (1245.89) + new spending
       balanceLimit: 8000,
       lastStatementBalance: -1245.89, // OVERDUE statement balance from July-Aug cycle
-      nextPaymentDueDate: '2025-08-30', // Overdue (3 days late - due Aug 30, today is Sep 2)
+      nextPaymentDueDate: '2025-08-24', // Overdue - was due 9 days ago (July 30 + 25 days)
       minimumPaymentAmount: 85.00,
     },
   ];
@@ -109,10 +109,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardId: 'mock-card-1',
       creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-07-16',
-      endDate: '2025-08-15',
+      endDate: '2025-08-15', // Statement closed Aug 15
       totalSpend: 1850.25,
       transactionCount: 23,
-      dueDate: '2025-08-15',
+      dueDate: '2025-09-09', // Due 25 days after close (Aug 15 + 25 days)
       statementBalance: 1850.25,
       paymentStatus: 'due', // Active statement balance, no checkmark
     },
@@ -133,11 +133,11 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'cycle-3',
       creditCardId: 'mock-card-2',
       creditCardName: 'Capital One Venture',
-      startDate: '2025-08-20',
-      endDate: '2025-09-20',
+      startDate: '2025-07-21',
+      endDate: '2025-08-20', // Statement closed Aug 20
       totalSpend: 642.18,
       transactionCount: 15,
-      dueDate: '2025-09-20',
+      dueDate: '2025-09-14', // Due 25 days after close (Aug 20 + 25 days)
       statementBalance: 642.18,
       paymentStatus: 'due', // Active statement balance, no checkmark
     },
@@ -158,24 +158,24 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'cycle-current-3',
       creditCardId: 'mock-card-3',
       creditCardName: 'American Express Gold',
-      startDate: '2025-08-31',
-      endDate: '2025-09-30', // Currently open cycle
+      startDate: '2025-07-31',
+      endDate: '2025-08-30', // Currently open cycle
       totalSpend: 300.00, // New spending since overdue payment
       transactionCount: 8,
       // No dueDate yet - cycle not closed
       // No statementBalance yet - cycle still open
       paymentStatus: 'current',
     },
-    // OVERDUE Cycle - American Express Gold (Outstanding from August 2025 - 3 days late)
+    // OVERDUE Cycle - American Express Gold (Outstanding from August 2025 - 9 days late)
     {
       id: 'cycle-5',
       creditCardId: 'mock-card-3',
       creditCardName: 'American Express Gold',
-      startDate: '2025-07-30',
-      endDate: '2025-08-30',
+      startDate: '2025-06-30',
+      endDate: '2025-07-30', // Statement closed July 30
       totalSpend: 1245.89,
       transactionCount: 19,
-      dueDate: '2025-08-30', // This is overdue (3 days late - due Aug 30, today is Sep 2)
+      dueDate: '2025-08-24', // Due 25 days after close (July 30 + 25 days) - 9 days overdue
       statementBalance: 1245.89,
       paymentStatus: 'outstanding', // This makes it overdue, NO checkmark
     },
