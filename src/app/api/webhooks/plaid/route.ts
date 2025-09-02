@@ -13,33 +13,71 @@ const WEBHOOK_DEDUP_WINDOW = 10000; // 10 seconds
 
 async function verifyPlaidWebhook(body: string, jwtToken: string): Promise<boolean> {
   try {
+    console.log('🔐 Starting webhook verification...');
+    console.log('🔐 JWT Token present:', !!jwtToken);
+    console.log('🔐 Body length:', body.length);
+    console.log('🔐 Plaid environment:', process.env.PLAID_ENV);
+    console.log('🔐 Plaid client ID present:', !!process.env.PLAID_CLIENT_ID);
+    console.log('🔐 Plaid secret present:', !!process.env.PLAID_SECRET);
+
     // Get the verification key from Plaid
-    const response = await plaidClient.webhookVerificationKeyGet({});
-    const { key } = response.data;
-    
-    // Create public key from the JWK
-    const publicKey = `-----BEGIN PUBLIC KEY-----\n${key.x5c[0]}\n-----END PUBLIC KEY-----`;
-    
-    // Verify the JWT
-    const decoded = jwt.verify(jwtToken, publicKey, { algorithms: ['ES256'] }) as any;
-    
-    // Check webhook age (should not be older than 5 minutes)
-    const now = Math.floor(Date.now() / 1000);
-    if (now - decoded.iat > 300) {
-      console.error('Webhook is too old (older than 5 minutes)');
-      return false;
+    console.log('🔐 Requesting webhook verification key from Plaid...');
+    try {
+      const response = await plaidClient.webhookVerificationKeyGet({});
+      console.log('🔐 Webhook verification key response status:', response.status);
+      console.log('🔐 Webhook verification key response data keys:', Object.keys(response.data));
+      
+      const { key } = response.data;
+      console.log('🔐 Verification key object keys:', Object.keys(key));
+      console.log('🔐 x5c array length:', key.x5c?.length);
+
+      // Create public key from the JWK
+      const publicKey = `-----BEGIN PUBLIC KEY-----\n${key.x5c[0]}\n-----END PUBLIC KEY-----`;
+      console.log('🔐 Public key created, length:', publicKey.length);
+      
+      // Verify the JWT
+      console.log('🔐 Attempting to verify JWT...');
+      const decoded = jwt.verify(jwtToken, publicKey, { algorithms: ['ES256'] }) as any;
+      console.log('🔐 JWT decoded successfully:', Object.keys(decoded));
+      
+      // Check webhook age (should not be older than 5 minutes)
+      const now = Math.floor(Date.now() / 1000);
+      const age = now - decoded.iat;
+      console.log('🔐 Webhook age in seconds:', age);
+      
+      if (age > 300) {
+        console.error('❌ Webhook is too old (older than 5 minutes)');
+        return false;
+      }
+      
+      // Verify body hash
+      const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
+      console.log('🔐 Body hash calculated:', bodyHash);
+      console.log('🔐 Expected hash from JWT:', decoded.request_body_sha256);
+      
+      if (decoded.request_body_sha256 !== bodyHash) {
+        console.error('❌ Webhook body hash mismatch');
+        return false;
+      }
+      
+      console.log('✅ Webhook verification successful');
+      return true;
+    } catch (apiError: any) {
+      console.error('❌ Plaid webhook verification key API error:', {
+        status: apiError.response?.status,
+        statusText: apiError.response?.statusText,
+        data: apiError.response?.data,
+        headers: apiError.response?.headers,
+        config: {
+          url: apiError.config?.url,
+          method: apiError.config?.method,
+          headers: apiError.config?.headers
+        }
+      });
+      throw apiError;
     }
-    
-    // Verify body hash
-    const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
-    if (decoded.request_body_sha256 !== bodyHash) {
-      console.error('Webhook body hash mismatch');
-      return false;
-    }
-    
-    return true;
   } catch (error) {
-    console.error('Webhook verification failed:', error);
+    console.error('❌ Webhook verification failed:', error);
     return false;
   }
 }
