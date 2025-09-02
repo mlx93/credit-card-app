@@ -36,45 +36,24 @@ export const authOptions: NextAuthOptions = {
           console.log('🔐 Auth: Attempting to verify code for:', credentials.email);
           console.log('🔐 Auth: Received code:', credentials.code);
           
-          // First try to get verification code from verification_tokens table
-          let verification: any = null;
-          let verifyError: any = null;
-          
+          // Get verification code from verification_tokens table
           const { data: tokenData, error: tokenError } = await supabase
             .from('verification_tokens')
             .select('token, expires')
             .eq('identifier', credentials.email)
+            .order('expires', { ascending: false })
+            .limit(1)
             .single();
             
           console.log('🔐 Auth: verification_tokens query result:', { tokenData, tokenError });
-            
-          if (!tokenError && tokenData) {
-            verification = tokenData;
-            console.log('🔐 Auth: Found code in verification_tokens table');
-          } else {
-            console.log('🔐 Auth: Checking users table fallback...');
-            // Fallback: Check users table for verification code
-            const { data: userData, error: userError } = await supabase
-              .from('users')
-              .select('verificationCode, verificationExpires')
-              .eq('email', credentials.email)
-              .single();
-              
-            console.log('🔐 Auth: users table query result:', { userData, userError });
-              
-            if (!userError && userData && userData.verificationCode) {
-              verification = {
-                token: userData.verificationCode,
-                expires: userData.verificationExpires
-              };
-              console.log('🔐 Auth: Found code in users table');
-            }
-          }
 
-          if (!verification) {
+          if (tokenError || !tokenData) {
             console.log('❌ Auth: No verification code found for:', credentials.email);
             return null;
           }
+          
+          const verification = tokenData;
+          console.log('🔐 Auth: Found code in verification_tokens table');
 
           console.log('🔐 Auth: Verification data:', {
             storedToken: verification.token,
@@ -124,20 +103,11 @@ export const authOptions: NextAuthOptions = {
             user = existingUser;
           }
 
-          // Clean up used verification token from both tables
+          // Clean up used verification token
           await supabase
             .from('verification_tokens')
             .delete()
             .eq('identifier', credentials.email);
-            
-          // Also clear from users table if stored there
-          await supabase
-            .from('users')
-            .update({
-              verificationCode: null,
-              verificationExpires: null
-            })
-            .eq('email', credentials.email);
 
           return {
             id: user.id,

@@ -41,9 +41,15 @@ export async function POST(request: NextRequest) {
     // First try the verification_tokens table, if it fails, use users table as fallback
     let codeStoredSuccessfully = false;
     
+    // Delete any existing codes for this email first
+    await supabase
+      .from('verification_tokens')
+      .delete()
+      .eq('identifier', email);
+    
     const { error: dbError } = await supabase
       .from('verification_tokens')
-      .upsert({
+      .insert({
         identifier: email,
         token: code,
         expires: expires,
@@ -51,34 +57,12 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error('Verification tokens table error:', dbError);
-      console.log('Attempting fallback to users table...');
-      
-      // Fallback: Store in users table temporarily
-      console.log('💾 Storing code in users table:', { email, code, expires });
-      const { error: userError } = await supabase
-        .from('users')
-        .upsert({
-          email: email,
-          verificationCode: code,
-          verificationExpires: expires,
-          updatedAt: new Date().toISOString(),
-        }, {
-          onConflict: 'email'
-        });
-        
-      console.log('💾 Users table upsert result:', { userError });
-        
-      if (userError) {
-        console.error('Users table error:', userError);
-        // Continue anyway - we'll still try to send the email
-        console.log('WARNING: Could not store verification code in database');
-      } else {
-        codeStoredSuccessfully = true;
-        console.log('Code stored in users table successfully');
-      }
+      console.log('❌ Failed to store verification code in database');
+      // Continue anyway - we'll still try to send the email
+      codeStoredSuccessfully = false;
     } else {
       codeStoredSuccessfully = true;
-      console.log('Code stored in verification_tokens table successfully');
+      console.log('✅ Code stored in verification_tokens table successfully');
     }
 
     // Send email with verification code
