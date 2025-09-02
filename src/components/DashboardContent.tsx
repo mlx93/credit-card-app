@@ -471,7 +471,25 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           console.warn(`Sync completed with ${successCount} successes and some errors`);
           
           if (reconnectionRequired) {
-            alert(`Connection expired - please use the "Reconnect" button instead of sync. ${successCount > 0 ? `${successCount} other cards synced successfully.` : ''}`);
+            // Find the specific itemId that requires reconnection
+            const errorResult = syncData.results?.find((r: any) => r.requiresReconnection);
+            if (errorResult?.itemId) {
+              console.log(`🔄 Auto-triggering reconnection for itemId: ${errorResult.itemId}`);
+              
+              // Show brief message then auto-trigger reconnection
+              if (successCount > 0) {
+                console.log(`✅ ${successCount} cards synced successfully. Opening reconnection for expired connection...`);
+                // Don't use alert here as it might interrupt the Plaid flow
+              } else {
+                console.log(`🔄 Opening reconnection for expired connection...`);
+              }
+              
+              // Auto-trigger reconnection flow
+              await handleCardReconnect(errorResult.itemId);
+              return; // Exit early, don't refresh data yet (reconnection will handle that)
+            } else {
+              alert(`Connection expired - please use the "Reconnect" button. ${successCount > 0 ? `${successCount} other cards synced successfully.` : ''}`);
+            }
           } else {
             alert(`Sync completed but some connections need attention. ${successCount} cards synced successfully.`);
           }
