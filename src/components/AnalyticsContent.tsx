@@ -21,12 +21,12 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
   const [isMonthlySpendExpanded, setIsMonthlySpendExpanded] = useState(false);
 
   const mockData = {
-    totalSpendThisMonth: 1100.50, // Sum of current open cycles: 800.50 + 300.00
+    totalSpendThisMonth: 1100.50, // Sum of current open cycles: 800.50 + 300.00  
     monthlySpend: [
-      { month: 'May 2025', amount: 3867 },
-      { month: 'Jun 2025', amount: 4234 },
-      { month: 'Jul 2025', amount: 4156 },
-      { month: 'Aug 2025', amount: 1101 }, // Current month (rounded)
+      { month: 'Jun 2025', amount: 3867 },
+      { month: 'Jul 2025', amount: 4234 },
+      { month: 'Aug 2025', amount: 4156 }, // Closed statements from Aug
+      { month: 'Sep 2025', amount: 1101 }, // Current month - early Sep (partial)
     ],
     categories: [
       { name: 'Dining', amount: 450, percentage: 40.9 },
@@ -42,11 +42,11 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
       { name: 'American Express Gold', amount: 300.00, color: 'bg-orange-500' }, // Open cycle
     ],
     monthlyComparison: [
-      { category: 'Dining', thisMonth: 450, lastMonth: 1320, change: -65.9 },
-      { category: 'Shopping', thisMonth: 280, lastMonth: 1350, change: -79.3 },
-      { category: 'Groceries', thisMonth: 200, lastMonth: 920, change: -78.3 },
-      { category: 'Travel', thisMonth: 50, lastMonth: 280, change: -82.1 },
-      { category: 'Gas', thisMonth: 120, lastMonth: 405, change: -70.4 },
+      { category: 'Dining', thisMonth: 450, lastMonth: 1456, change: -69.1 }, // Sep vs Aug
+      { category: 'Shopping', thisMonth: 280, lastMonth: 1245, change: -77.5 }, // Sep vs Aug
+      { category: 'Groceries', thisMonth: 200, lastMonth: 1089, change: -81.6 }, // Sep vs Aug  
+      { category: 'Travel', thisMonth: 50, lastMonth: 245, change: -79.6 }, // Sep vs Aug
+      { category: 'Gas', thisMonth: 120, lastMonth: 421, change: -71.5 }, // Sep vs Aug
     ],
     transactionCount: 20, // Sum of transaction counts from current open cycles (12 + 8)
   };
