@@ -110,7 +110,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   closedCycleStart.setDate(closedCycleStart.getDate() - cycleLength + 1);
   
   // Create the closed cycle with statement balance
-  await createOrUpdateCycle(creditCardWithTransactions, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true);
+  await createOrUpdateCycle(creditCardWithTransactions, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true, transactionsWithDates);
   
   // Calculate the current ongoing cycle that starts after the statement date
   const currentCycleStart = new Date(lastStatementDate);
@@ -121,7 +121,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   currentDueDate.setDate(currentDueDate.getDate() + 21);
   
   // Create the current cycle (no statement balance yet)
-  await createOrUpdateCycle(creditCardWithTransactions, cycles, currentCycleStart, currentCycleEnd, currentDueDate, false);
+  await createOrUpdateCycle(creditCardWithTransactions, cycles, currentCycleStart, currentCycleEnd, currentDueDate, false, transactionsWithDates);
   
   // Create historical cycles going back 12 months, but not before card open date
   let historicalCycleEnd = new Date(closedCycleStart);
@@ -151,7 +151,7 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     
     // Historical cycles that have ended should be treated as having statement balances
     const isCompletedCycle = historicalCycleEnd < now;
-    await createOrUpdateCycle(creditCardWithTransactions, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, isCompletedCycle);
+    await createOrUpdateCycle(creditCardWithTransactions, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, isCompletedCycle, transactionsWithDates);
     
     historicalCycleEnd = new Date(historicalCycleStart);
     historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
@@ -166,7 +166,8 @@ async function createOrUpdateCycle(
   cycleStart: Date,
   cycleEnd: Date,
   dueDate: Date | null,
-  hasStatementBalance: boolean
+  hasStatementBalance: boolean,
+  transactionsWithDates: any[]
 ): Promise<void> {
   // For current cycles, cap the transaction search at today to get accurate spend calculation
   const today = new Date();
@@ -413,7 +414,7 @@ async function generateEstimatedCycles(creditCard: any, cycles: BillingCycleData
     
     const isHistorical = currentCycleEnd < today;
     
-    await createOrUpdateCycle(creditCard, cycles, currentCycleStart, currentCycleEnd, currentDueDate, isHistorical);
+    await createOrUpdateCycle(creditCard, cycles, currentCycleStart, currentCycleEnd, currentDueDate, isHistorical, creditCard.transactions);
     
     currentCycleStart = addMonths(currentCycleStart, 1);
   }
