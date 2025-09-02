@@ -221,8 +221,23 @@ async function handleTransactionWebhook(webhookCode: string, itemId: string) {
         .single();
       
       if (error || !plaidItem) {
-        console.error(`No Plaid item found for itemId: ${itemId}`, error);
-        return;
+        console.error(`❌ ORPHANED ITEM DETECTED: No Plaid item found for itemId: ${itemId}`, error);
+        
+        // Log this as an orphaned item for cleanup
+        console.log(`🧹 ORPHANED ITEM: ${itemId} - webhook type: TRANSACTIONS, code: ${webhookCode}`);
+        
+        // Try to get institution info from Plaid to help with identification
+        try {
+          // We can't get institution info without access token, so just log the item ID
+          console.log(`📋 CLEANUP NEEDED: Item ${itemId} should be removed from Plaid system`);
+          
+          // Store orphaned items for later cleanup (optional - implement if needed)
+          await logOrphanedItem(itemId, 'TRANSACTIONS', webhookCode);
+        } catch (identificationError) {
+          console.error(`Failed to identify orphaned item ${itemId}:`, identificationError);
+        }
+        
+        return; // Return successfully - don't let orphaned items break webhook processing
       }
 
       // Decrypt the access token before using it
@@ -247,16 +262,18 @@ async function handleLiabilitiesWebhook(webhookCode: string, itemId: string) {
         .eq('itemId', itemId)
         .single();
       
-      if (error) {
-        console.error('Error fetching plaid item:', error);
-        return;
+      if (error || !plaidItem) {
+        console.error(`❌ ORPHANED ITEM DETECTED: No Plaid item found for itemId: ${itemId}`, error);
+        console.log(`🧹 ORPHANED ITEM: ${itemId} - webhook type: LIABILITIES, code: ${webhookCode}`);
+        console.log(`📋 CLEANUP NEEDED: Item ${itemId} should be removed from Plaid system`);
+        
+        await logOrphanedItem(itemId, 'LIABILITIES', webhookCode);
+        return; // Return successfully - don't let orphaned items break webhook processing
       }
 
-      if (plaidItem) {
-        // Decrypt the access token before using it
-        const decryptedAccessToken = decrypt(plaidItem.accessToken);
-        await plaidService.syncAccounts(decryptedAccessToken, itemId);
-      }
+      // Decrypt the access token before using it
+      const decryptedAccessToken = decrypt(plaidItem.accessToken);
+      await plaidService.syncAccounts(decryptedAccessToken, itemId);
       break;
     default:
       console.log(`Unhandled liabilities webhook code: ${webhookCode}`);
@@ -292,5 +309,33 @@ async function handleItemWebhook(webhookCode: string, itemId: string) {
       break;
     default:
       console.log(`Unhandled item webhook code: ${webhookCode}`);
+  }
+}
+
+// Function to log orphaned items for cleanup
+async function logOrphanedItem(itemId: string, webhookType: string, webhookCode: string) {
+  try {
+    console.log(`📝 Logging orphaned item for cleanup: ${itemId}`);
+    
+    // Create a log entry in the database for later cleanup
+    // This could be a dedicated table or just detailed logging
+    const orphanedItemLog = {
+      itemId: itemId,
+      webhookType: webhookType,
+      webhookCode: webhookCode,
+      detectedAt: new Date().toISOString(),
+      status: 'needs_cleanup'
+    };
+    
+    // For now, just log it. In the future, you could store this in a dedicated table
+    console.log(`🗃️  ORPHANED ITEM LOG:`, orphanedItemLog);
+    
+    // Optional: Store in database table for tracking
+    // await supabaseAdmin
+    //   .from('orphaned_items')
+    //   .upsert(orphanedItemLog, { onConflict: 'itemId' });
+    
+  } catch (error) {
+    console.error(`Failed to log orphaned item ${itemId}:`, error);
   }
 }
