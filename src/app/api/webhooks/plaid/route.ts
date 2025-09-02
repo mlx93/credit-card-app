@@ -65,10 +65,19 @@ async function verifyPlaidWebhook(body: string, jwtToken: string): Promise<boole
         publicKey = `-----BEGIN PUBLIC KEY-----\n${key.x5c[0]}\n-----END PUBLIC KEY-----`;
         console.log('🔐 Using x5c certificate format');
       } else if (key.kty === 'EC' && key.crv && key.x && key.y) {
-        // New EC format - use the JWK directly for verification
+        // New EC format - convert JWK to PEM format
         console.log('🔐 Using EC JWK format for verification');
-        // For ES256, we can use the JWK directly with jsonwebtoken
-        publicKey = key; // Pass the entire key object for EC verification
+        console.log('🔐 Converting EC JWK to PEM format...');
+        
+        try {
+          // Use the 'crypto' module to convert JWK to PEM
+          const keyObject = crypto.createPublicKey({ format: 'jwk', key: key as any });
+          publicKey = keyObject.export({ format: 'pem', type: 'spki' }) as string;
+          console.log('🔐 Successfully converted JWK to PEM format');
+        } catch (conversionError) {
+          console.error('❌ Failed to convert JWK to PEM:', conversionError);
+          return false;
+        }
       } else {
         console.error('❌ Unsupported key format:', key);
         return false;
