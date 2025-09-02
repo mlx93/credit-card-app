@@ -23,10 +23,10 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
   const mockData = {
     totalSpendThisMonth: 4738.32, // Sum of current spending from all cards
     monthlySpend: [
-      { month: 'Sep 2024', amount: 3867 },
-      { month: 'Oct 2024', amount: 4234 },
-      { month: 'Nov 2024', amount: 4156 },
-      { month: 'Dec 2024', amount: 4738 },
+      { month: 'May 2025', amount: 3867 },
+      { month: 'Jun 2025', amount: 4234 },
+      { month: 'Jul 2025', amount: 4156 },
+      { month: 'Aug 2025', amount: 4738 },
     ],
     categories: [
       { name: 'Dining', amount: 1450, percentage: 30.6 },

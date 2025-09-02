@@ -84,12 +84,22 @@ async function verifyPlaidWebhook(body: string, jwtToken: string): Promise<boole
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🌐 Webhook POST endpoint called at:', new Date().toISOString());
+    console.log('🌐 Request headers:', Object.fromEntries(request.headers.entries()));
+    
     // Get raw body for JWT verification
     const rawBody = await request.text();
     const jwtToken = request.headers.get('plaid-verification') || '';
     
+    console.log('🌐 Raw body received, length:', rawBody.length);
+    console.log('🌐 JWT token from header:', jwtToken ? 'Present' : 'Missing');
+    
     // Verify webhook JWT for security
-    if (!(await verifyPlaidWebhook(rawBody, jwtToken))) {
+    console.log('🌐 About to call verifyPlaidWebhook...');
+    const verificationResult = await verifyPlaidWebhook(rawBody, jwtToken);
+    console.log('🌐 Verification result:', verificationResult);
+    
+    if (!verificationResult) {
       console.error('🚫 Invalid webhook JWT - potential security threat');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
