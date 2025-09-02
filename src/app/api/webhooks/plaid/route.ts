@@ -49,11 +49,32 @@ async function verifyPlaidWebhook(body: string, jwtToken: string): Promise<boole
       
       const { key } = response.data;
       console.log('🔐 Verification key object keys:', Object.keys(key));
-      console.log('🔐 x5c array length:', key.x5c?.length);
+      console.log('🔐 Key details:', {
+        kty: key.kty,
+        use: key.use,
+        alg: key.alg,
+        crv: key.crv,
+        hasX5c: !!key.x5c,
+        x5cLength: key.x5c?.length
+      });
 
-      // Create public key from the JWK
-      const publicKey = `-----BEGIN PUBLIC KEY-----\n${key.x5c[0]}\n-----END PUBLIC KEY-----`;
-      console.log('🔐 Public key created, length:', publicKey.length);
+      // Create public key from the JWK format
+      let publicKey: string;
+      if (key.x5c && key.x5c.length > 0) {
+        // Legacy format with x5c certificate chain
+        publicKey = `-----BEGIN PUBLIC KEY-----\n${key.x5c[0]}\n-----END PUBLIC KEY-----`;
+        console.log('🔐 Using x5c certificate format');
+      } else if (key.kty === 'EC' && key.crv && key.x && key.y) {
+        // New EC format - use the JWK directly for verification
+        console.log('🔐 Using EC JWK format for verification');
+        // For ES256, we can use the JWK directly with jsonwebtoken
+        publicKey = key; // Pass the entire key object for EC verification
+      } else {
+        console.error('❌ Unsupported key format:', key);
+        return false;
+      }
+      
+      console.log('🔐 Public key prepared, type:', typeof publicKey);
       
       // Verify the JWT
       console.log('🔐 Attempting to verify JWT...');
