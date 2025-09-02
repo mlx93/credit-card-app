@@ -117,6 +117,19 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       // No statementBalance yet - cycle still open
       paymentStatus: 'current',
     },
+    // OPEN/CURRENT Cycle - Capital One Venture (ongoing, no statement balance yet)
+    {
+      id: 'cycle-current-2',
+      creditCardId: 'mock-card-2',
+      creditCardName: 'Capital One Venture',
+      startDate: '2025-08-21',
+      endDate: '2025-09-20', // Currently open cycle
+      totalSpend: 253.24, // Current spending in open cycle
+      transactionCount: 7,
+      // No dueDate yet - cycle not closed
+      // No statementBalance yet - cycle still open
+      paymentStatus: 'current',
+    },
     // CLOSED Cycle - Chase Sapphire Preferred (Active statement balance, due in future)
     {
       id: 'cycle-1',
@@ -154,18 +167,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       dueDate: '2025-09-14', // Due 25 days after close (Aug 20 + 25 days)
       statementBalance: 642.18,
       paymentStatus: 'due', // Active statement balance, no checkmark
-    },
-    {
-      id: 'cycle-4',
-      creditCardId: 'mock-card-2',
-      creditCardName: 'Capital One Venture',
-      startDate: '2025-07-20',
-      endDate: '2025-08-19',
-      totalSpend: 891.34,
-      transactionCount: 18,
-      dueDate: '2025-08-10',
-      statementBalance: 891.34,
-      paymentStatus: 'paid',
     },
     // OVERDUE Cycle - American Express Gold (Outstanding from August 2025 - 9 days late)
     {
