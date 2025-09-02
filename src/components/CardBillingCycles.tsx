@@ -147,11 +147,18 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
     const accountedFor = mostRecentClosedBalance + openCycleSpend;
     const remainingFromOlderCycles = currentBalance - accountedFor;
     
-    // Check if this cycle IS the most recent closed cycle (should show "Due By")
+    // Check if this cycle IS the most recent closed cycle (should show "Due By" or "Outstanding")
     
     if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
-      paymentStatus = 'due';
-      paymentAnalysis = `Most recent closed cycle - Due By ${cycle.dueDate ? formatDate(cycle.dueDate) : 'NO DUE DATE'}`;
+      // Check if the due date has passed (overdue)
+      if (cycle.dueDate && new Date(cycle.dueDate) < new Date()) {
+        paymentStatus = 'outstanding';
+        const daysOverdue = Math.floor((new Date().getTime() - new Date(cycle.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+        paymentAnalysis = `Most recent closed cycle - OVERDUE by ${daysOverdue} days`;
+      } else {
+        paymentStatus = 'due';
+        paymentAnalysis = `Most recent closed cycle - Due By ${cycle.dueDate ? formatDate(cycle.dueDate) : 'NO DUE DATE'}`;
+      }
     }
     // Step 3: Check if older cycles are paid
     else {
