@@ -17,11 +17,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check if specific itemId was requested
+    let targetItemId: string | null = null;
+    try {
+      const body = await request.json();
+      targetItemId = body?.itemId || null;
+      if (targetItemId) {
+        console.log('🎯 Individual card sync requested for itemId:', targetItemId);
+      } else {
+        console.log('🎯 Full sync requested for all cards');
+      }
+    } catch {
+      // No body or invalid JSON - sync all items
+      console.log('🎯 No request body - syncing all items');
+    }
+
     console.log('Fetching Plaid items for user:', session.user.id);
-    const { data: plaidItems, error: plaidError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('plaid_items')
       .select('*')
       .eq('userId', session.user.id);
+
+    // Filter to specific itemId if requested
+    if (targetItemId) {
+      query = query.eq('itemId', targetItemId);
+    }
+
+    const { data: plaidItems, error: plaidError } = await query;
 
     if (plaidError) {
       throw new Error(`Failed to fetch plaid items: ${plaidError.message}`);
@@ -31,6 +53,15 @@ export async function POST(request: NextRequest) {
     (plaidItems || []).forEach((item, index) => {
       console.log(`Item ${index + 1}: ${item.institutionName} (${item.itemId})`);
     });
+
+    // Check if specific item was requested but not found
+    if (targetItemId && (plaidItems || []).length === 0) {
+      console.log(`❌ Requested itemId ${targetItemId} not found for user`);
+      return NextResponse.json({ 
+        message: `Card with ID ${targetItemId} not found`,
+        results: []
+      });
+    }
 
     if ((plaidItems || []).length === 0) {
       console.log('No Plaid items found - returning early');

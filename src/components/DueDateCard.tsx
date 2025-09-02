@@ -298,10 +298,10 @@ export function DueDateCard({
   const lastSuccessfulSync = cardConnectionHealth?.lastSuccessfulSync;
   const apiConnectivity = cardConnectionHealth?.apiConnectivity;
   
-  // Connection status indicators
-  const hasConnectionIssue = connectionStatus === 'requires_auth' || connectionStatus === 'error';
-  const isStale = connectionStatus === 'unknown' || (lastSuccessfulSync && 
-    (new Date().getTime() - new Date(lastSuccessfulSync).getTime()) > 24 * 60 * 60 * 1000); // 24 hours
+  // Connection status indicators - skip for demo cards (no plaidItem)
+  const hasConnectionIssue = card.plaidItem && (connectionStatus === 'requires_auth' || connectionStatus === 'error');
+  const isStale = card.plaidItem && (connectionStatus === 'unknown' || (lastSuccessfulSync && 
+    (new Date().getTime() - new Date(lastSuccessfulSync).getTime()) > 24 * 60 * 60 * 1000)); // 24 hours
   
   // Calculate time since last sync
   const lastSyncTime = lastSuccessfulSync ? new Date(lastSuccessfulSync) : null;

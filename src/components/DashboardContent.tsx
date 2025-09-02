@@ -465,14 +465,22 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         // Check if sync was actually successful
         const hasErrors = syncData.results?.some((r: any) => r.status === 'error');
         const successCount = syncData.results?.filter((r: any) => r.status === 'success').length || 0;
+        const reconnectionRequired = syncData.results?.some((r: any) => r.requiresReconnection);
         
         if (hasErrors) {
           console.warn(`Sync completed with ${successCount} successes and some errors`);
-          alert(`Sync completed but some connections need attention. ${successCount} cards synced successfully.`);
+          
+          if (reconnectionRequired) {
+            alert(`Connection expired - please use the "Reconnect" button instead of sync. ${successCount > 0 ? `${successCount} other cards synced successfully.` : ''}`);
+          } else {
+            alert(`Sync completed but some connections need attention. ${successCount} cards synced successfully.`);
+          }
         } else {
           console.log('Card sync fully successful');
         }
         
+        // Add small delay to ensure database updates are complete before refreshing
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await fetchUserData(); // Refresh data after sync
       } else {
         console.error('Card sync failed:', response.status);
