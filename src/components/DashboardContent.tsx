@@ -82,7 +82,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'mock-card-3',
       name: 'American Express Gold',
       mask: '9012',
-      balanceCurrent: -1245.89, // Exactly matches the outstanding statement balance
+      balanceCurrent: -1545.89, // Outstanding statement (1245.89) + new spending (300.00)
       balanceLimit: 8000,
       lastStatementBalance: -1245.89, // OVERDUE statement balance from July-Aug cycle
       nextPaymentDueDate: '2025-08-24', // Overdue - was due 9 days ago (July 30 + 25 days)
@@ -98,8 +98,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'American Express Gold',
       startDate: '2025-08-07',
       endDate: '2025-09-06', // Currently open cycle - pushed forward a week
-      totalSpend: 0.00, // No new spending yet - all balance is from overdue statement
-      transactionCount: 0,
+      totalSpend: 300.00, // New spending since overdue payment - component should handle this
+      transactionCount: 8,
       // No dueDate yet - cycle not closed
       // No statementBalance yet - cycle still open
       paymentStatus: 'current',
