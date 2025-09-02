@@ -21,34 +21,34 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
   const [isMonthlySpendExpanded, setIsMonthlySpendExpanded] = useState(false);
 
   const mockData = {
-    totalSpendThisMonth: 4738.32, // Sum of current spending from all cards
+    totalSpendThisMonth: 1100.50, // Sum of current open cycles: 800.50 + 300.00
     monthlySpend: [
       { month: 'May 2025', amount: 3867 },
       { month: 'Jun 2025', amount: 4234 },
       { month: 'Jul 2025', amount: 4156 },
-      { month: 'Aug 2025', amount: 4738 },
+      { month: 'Aug 2025', amount: 1101 }, // Current month (rounded)
     ],
     categories: [
-      { name: 'Dining', amount: 1450, percentage: 30.6 },
-      { name: 'Shopping', amount: 1180, percentage: 24.9 },
-      { name: 'Groceries', amount: 950, percentage: 20.0 },
-      { name: 'Travel', amount: 620, percentage: 13.1 },
-      { name: 'Gas', amount: 378, percentage: 8.0 },
-      { name: 'Other', amount: 160, percentage: 3.4 },
+      { name: 'Dining', amount: 450, percentage: 40.9 },
+      { name: 'Shopping', amount: 280, percentage: 25.4 },
+      { name: 'Groceries', amount: 200, percentage: 18.2 },
+      { name: 'Gas', amount: 120, percentage: 10.9 },
+      { name: 'Travel', amount: 50, percentage: 4.5 },
+      { name: 'Other', amount: 0.50, percentage: 0.1 },
     ],
     cardSpending: [
-      { name: 'Chase Sapphire Preferred', amount: 1850.25, color: 'bg-blue-500' },
-      { name: 'Capital One Venture', amount: 642.18, color: 'bg-green-500' },
-      { name: 'American Express Gold', amount: 1245.89, color: 'bg-orange-500' },
+      { name: 'Chase Sapphire Preferred', amount: 800.50, color: 'bg-blue-500' }, // Open cycle
+      { name: 'Capital One Venture', amount: 0, color: 'bg-green-500' }, // No open cycle
+      { name: 'American Express Gold', amount: 300.00, color: 'bg-orange-500' }, // Open cycle
     ],
     monthlyComparison: [
-      { category: 'Dining', thisMonth: 1450, lastMonth: 1320, change: 9.8 },
-      { category: 'Shopping', thisMonth: 1180, lastMonth: 1350, change: -12.6 },
-      { category: 'Groceries', thisMonth: 950, lastMonth: 920, change: 3.3 },
-      { category: 'Travel', thisMonth: 620, lastMonth: 280, change: 121.4 },
-      { category: 'Gas', thisMonth: 378, lastMonth: 405, change: -6.7 },
+      { category: 'Dining', thisMonth: 450, lastMonth: 1320, change: -65.9 },
+      { category: 'Shopping', thisMonth: 280, lastMonth: 1350, change: -79.3 },
+      { category: 'Groceries', thisMonth: 200, lastMonth: 920, change: -78.3 },
+      { category: 'Travel', thisMonth: 50, lastMonth: 280, change: -82.1 },
+      { category: 'Gas', thisMonth: 120, lastMonth: 405, change: -70.4 },
     ],
-    transactionCount: 57, // Sum of transaction counts from current cycles
+    transactionCount: 20, // Sum of transaction counts from current open cycles (12 + 8)
   };
 
   const fetchAnalytics = async (month?: string) => {

@@ -116,6 +116,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-2',
       creditCardId: 'mock-card-1',
+      creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-06-16',
       endDate: '2025-07-15',
       totalSpend: 2134.67,
@@ -124,10 +125,11 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       statementBalance: 2134.67,
       paymentStatus: 'paid',
     },
-    // Current/Recent Cycles - Capital One Venture (Active statement balance, due in future)
+    // CLOSED Cycle - Capital One Venture (Active statement balance, due in future)
     {
       id: 'cycle-3',
       creditCardId: 'mock-card-2',
+      creditCardName: 'Capital One Venture',
       startDate: '2025-08-20',
       endDate: '2025-09-20',
       totalSpend: 642.18,
@@ -139,6 +141,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-4',
       creditCardId: 'mock-card-2',
+      creditCardName: 'Capital One Venture',
       startDate: '2025-07-20',
       endDate: '2025-08-19',
       totalSpend: 891.34,
@@ -147,10 +150,24 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       statementBalance: 891.34,
       paymentStatus: 'paid',
     },
+    // OPEN/CURRENT Cycle - American Express Gold (ongoing, no statement balance yet)
+    {
+      id: 'cycle-current-3',
+      creditCardId: 'mock-card-3',
+      creditCardName: 'American Express Gold',
+      startDate: '2025-08-11',
+      endDate: '2025-09-10', // Currently open cycle
+      totalSpend: 300.00, // New spending since overdue payment
+      transactionCount: 8,
+      // No dueDate yet - cycle not closed
+      // No statementBalance yet - cycle still open
+      paymentStatus: 'current',
+    },
     // OVERDUE Cycle - American Express Gold (Outstanding from August 2025 - a few weeks late)
     {
       id: 'cycle-5',
       creditCardId: 'mock-card-3',
+      creditCardName: 'American Express Gold',
       startDate: '2025-07-10',
       endDate: '2025-08-10',
       totalSpend: 1245.89,
@@ -162,6 +179,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-6',
       creditCardId: 'mock-card-3',
+      creditCardName: 'American Express Gold',
       startDate: '2025-06-10',
       endDate: '2025-07-09',
       totalSpend: 987.45,
@@ -174,6 +192,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-7',
       creditCardId: 'mock-card-1',
+      creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-05-16',
       endDate: '2025-06-15',
       totalSpend: 3245.89,
@@ -185,6 +204,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-8',
       creditCardId: 'mock-card-1',
+      creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-04-16',
       endDate: '2025-05-15',
       totalSpend: 1789.45,
@@ -197,6 +217,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-9',
       creditCardId: 'mock-card-2',
+      creditCardName: 'Capital One Venture',
       startDate: '2025-06-20',
       endDate: '2025-07-19',
       totalSpend: 1456.78,
@@ -208,6 +229,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-10',
       creditCardId: 'mock-card-2',
+      creditCardName: 'Capital One Venture',
       startDate: '2025-05-20',
       endDate: '2025-06-19',
       totalSpend: 723.56,
@@ -220,6 +242,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-11',
       creditCardId: 'mock-card-3',
+      creditCardName: 'American Express Gold',
       startDate: '2025-05-10',
       endDate: '2025-06-09',
       totalSpend: 1124.89,
@@ -231,6 +254,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     {
       id: 'cycle-12',
       creditCardId: 'mock-card-3',
+      creditCardName: 'American Express Gold',
       startDate: '2025-04-10',
       endDate: '2025-05-09',
       totalSpend: 834.45,
