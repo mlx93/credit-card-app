@@ -66,7 +66,16 @@ async function testPlaidConnection(accessToken: string, itemId: string): Promise
   // Test account balances (if accounts worked)
   if (connectivity.accounts) {
     try {
-      await plaidClient.accountsBalanceGet({ access_token: accessToken });
+      // Set min_last_updated_datetime to satisfy Capital One requirements
+      const minDate = new Date();
+      minDate.setDate(minDate.getDate() - 30);
+      
+      await plaidClient.accountsBalanceGet({ 
+        access_token: accessToken,
+        options: {
+          min_last_updated_datetime: minDate.toISOString()
+        }
+      });
       connectivity.balances = true;
     } catch (error: any) {
       console.log(`Balance check failed for ${itemId}:`, error?.response?.data);
