@@ -20,10 +20,30 @@ async function verifyPlaidWebhook(body: string, jwtToken: string): Promise<boole
     console.log('🔐 Plaid client ID present:', !!process.env.PLAID_CLIENT_ID);
     console.log('🔐 Plaid secret present:', !!process.env.PLAID_SECRET);
 
-    // Get the verification key from Plaid
-    console.log('🔐 Requesting webhook verification key from Plaid...');
+    // First, decode the JWT header to get the key_id (without verification)
+    console.log('🔐 Decoding JWT header to extract key_id...');
+    const jwtParts = jwtToken.split('.');
+    if (jwtParts.length !== 3) {
+      console.error('❌ Invalid JWT format - should have 3 parts');
+      return false;
+    }
+    
+    const headerBuffer = Buffer.from(jwtParts[0], 'base64url');
+    const header = JSON.parse(headerBuffer.toString());
+    console.log('🔐 JWT Header:', header);
+    
+    const keyId = header.kid;
+    if (!keyId) {
+      console.error('❌ No key_id found in JWT header');
+      return false;
+    }
+    
+    console.log('🔐 Extracted key_id:', keyId);
+
+    // Get the verification key from Plaid using the key_id
+    console.log('🔐 Requesting webhook verification key from Plaid with key_id...');
     try {
-      const response = await plaidClient.webhookVerificationKeyGet({});
+      const response = await plaidClient.webhookVerificationKeyGet({ key_id: keyId });
       console.log('🔐 Webhook verification key response status:', response.status);
       console.log('🔐 Webhook verification key response data keys:', Object.keys(response.data));
       
