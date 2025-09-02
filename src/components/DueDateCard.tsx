@@ -520,9 +520,7 @@ export function DueDateCard({
               <p className="text-sm text-gray-600">•••• {card.mask}</p>
               {card.plaidItem && (
                 <p className="text-xs text-gray-500">
-                  {hasConnectionIssue ? (
-                    <span className="text-red-600">Connection: {connectionStatus}</span>
-                  ) : lastSyncDaysAgo !== null && lastSyncHoursAgo !== null ? (
+                  {lastSyncDaysAgo !== null && lastSyncHoursAgo !== null ? (
                     <span>Last sync: {lastSyncDaysAgo === 0 ? 
                       (lastSyncHoursAgo === 0 ? 'Just now' : `${lastSyncHoursAgo}h ago`) : 
                       `${lastSyncDaysAgo}d ago`
@@ -595,27 +593,27 @@ export function DueDateCard({
             <div className="flex items-center gap-1">
               <button
                 onClick={handleSync}
-                disabled={syncing}
-                className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                title="Refresh data"
+                disabled={syncing || reconnecting}
+                className={`p-1 rounded disabled:opacity-50 ${
+                  hasConnectionIssue 
+                    ? 'hover:bg-blue-100 text-blue-500 hover:text-blue-700' 
+                    : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'
+                }`}
+                title={
+                  syncing ? "Syncing data..." :
+                  reconnecting ? "Opening reconnection..." :
+                  hasConnectionIssue ? "Reconnect account" :
+                  "Refresh data"
+                }
               >
-                <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing || reconnecting ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : hasConnectionIssue ? (
+                  <ExternalLink className="h-4 w-4" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
               </button>
-              
-              {hasConnectionIssue && onReconnect && (
-                <button
-                  onClick={handleReconnect}
-                  disabled={reconnecting}
-                  className="p-1 rounded hover:bg-blue-100 text-blue-500 hover:text-blue-700 disabled:opacity-50 transition-opacity"
-                  title={reconnecting ? "Creating reconnection link..." : "Reconnect account"}
-                >
-                  {reconnecting ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ExternalLink className="h-4 w-4" />
-                  )}
-                </button>
-              )}
               
               {onRemove && (
                 <button

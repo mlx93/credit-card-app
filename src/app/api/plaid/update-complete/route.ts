@@ -69,16 +69,22 @@ export async function POST(request: NextRequest) {
       // Update the access token in the database
       const encryptedAccessToken = encrypt(newAccessToken);
       
+      console.log('🔄 Updating database with new access token...', {
+        existingItemId: existingItem.id,
+        newItemId: newItemId,
+        institutionName: existingItem.institutionName || existingItem.institution_name
+      });
+      
       const { data: updatedItem, error: updateError } = await supabaseAdmin
         .from('plaid_items')
         .update({
-          access_token: encryptedAccessToken,
-          item_id: newItemId, // Item ID might change during update
+          accessToken: encryptedAccessToken, // Use camelCase column name
+          itemId: newItemId, // Item ID might change during update
           status: 'active',
-          last_sync_at: new Date().toISOString(),
-          error_code: null,
-          error_message: null,
-          updated_at: new Date().toISOString()
+          lastSyncAt: new Date().toISOString(),
+          errorCode: null,
+          errorMessage: null,
+          updatedAt: new Date().toISOString()
         })
         .eq('id', existingItem.id)
         .select()
@@ -138,9 +144,9 @@ export async function POST(request: NextRequest) {
             .from('plaid_items')
             .update({
               status: 'active', // Connection is fixed, but sync had issues
-              error_code: 'SYNC_WARNING',
-              error_message: `Connection restored but sync incomplete: ${JSON.stringify(syncResult.details)}`,
-              updated_at: new Date().toISOString()
+              errorCode: 'SYNC_WARNING',
+              errorMessage: `Connection restored but sync incomplete: ${JSON.stringify(syncResult.details)}`,
+              updatedAt: new Date().toISOString()
             })
             .eq('id', existingItem.id);
           
@@ -163,9 +169,9 @@ export async function POST(request: NextRequest) {
           .from('plaid_items')
           .update({
             status: 'active', // Connection is fixed, but sync had issues
-            error_code: 'SYNC_ERROR',
-            error_message: `Connection restored but comprehensive sync failed: ${syncError?.message}`,
-            updated_at: new Date().toISOString()
+            errorCode: 'SYNC_ERROR',
+            errorMessage: `Connection restored but comprehensive sync failed: ${syncError?.message}`,
+            updatedAt: new Date().toISOString()
           })
           .eq('id', existingItem.id);
         

@@ -56,8 +56,8 @@ export function PlaidUpdateLink({
           console.log(`🎉 ${institutionName} connection successfully updated!`);
           onSuccess();
         } else {
-          console.error(`❌ Failed to update ${institutionName} connection:`, data.error);
-          setError(`Failed to update connection: ${data.error}`);
+          console.error(`❌ Failed to update ${institutionName} connection:`, data);
+          setError(`Failed to update connection: ${data.error || data.details || 'Unknown error'}`);
         }
         
       } catch (error) {
