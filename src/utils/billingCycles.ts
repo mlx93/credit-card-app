@@ -28,6 +28,12 @@ export function isPaymentTransaction(transactionName: string): boolean {
     'ach payment',    // ACH payments
     'electronic payment', // Electronic payments
     'web payment',    // Web payments
+    'transfer',       // Bank transfers
+    'credit card payment', // Explicit credit card payments
+    'cc payment',     // Credit card payment abbreviation
+    'bill payment',   // Bill payment
+    'scheduled payment', // Scheduled payments
+    'recurring payment', // Recurring payments
   ];
   
   return paymentIndicators.some(indicator => lowerName.includes(indicator));
@@ -244,8 +250,12 @@ async function createOrUpdateCycle(
   if (hasStatementBalance) {
     const lastStatementDate = creditCard.lastStatementIssueDate ? new Date(creditCard.lastStatementIssueDate) : null;
     
-    // Check if this cycle ends exactly on the last statement date (most recent closed cycle)
-    const isStatementCycle = lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime();
+    // Check if this is the statement cycle (most recent closed cycle still within payment period)
+    const today = new Date();
+    const isClosedCycle = cycleEnd < today;
+    const isWithinPaymentPeriod = dueDate && dueDate >= today;
+    const isStatementCycle = (lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime()) ||
+                           (isClosedCycle && isWithinPaymentPeriod && hasStatementBalance);
     
     if (isStatementCycle) {
       // This is the exact cycle that corresponds to the last statement
