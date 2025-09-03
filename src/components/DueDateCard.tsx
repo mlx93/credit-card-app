@@ -4,52 +4,48 @@ import { useState, useEffect } from 'react';
 
 // Utility function to intelligently truncate credit card names
 const truncateCardName = (cardName: string): string => {
-  const maxLength = 25; // Target maximum length
+  const minLength = 15; // Always show at least 15 characters
+  const maxLength = 35; // Increased target maximum length
   
   if (cardName.length <= maxLength) {
     return cardName;
   }
 
-  // Common patterns to shorten intelligently
+  // Common patterns to shorten intelligently (more conservative)
   const shortenPatterns = [
-    // Generic shortening patterns
-    { from: /\bCustomized\b/gi, to: 'Custom' },
-    { from: /\bRewards\b/gi, to: 'Rewards' },
+    // Only remove redundant/unnecessary words
     { from: /\bSignature\b/gi, to: '' },
-    { from: /\bPlatinum\b/gi, to: 'Plat' },
-    { from: /\bPreferred\b/gi, to: 'Pref' },
-    { from: /\bUnlimited\b/gi, to: 'Unlmtd' },
-    { from: /\bBusiness\b/gi, to: 'Biz' },
-    { from: /\bProfessional\b/gi, to: 'Pro' },
-    
-    // Bank name shortening
-    { from: /\bBank of America\b/gi, to: 'BofA' },
-    { from: /\bAmerican Express\b/gi, to: 'Amex' },
-    { from: /\bCapital One\b/gi, to: 'Cap One' },
-    { from: /\bDiscover\b/gi, to: 'Discover' },
-    { from: /\bChase\b/gi, to: 'Chase' },
-    { from: /\bCitibank\b/gi, to: 'Citi' },
-    
-    // Card type shortening
     { from: /\bVisa\b/gi, to: '' },
     { from: /\bMastercard\b/gi, to: '' },
     { from: /\bMasterCard\b/gi, to: '' },
+    
+    // Light abbreviations for very common terms
+    { from: /\bCustomized\b/gi, to: 'Custom' },
+    { from: /\bPreferred\b/gi, to: 'Pref' },
+    { from: /\bUnlimited\b/gi, to: 'Unlmtd' },
+    { from: /\bBusiness\b/gi, to: 'Biz' },
+    
+    // Only abbreviate very long bank names
+    { from: /\bBank of America\b/gi, to: 'BofA' },
     { from: /\bAmerican Express\b/gi, to: 'Amex' },
   ];
 
   let shortened = cardName;
   
-  // Apply shortening patterns
+  // Apply shortening patterns only if needed
   for (const pattern of shortenPatterns) {
-    shortened = shortened.replace(pattern.from, pattern.to);
+    if (shortened.length > maxLength) {
+      shortened = shortened.replace(pattern.from, pattern.to);
+    }
   }
   
   // Clean up extra spaces
   shortened = shortened.replace(/\s+/g, ' ').trim();
   
-  // If still too long, truncate with ellipsis
+  // If still too long, truncate with ellipsis but respect minimum length
   if (shortened.length > maxLength) {
-    shortened = shortened.substring(0, maxLength - 3) + '...';
+    const truncateLength = Math.max(minLength, maxLength - 3);
+    shortened = shortened.substring(0, truncateLength) + '...';
   }
   
   return shortened;
@@ -353,15 +349,17 @@ export function DueDateCard({
   // Use card's own lastSyncAt as primary source, fallback to connection health
   const primarySyncTime = card.plaidItem?.lastSyncAt || cardConnectionHealth?.lastSuccessfulSync;
   
-  // Connection status indicators - skip for demo cards (no plaidItem)
-  const hasConnectionIssue = card.plaidItem && (connectionStatus === 'requires_auth' || connectionStatus === 'error');
-  const isStale = card.plaidItem && (connectionStatus === 'unknown' || (primarySyncTime && 
-    (new Date().getTime() - new Date(primarySyncTime).getTime()) > 24 * 60 * 60 * 1000)); // 24 hours
+  // Connection status indicators - skip for demo cards (no plaidItem)  
+  // Only show issues if we actually have connection health data AND there's a real problem
+  const hasConnectionIssue = card.plaidItem && connectionHealth && (connectionStatus === 'requires_auth' || connectionStatus === 'error');
+  const isStale = card.plaidItem && connectionHealth && primarySyncTime && 
+    (new Date().getTime() - new Date(primarySyncTime).getTime()) > 24 * 60 * 60 * 1000; // 24 hours
   
-  // Calculate time since last sync using primary sync time
+  // Calculate time since last sync using primary sync time with minute granularity
   const lastSyncTime = primarySyncTime ? new Date(primarySyncTime) : null;
   const timeDiffMs = lastSyncTime ? Date.now() - lastSyncTime.getTime() : null;
-  const lastSyncHoursAgo = timeDiffMs ? Math.max(0, Math.floor(timeDiffMs / (1000 * 60 * 60))) : null;
+  const lastSyncMinutesAgo = timeDiffMs ? Math.max(0, Math.floor(timeDiffMs / (1000 * 60))) : null;
+  const lastSyncHoursAgo = lastSyncMinutesAgo !== null ? Math.floor(lastSyncMinutesAgo / 60) : null;
   const lastSyncDaysAgo = lastSyncHoursAgo !== null ? Math.floor(lastSyncHoursAgo / 24) : null;
   
   // Determine credit limit logic
@@ -420,6 +418,7 @@ export function DueDateCard({
       cardLastSyncAt: card.plaidItem?.lastSyncAt,
       connectionLastSync: cardConnectionHealth?.lastSuccessfulSync,
       primarySyncTime,
+      lastSyncMinutesAgo,
       lastSyncHoursAgo,
       lastSyncDaysAgo,
       apiConnectivity
@@ -579,10 +578,12 @@ export function DueDateCard({
               <p className="text-sm text-gray-600">•••• {card.mask}</p>
               {card.plaidItem && (
                 <p className="text-xs text-gray-500">
-                  {lastSyncDaysAgo !== null && lastSyncHoursAgo !== null ? (
-                    <span>Last sync: {lastSyncDaysAgo === 0 ? 
-                      (lastSyncHoursAgo === 0 ? 'Just now' : `${lastSyncHoursAgo}h ago`) : 
-                      `${lastSyncDaysAgo}d ago`
+                  {lastSyncDaysAgo !== null && lastSyncHoursAgo !== null && lastSyncMinutesAgo !== null ? (
+                    <span>Last sync: {
+                      lastSyncDaysAgo > 0 ? `${lastSyncDaysAgo}d ago` :
+                      lastSyncHoursAgo > 0 ? `${lastSyncHoursAgo}h ago` :
+                      lastSyncMinutesAgo > 1 ? `${lastSyncMinutesAgo}m ago` :
+                      'Just now'
                     }</span>
                   ) : (
                     <span>Never synced</span>
