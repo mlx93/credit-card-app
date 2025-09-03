@@ -603,7 +603,7 @@ export function DueDateCard({
                   backdropFilter: 'blur(4px)',
                   WebkitBackdropFilter: 'blur(4px)',
                   minWidth: '90px',
-                  minHeight: '64px' // Match due date box height
+                  minHeight: '84px' // Increased to accommodate next due date or maintain height consistency
                 }}
               >
                 <div className="flex flex-col items-center justify-center h-full">
@@ -705,7 +705,7 @@ export function DueDateCard({
 
       {/* Balance Information - Show statement balance when there's a due date OR when balances differ */}
       {card.lastStatementBalance && (card.nextPaymentDueDate || card.lastStatementBalance !== card.balanceCurrent) ? (
-        <div className="grid grid-cols-3 gap-2 mb-2 min-h-[48px]">
+        <div className="grid grid-cols-3 gap-2 mb-4 min-h-[48px]">
           <div>
             <p className="text-xs text-gray-600">Statement Balance</p>
             <p className="font-semibold text-sm text-blue-600">
@@ -730,7 +730,7 @@ export function DueDateCard({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2 mb-2 min-h-[48px] items-center">
+        <div className="grid grid-cols-2 gap-2 mb-4 min-h-[48px] items-center">
           <div>
             <p className="text-xs text-gray-600 mb-1">Balance</p>
             <p className={`font-bold ${isPaidOff ? 'text-xl' : 'text-lg'} text-gray-900`}>
