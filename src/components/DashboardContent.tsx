@@ -15,8 +15,42 @@ interface DashboardContentProps {
 }
 
 export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
-  const [creditCards, setCreditCards] = useState<any[]>([]);
-  const [billingCycles, setBillingCycles] = useState<any[]>([]);
+  // Initialize state from localStorage if available
+  const [creditCards, setCreditCardsRaw] = useState<any[]>(() => {
+    if (typeof window !== 'undefined' && isLoggedIn) {
+      const cached = localStorage.getItem('cached_credit_cards');
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
+  const [billingCycles, setBillingCyclesRaw] = useState<any[]>(() => {
+    if (typeof window !== 'undefined' && isLoggedIn) {
+      const cached = localStorage.getItem('cached_billing_cycles');
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
+  
+  // Wrapper functions to also update localStorage when setting state
+  const setCreditCards = (cards: any) => {
+    const newCards = typeof cards === 'function' ? cards(creditCardsRaw) : cards;
+    setCreditCardsRaw(newCards);
+    if (typeof window !== 'undefined' && isLoggedIn) {
+      localStorage.setItem('cached_credit_cards', JSON.stringify(newCards));
+    }
+  };
+  
+  const setBillingCycles = (cycles: any) => {
+    const newCycles = typeof cycles === 'function' ? cycles(billingCyclesRaw) : cycles;
+    setBillingCyclesRaw(newCycles);
+    if (typeof window !== 'undefined' && isLoggedIn) {
+      localStorage.setItem('cached_billing_cycles', JSON.stringify(newCycles));
+    }
+  };
+  
+  // Use the raw state values for reading
+  const creditCards = creditCardsRaw;
+  const billingCycles = billingCyclesRaw;
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
   const [connectionHealth, setConnectionHealth] = useState<any>(null);
   const [loading, setLoading] = useState(false);
