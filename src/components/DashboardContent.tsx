@@ -298,7 +298,22 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     },
   ];
 
-  // Shared data fetching logic used by both fetchUserData and backgroundSync
+  // Shared Plaid API sync function
+  const syncWithPlaidAPI = async (logPrefix: string = '') => {
+    console.log(`🔄${logPrefix}: Starting Plaid API sync...`);
+    const syncResponse = await fetch('/api/sync', { method: 'POST' });
+    
+    if (syncResponse.ok) {
+      const syncResult = await syncResponse.json();
+      console.log(`✅${logPrefix}: Plaid sync completed successfully`);
+      return syncResult;
+    } else {
+      console.warn(`⚠️${logPrefix}: Plaid sync failed`);
+      throw new Error(`Plaid sync failed: ${syncResponse.status}`);
+    }
+  };
+
+  // Shared data fetching logic used by all sync functions
   const fetchAllUserData = async (logPrefix: string = '') => {
     if (!isLoggedIn) return;
     
@@ -418,20 +433,16 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     try {
       setBackgroundSyncing(true);
       
-      // Call /api/sync to actually sync with Plaid API (same as Refresh All)
-      console.log('🔄 Background sync: Starting Plaid API sync...');
-      const syncResponse = await fetch('/api/sync', { method: 'POST' });
-      
-      if (syncResponse.ok) {
-        const syncResult = await syncResponse.json();
-        console.log('✅ Background sync: Plaid sync completed successfully');
+      // Sync with Plaid API using shared function
+      try {
+        const syncResult = await syncWithPlaidAPI(' Background sync');
         
         // Handle any reconnection needs silently (don't auto-trigger for background sync)
         const needsReconnection = syncResult.results?.some((result: any) => result.requiresReconnection);
         if (needsReconnection) {
           console.log('⚠️ Background sync: Some connections need reconnection (user can use Refresh All for auto-reconnect)');
         }
-      } else {
+      } catch (error) {
         console.warn('⚠️ Background sync: Plaid sync failed, falling back to database fetch');
       }
       
@@ -462,21 +473,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       setRefreshStep('Connecting to your banks...');
       setRefreshProgress(20);
       
-      console.log('Calling /api/sync...');
-      const syncResponse = await fetch('/api/sync', { method: 'POST' });
-      console.log('Sync API response status:', syncResponse.status);
-      
-      if (!syncResponse.ok) {
-        console.error('Sync API failed with status:', syncResponse.status);
-        const errorText = await syncResponse.text();
-        console.error('Sync API error response:', errorText);
-        throw new Error(`Sync API failed: ${syncResponse.status}`);
-      }
-      
       setRefreshStep('Syncing account data...');
       setRefreshProgress(50);
       
-      const syncResult = await syncResponse.json();
+      const syncResult = await syncWithPlaidAPI(' Refresh All');
       console.log('Sync API success result:', syncResult);
       
       setRefreshStep('Processing connections...');
