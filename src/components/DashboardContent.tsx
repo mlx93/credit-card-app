@@ -890,6 +890,19 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                             .sort((a, b) => b.getTime() - a.getTime())[0]
                         : null;
 
+                      // Debug dashboard sync time calculation
+                      if (mostRecentSync) {
+                        const timeDiff = Date.now() - mostRecentSync.getTime();
+                        const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+                        console.log('🕐 DASHBOARD SYNC TIME DEBUG:', {
+                          mostRecentSyncTime: mostRecentSync.toISOString(),
+                          currentTime: new Date().toISOString(),
+                          timeDiffMs: timeDiff,
+                          minutesAgo,
+                          displayText: timeDiff < 30000 ? 'Data current' : minutesAgo < 60 ? `${minutesAgo}m ago` : 'older'
+                        });
+                      }
+
                       if (mostRecentSync) {
                         const timeDiff = Date.now() - mostRecentSync.getTime();
                         const minutesAgo = Math.floor(timeDiff / (1000 * 60));
