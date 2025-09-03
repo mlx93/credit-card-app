@@ -575,7 +575,7 @@ export function DueDateCard({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1 min-h-[24px]">
                 <h3 
-                  className="font-semibold text-gray-900 leading-tight text-sm"
+                  className="font-semibold text-gray-900 leading-tight"
                   style={{ 
                     maxWidth: '200px',
                     display: '-webkit-box',
