@@ -723,13 +723,13 @@ export function DueDateCard({
 
       {/* Balance Information - Show statement balance when there's a due date OR when balances differ */}
       {card.lastStatementBalance && (card.nextPaymentDueDate || card.lastStatementBalance !== card.balanceCurrent) ? (
-        <div className="grid grid-cols-3 gap-2 mb-4 min-h-[48px]">
+        <div className="grid grid-cols-3 gap-2 mb-auto min-h-[48px]">
           <div>
             <p className="text-xs text-gray-600">Statement Balance</p>
             <p className="font-semibold text-sm text-blue-600">
               {formatCurrency(Math.abs(card.lastStatementBalance))}
             </p>
-            <p className="text-xs text-blue-500 mb-2">Due on payment date</p>
+            <p className="text-xs text-blue-500">Due on payment date</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-gray-600">Current Balance</p>
@@ -769,7 +769,7 @@ export function DueDateCard({
         </div>
       )}
 
-      <div className="mb-2 mt-4">
+      <div className="mt-auto">
         <div className="flex justify-between items-center text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
           <div className="flex items-center gap-2">
