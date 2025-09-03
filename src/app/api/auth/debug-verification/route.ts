@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdminAccess } from '@/lib/adminSecurity';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,6 +9,13 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
+    // Security check - admin only
+    const securityError = await requireAdminAccess(request, {
+      endpointName: 'auth/debug-verification',
+      logAccess: true
+    });
+    if (securityError) return securityError;
+
     const { email } = await request.json();
     
     if (!email) {
