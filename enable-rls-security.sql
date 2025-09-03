@@ -9,8 +9,8 @@ ALTER TABLE billing_cycles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE aprs ENABLE ROW LEVEL SECURITY;
 
 -- 2. Create a helper function to get the current user's ID from session
--- This works with NextAuth sessions
-CREATE OR REPLACE FUNCTION auth.get_user_id() RETURNS uuid AS $$
+-- This works with NextAuth sessions and uses public schema
+CREATE OR REPLACE FUNCTION public.get_current_user_id() RETURNS uuid AS $$
 DECLARE
   user_id uuid;
 BEGIN
@@ -26,35 +26,35 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- 3. RLS Policies for plaid_items table
 -- Users can only access their own Plaid connections
 CREATE POLICY "Users can view own plaid items" ON plaid_items
     FOR SELECT 
     USING (
-        "userId" = auth.get_user_id() 
+        "userId" = public.get_current_user_id() 
         OR current_setting('role') = 'service_role'
     );
 
 CREATE POLICY "Users can insert own plaid items" ON plaid_items
     FOR INSERT 
     WITH CHECK (
-        "userId" = auth.get_user_id() 
+        "userId" = public.get_current_user_id() 
         OR current_setting('role') = 'service_role'
     );
 
 CREATE POLICY "Users can update own plaid items" ON plaid_items
     FOR UPDATE 
     USING (
-        "userId" = auth.get_user_id() 
+        "userId" = public.get_current_user_id() 
         OR current_setting('role') = 'service_role'
     );
 
 CREATE POLICY "Users can delete own plaid items" ON plaid_items
     FOR DELETE 
     USING (
-        "userId" = auth.get_user_id() 
+        "userId" = public.get_current_user_id() 
         OR current_setting('role') = 'service_role'
     );
 
@@ -64,7 +64,7 @@ CREATE POLICY "Users can view own credit cards" ON credit_cards
     FOR SELECT 
     USING (
         "plaidItemId" IN (
-            SELECT id FROM plaid_items WHERE "userId" = auth.get_user_id()
+            SELECT id FROM plaid_items WHERE "userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -73,7 +73,7 @@ CREATE POLICY "Users can insert own credit cards" ON credit_cards
     FOR INSERT 
     WITH CHECK (
         "plaidItemId" IN (
-            SELECT id FROM plaid_items WHERE "userId" = auth.get_user_id()
+            SELECT id FROM plaid_items WHERE "userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -82,7 +82,7 @@ CREATE POLICY "Users can update own credit cards" ON credit_cards
     FOR UPDATE 
     USING (
         "plaidItemId" IN (
-            SELECT id FROM plaid_items WHERE "userId" = auth.get_user_id()
+            SELECT id FROM plaid_items WHERE "userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -91,7 +91,7 @@ CREATE POLICY "Users can delete own credit cards" ON credit_cards
     FOR DELETE 
     USING (
         "plaidItemId" IN (
-            SELECT id FROM plaid_items WHERE "userId" = auth.get_user_id()
+            SELECT id FROM plaid_items WHERE "userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -104,7 +104,7 @@ CREATE POLICY "Users can view own transactions" ON transactions
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -115,7 +115,7 @@ CREATE POLICY "Users can insert own transactions" ON transactions
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -126,7 +126,7 @@ CREATE POLICY "Users can update own transactions" ON transactions
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -137,7 +137,7 @@ CREATE POLICY "Users can delete own transactions" ON transactions
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -150,7 +150,7 @@ CREATE POLICY "Users can view own billing cycles" ON billing_cycles
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -161,7 +161,7 @@ CREATE POLICY "Users can insert own billing cycles" ON billing_cycles
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -172,7 +172,7 @@ CREATE POLICY "Users can update own billing cycles" ON billing_cycles
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -183,7 +183,7 @@ CREATE POLICY "Users can delete own billing cycles" ON billing_cycles
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -196,7 +196,7 @@ CREATE POLICY "Users can view own aprs" ON aprs
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -207,7 +207,7 @@ CREATE POLICY "Users can insert own aprs" ON aprs
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -218,7 +218,7 @@ CREATE POLICY "Users can update own aprs" ON aprs
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
@@ -229,7 +229,7 @@ CREATE POLICY "Users can delete own aprs" ON aprs
         "creditCardId" IN (
             SELECT cc.id FROM credit_cards cc
             JOIN plaid_items pi ON cc."plaidItemId" = pi.id
-            WHERE pi."userId" = auth.get_user_id()
+            WHERE pi."userId" = public.get_current_user_id()
         )
         OR current_setting('role') = 'service_role'
     );
