@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Database type definitions based on Prisma schema
+// Database type definitions for Supabase tables
 export interface Database {
   next_auth: {
     Tables: {

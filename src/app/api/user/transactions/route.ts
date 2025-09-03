@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       throw new Error(`Failed to fetch transactions: ${transactionsError.message}`);
     }
 
-    // Format the response to match the original Prisma structure
+    // Format the response to match the expected structure
     const formattedTransactions = (transactions || []).map(transaction => ({
       ...transaction,
       creditCard: transaction.credit_cards ? {

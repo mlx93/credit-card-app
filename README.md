@@ -15,7 +15,7 @@ A comprehensive credit card management application built with Next.js and Plaid 
 ## Tech Stack
 
 - **Framework**: Next.js 15 with App Router
-- **Database**: SQLite with Prisma ORM
+- **Database**: PostgreSQL with Supabase
 - **Authentication**: NextAuth.js with Google OAuth
 - **Banking API**: Plaid for secure financial data access
 - **UI**: Tailwind CSS with Lucide React icons
@@ -43,8 +43,11 @@ A comprehensive credit card management application built with Next.js and Plaid 
    PLAID_SECRET=your_plaid_secret
    PLAID_ENV=sandbox # or development/production
    
-   # Database
-   DATABASE_URL="file:./dev.db"
+   # Database (Supabase)
+   DATABASE_URL="postgres://[user]:[password]@[host]:[port]/postgres"
+   NEXT_PUBLIC_SUPABASE_URL="https://[project].supabase.co"
+   NEXT_PUBLIC_SUPABASE_ANON_KEY="your_anon_key"
+   SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
    
    # NextAuth
    NEXTAUTH_SECRET=your_nextauth_secret
@@ -58,11 +61,8 @@ A comprehensive credit card management application built with Next.js and Plaid 
    APP_URL=http://localhost:3000
    ```
 
-3. **Set up the database**:
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
+3. **Database Setup**:
+   The database schema is already configured in Supabase. Ensure your Supabase project has the necessary tables created.
 
 4. **Run the development server**:
    ```bash
@@ -99,7 +99,7 @@ A comprehensive credit card management application built with Next.js and Plaid 
 
 ## Database Schema
 
-The application uses Prisma with the following key models:
+The application uses Supabase with the following key tables:
 - **User**: User accounts and authentication
 - **PlaidItem**: Connected financial institutions
 - **CreditCard**: Credit card account details
