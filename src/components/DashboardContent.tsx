@@ -298,106 +298,112 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     },
   ];
 
+  // Shared data fetching logic used by both fetchUserData and backgroundSync
+  const fetchAllUserData = async (logPrefix: string = '') => {
+    if (!isLoggedIn) return;
+    
+    // Get current month date range
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    
+    const [creditCardsRes, billingCyclesRes, transactionsRes, connectionHealthRes] = await Promise.all([
+      fetch('/api/user/credit-cards', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      }),
+      fetch('/api/user/billing-cycles', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      }),
+      fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      }),
+      fetch('/api/user/connection-health', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+    ]);
+
+    if (creditCardsRes.ok) {
+      const { creditCards: cards } = await creditCardsRes.json();
+      // Ensure cards is always an array to prevent filter errors
+      const safeCards = Array.isArray(cards) ? cards : [];
+      setCreditCards(safeCards);
+      
+      // Set default shared card order if it hasn't been set yet
+      if (sharedCardOrder.length === 0 && safeCards.length > 0) {
+        const defaultOrder = getDefaultCardOrder(safeCards);
+        setSharedCardOrder(defaultOrder);
+        console.log(`Setting default card order${logPrefix}:`, {
+          cardCount: safeCards.length,
+          defaultOrder,
+          cardNames: defaultOrder.map(id => safeCards.find(c => c.id === id)?.name)
+        });
+      }
+    }
+
+    if (billingCyclesRes.ok) {
+      const { billingCycles: cycles } = await billingCyclesRes.json();
+      
+      // Ensure cycles is always an array to prevent filter errors
+      const safeCycles = Array.isArray(cycles) ? cycles : [];
+      
+      // Debug: Log what we receive from API
+      const amexCycles = safeCycles.filter((c: any) => 
+        c.creditCardName?.toLowerCase().includes('platinum')
+      );
+      console.log(`🔍 DASHBOARD${logPrefix} RECEIVED FROM API:`, {
+        totalCycles: safeCycles.length,
+        amexCycles: amexCycles.length,
+        amexCycleIds: amexCycles.slice(0, 5).map((c: any) => ({
+          id: c.id?.substring(0, 8),
+          startDate: c.startDate,
+          endDate: c.endDate
+        }))
+      });
+      
+      setBillingCycles(safeCycles);
+    }
+
+    if (transactionsRes.ok) {
+      const { transactions } = await transactionsRes.json();
+      // Ensure transactions is always an array to prevent filter errors
+      const safeTransactions = Array.isArray(transactions) ? transactions : [];
+      setCurrentMonthTransactions(safeTransactions);
+    }
+
+    // Process connection health data
+    if (connectionHealthRes.ok) {
+      const healthData = await connectionHealthRes.json();
+      console.log(`📊 Connection health data received${logPrefix}:`, healthData);
+      setConnectionHealth(healthData);
+    } else {
+      const errorText = await connectionHealthRes.text();
+      console.warn(`Failed to fetch connection health data${logPrefix}:`, connectionHealthRes.status, errorText);
+      setConnectionHealth(null);
+    }
+  };
+
   const fetchUserData = async () => {
     if (!isLoggedIn) return;
     
     try {
       setLoading(true);
-      
-      // Get current month date range
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      
-      const [creditCardsRes, billingCyclesRes, transactionsRes, connectionHealthRes] = await Promise.all([
-        fetch('/api/user/credit-cards', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }),
-        fetch('/api/user/billing-cycles', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }),
-        fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }),
-        fetch('/api/user/connection-health', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        })
-      ]);
-
-      if (creditCardsRes.ok) {
-        const { creditCards: cards } = await creditCardsRes.json();
-        // Ensure cards is always an array to prevent filter errors
-        const safeCards = Array.isArray(cards) ? cards : [];
-        setCreditCards(safeCards);
-        
-        // Set default shared card order if it hasn't been set yet (first load)
-        if (sharedCardOrder.length === 0 && safeCards.length > 0) {
-          const defaultOrder = getDefaultCardOrder(safeCards);
-          setSharedCardOrder(defaultOrder);
-          console.log('Setting default card order:', {
-            cardCount: safeCards.length,
-            defaultOrder,
-            cardNames: defaultOrder.map(id => safeCards.find(c => c.id === id)?.name)
-          });
-        }
-      }
-
-      if (billingCyclesRes.ok) {
-        const { billingCycles: cycles } = await billingCyclesRes.json();
-        
-        // Ensure cycles is always an array to prevent filter errors
-        const safeCycles = Array.isArray(cycles) ? cycles : [];
-        
-        // Debug: Log what we receive from API
-        const amexCycles = safeCycles.filter((c: any) => 
-          c.creditCardName?.toLowerCase().includes('platinum')
-        );
-        console.log('🔍 DASHBOARD RECEIVED FROM API:', {
-          totalCycles: safeCycles.length,
-          amexCycles: amexCycles.length,
-          amexCycleIds: amexCycles.slice(0, 5).map((c: any) => ({
-            id: c.id?.substring(0, 8),
-            startDate: c.startDate,
-            endDate: c.endDate
-          }))
-        });
-        
-        setBillingCycles(safeCycles);
-      }
-
-      if (transactionsRes.ok) {
-        const { transactions } = await transactionsRes.json();
-        // Ensure transactions is always an array to prevent filter errors
-        const safeTransactions = Array.isArray(transactions) ? transactions : [];
-        setCurrentMonthTransactions(safeTransactions);
-      }
-
-      // Process connection health data
-      if (connectionHealthRes.ok) {
-        const healthData = await connectionHealthRes.json();
-        console.log('📊 Connection health data received:', healthData);
-        setConnectionHealth(healthData);
-      } else {
-        const errorText = await connectionHealthRes.text();
-        console.warn('Failed to fetch connection health data:', connectionHealthRes.status, errorText);
-        setConnectionHealth(null);
-      }
+      await fetchAllUserData('');
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
@@ -411,75 +417,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     
     try {
       setBackgroundSyncing(true);
-      
-      // Get current month date range
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      
-      const [creditCardsRes, billingCyclesRes, transactionsRes, connectionHealthRes] = await Promise.all([
-        fetch('/api/user/credit-cards', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }),
-        fetch('/api/user/billing-cycles', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }),
-        fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }),
-        fetch('/api/user/connection-health', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        })
-      ]);
-
-      if (creditCardsRes.ok) {
-        const { creditCards: cards } = await creditCardsRes.json();
-        // Ensure cards is always an array to prevent filter errors during background sync
-        const safeCards = Array.isArray(cards) ? cards : [];
-        setCreditCards(safeCards);
-        
-        // Preserve existing card order if it exists, or set new default order
-        if (sharedCardOrder.length === 0) {
-          const defaultOrder = getDefaultCardOrder(safeCards);
-          setSharedCardOrder(defaultOrder);
-        }
-      }
-
-      if (billingCyclesRes.ok) {
-        const { billingCycles: cycles } = await billingCyclesRes.json();
-        // Ensure cycles is always an array to prevent filter errors during background sync
-        const safeCycles = Array.isArray(cycles) ? cycles : [];
-        setBillingCycles(safeCycles);
-      }
-
-      if (transactionsRes.ok) {
-        const { transactions } = await transactionsRes.json();
-        // Ensure transactions is always an array to prevent filter errors during background sync
-        const safeTransactions = Array.isArray(transactions) ? transactions : [];
-        setCurrentMonthTransactions(safeTransactions);
-      }
-
-      if (connectionHealthRes.ok) {
-        const health = await connectionHealthRes.json();
-        setConnectionHealth(health);
-      }
-      
+      await fetchAllUserData(' (background sync)');
       setLastBackgroundSync(new Date());
     } catch (error) {
       console.error('Background sync error:', error);
