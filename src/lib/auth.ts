@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { createClient } from '@supabase/supabase-js';
+import { SupabaseAdapter } from '@next-auth/supabase-adapter';
 
 // Create Supabase client for NextAuth operations
 const supabase = createClient(
@@ -11,9 +12,12 @@ const supabase = createClient(
 
 export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
-  // Use database strategy without adapter to avoid schema issues
+  adapter: SupabaseAdapter({
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  }),
   session: {
-    strategy: 'jwt', // Use JWT instead of database sessions to avoid schema issues
+    strategy: 'jwt', // Keep JWT for compatibility
   },
   providers: [
     GoogleProvider({
