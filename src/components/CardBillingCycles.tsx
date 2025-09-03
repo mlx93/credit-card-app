@@ -1,6 +1,55 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency, formatDate, getDaysUntil } from '@/utils/format';
 import { Calendar, CreditCard, ChevronDown, ChevronRight, History, GripVertical } from 'lucide-react';
+
+// Utility function to intelligently truncate credit card names (shared with DueDateCard)
+const truncateCardName = (cardName: string): string => {
+  const minLength = 15; // Always show at least 15 characters
+  const maxLength = 35; // Increased target maximum length
+  
+  if (cardName.length <= maxLength) {
+    return cardName;
+  }
+
+  // Common patterns to shorten intelligently (more conservative)
+  const shortenPatterns = [
+    // Only remove redundant/unnecessary words
+    { from: /\bSignature\b/gi, to: '' },
+    { from: /\bVisa\b/gi, to: '' },
+    { from: /\bMastercard\b/gi, to: '' },
+    { from: /\bMasterCard\b/gi, to: '' },
+    
+    // Light abbreviations for very common terms
+    { from: /\bCustomized\b/gi, to: 'Custom' },
+    { from: /\bPreferred\b/gi, to: 'Pref' },
+    { from: /\bUnlimited\b/gi, to: 'Unlmtd' },
+    { from: /\bBusiness\b/gi, to: 'Biz' },
+    
+    // Only abbreviate very long bank names
+    { from: /\bBank of America\b/gi, to: 'BofA' },
+    { from: /\bAmerican Express\b/gi, to: 'Amex' },
+  ];
+
+  let shortened = cardName;
+  
+  // Apply shortening patterns only if needed
+  for (const pattern of shortenPatterns) {
+    if (shortened.length > maxLength) {
+      shortened = shortened.replace(pattern.from, pattern.to);
+    }
+  }
+  
+  // Clean up extra spaces
+  shortened = shortened.replace(/\s+/g, ' ').trim();
+  
+  // If still too long, truncate with ellipsis but respect minimum length
+  if (shortened.length > maxLength) {
+    const truncateLength = Math.max(minLength, maxLength - 3);
+    shortened = shortened.substring(0, truncateLength) + '...';
+  }
+  
+  return shortened;
+};
 import {
   DndContext,
   closestCenter,
@@ -816,7 +865,9 @@ function CardContent({
             <CreditCard className="h-5 w-5 text-gray-600 mr-2" />
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-gray-900">{cardName}</h3>
+                <h3 className="font-semibold text-gray-900" title={cardName}>
+                  {truncateCardName(cardName)}
+                </h3>
               </div>
               {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
             </div>
