@@ -30,14 +30,25 @@ export async function GET(request: NextRequest) {
       .select('userId, provider, type')
       .order('userId');
 
+    console.log('👥 Accounts data:', accounts);
+    console.log('👥 Accounts error:', accountsError);
+
     const usersWithAuthType = users?.map(user => {
-      const hasOAuth = accounts?.some(acc => acc.userId === user.id);
+      const userAccounts = accounts?.filter(acc => acc.userId === user.id) || [];
+      const hasOAuth = userAccounts.length > 0;
+      
+      console.log(`👥 User ${user.email}:`, {
+        hasOAuth,
+        accounts: userAccounts
+      });
+      
       return {
         id: user.id,
         email: user.email,
         name: user.name || 'No name',
         createdAt: user.createdAt,
-        authType: hasOAuth ? 'Google OAuth' : 'Email Code'
+        authType: hasOAuth ? 'Google OAuth' : 'Email Code',
+        accountsFound: userAccounts
       };
     }) || [];
 
