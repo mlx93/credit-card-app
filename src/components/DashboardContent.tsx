@@ -784,18 +784,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    // On first load, show loading spinner and fetch all data
-    const hasExistingData = creditCards.length > 0 || billingCycles.length > 0;
-    
-    if (!hasExistingData) {
-      // First load: show loading spinner
-      fetchUserData();
-      setTimeout(checkConnectionHealth, 1000);
-    } else {
-      // Subsequent loads: background sync without blocking UI
-      backgroundSync();
-      setTimeout(checkConnectionHealth, 1000);
-    }
+    // Always start background sync immediately without blocking UI
+    // The UI will show cached data (if any) or empty state while sync runs
+    backgroundSync();
+    setTimeout(checkConnectionHealth, 1000);
   }, [isLoggedIn]);
 
   // Auto-close success popup after 5 seconds
@@ -951,26 +943,45 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                     )}
                   </button>
                   
-                  {/* Background sync status and last sync time */}
-                  {lastBackgroundSync && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      {(() => {
-                        const timeDiff = Date.now() - lastBackgroundSync.getTime();
-                        const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
-                        const daysAgo = Math.floor(hoursAgo / 24);
-                        
-                        if (hoursAgo === 0) {
-                          return 'Last sync: Just now';
-                        } else if (daysAgo === 0) {
-                          return `Last sync: ${hoursAgo}h ago`;
-                        } else {
-                          return `Last sync: ${daysAgo}d ago`;
-                        }
-                      })()}
-                    </div>
-                  )}
+                  {/* Elegant background sync status */}
+                  <div className="flex items-center space-x-2 text-xs">
+                    {backgroundSyncing ? (
+                      <div className="flex items-center text-blue-600">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-2"></div>
+                        <span className="font-medium">Syncing data...</span>
+                      </div>
+                    ) : lastBackgroundSync ? (
+                      <div className="text-gray-500">
+                        {(() => {
+                          const timeDiff = Date.now() - lastBackgroundSync.getTime();
+                          const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
+                          const daysAgo = Math.floor(hoursAgo / 24);
+                          
+                          if (hoursAgo === 0) {
+                            return (
+                              <div className="flex items-center">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                <span>Data current</span>
+                              </div>
+                            );
+                          } else if (daysAgo === 0) {
+                            return `Synced ${hoursAgo}h ago`;
+                          } else {
+                            return `Synced ${daysAgo}d ago`;
+                          }
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="text-gray-400">
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
+                          <span>Ready to sync</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   
-                  <PlaidLink onSuccess={fetchUserData} />
+                  <PlaidLink onSuccess={backgroundSync} />
                 </>
               ) : (
                 <div className="text-center py-2">
@@ -1036,18 +1047,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           </div>
         )}
 
-        {isLoggedIn && loading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <Loader2 className="h-12 w-12 animate-spin text-indigo-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading your credit card data...</h3>
-              <p className="text-gray-600">Please wait while we fetch your latest information</p>
-            </div>
-          </div>
-        )}
-
-        {(!isLoggedIn || !loading) && (
-          <>
+        {/* Always show content immediately - no more blocking loading states */}
 
         {/* Revolutionary Horizontal Card Layout */}
         <div className="mb-6">
@@ -1081,9 +1081,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             </div>
           ) : null}
         </div>
-
-          </>
-        )}
       </div>
       
       {/* Full-page loading overlay during refresh */}
