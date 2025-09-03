@@ -1,6 +1,59 @@
 import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/utils/format';
 import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical, Edit3, Check, X, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
+// Utility function to intelligently truncate credit card names
+const truncateCardName = (cardName: string): string => {
+  const maxLength = 25; // Target maximum length
+  
+  if (cardName.length <= maxLength) {
+    return cardName;
+  }
+
+  // Common patterns to shorten intelligently
+  const shortenPatterns = [
+    // Generic shortening patterns
+    { from: /\bCustomized\b/gi, to: 'Custom' },
+    { from: /\bRewards\b/gi, to: 'Rewards' },
+    { from: /\bSignature\b/gi, to: '' },
+    { from: /\bPlatinum\b/gi, to: 'Plat' },
+    { from: /\bPreferred\b/gi, to: 'Pref' },
+    { from: /\bUnlimited\b/gi, to: 'Unlmtd' },
+    { from: /\bBusiness\b/gi, to: 'Biz' },
+    { from: /\bProfessional\b/gi, to: 'Pro' },
+    
+    // Bank name shortening
+    { from: /\bBank of America\b/gi, to: 'BofA' },
+    { from: /\bAmerican Express\b/gi, to: 'Amex' },
+    { from: /\bCapital One\b/gi, to: 'Cap One' },
+    { from: /\bDiscover\b/gi, to: 'Discover' },
+    { from: /\bChase\b/gi, to: 'Chase' },
+    { from: /\bCitibank\b/gi, to: 'Citi' },
+    
+    // Card type shortening
+    { from: /\bVisa\b/gi, to: '' },
+    { from: /\bMastercard\b/gi, to: '' },
+    { from: /\bMasterCard\b/gi, to: '' },
+    { from: /\bAmerican Express\b/gi, to: 'Amex' },
+  ];
+
+  let shortened = cardName;
+  
+  // Apply shortening patterns
+  for (const pattern of shortenPatterns) {
+    shortened = shortened.replace(pattern.from, pattern.to);
+  }
+  
+  // Clean up extra spaces
+  shortened = shortened.replace(/\s+/g, ' ').trim();
+  
+  // If still too long, truncate with ellipsis
+  if (shortened.length > maxLength) {
+    shortened = shortened.substring(0, maxLength - 3) + '...';
+  }
+  
+  return shortened;
+};
 import {
   DndContext,
   closestCenter,
@@ -490,7 +543,7 @@ export function DueDateCard({
   };
   
   return (
-    <div className={`p-2 rounded-lg shadow-sm border-2 border-l-4 min-h-[200px] flex flex-col justify-between ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
+    <div className={`p-2 rounded-lg shadow-sm border-2 border-l-4 min-h-[200px] max-h-[250px] flex flex-col justify-between ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
       <div className="mb-2">
         {/* Header Row with Due Date Box */}
         <div className="flex items-start justify-between mb-1">
@@ -502,18 +555,19 @@ export function DueDateCard({
             )}
             <CreditCard className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 min-h-[24px]">
                 <h3 
-                  className="font-semibold text-gray-900 break-words leading-tight"
+                  className="font-semibold text-gray-900 leading-tight text-sm"
                   style={{ 
-                    maxWidth: '280px',
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word',
-                    hyphens: 'auto'
+                    maxWidth: '200px',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 1,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
                   }}
-                  title={card.name}
+                  title={card.name} // Show full name on hover
                 >
-                  {card.name}
+                  {truncateCardName(card.name)} {/* Display truncated name */}
                 </h3>
                 {hasConnectionIssue && (
                   <WifiOff className="h-4 w-4 text-red-500 flex-shrink-0" title="Connection issue" />
