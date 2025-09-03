@@ -1,10 +1,7 @@
 -- Fix search_path security issue for get_current_user_id function
 -- Run this SQL in your Supabase SQL Editor
 
--- Drop the existing function
-DROP FUNCTION IF EXISTS public.get_current_user_id();
-
--- Recreate with secure search_path
+-- Update the existing function with secure search_path (no DROP needed)
 CREATE OR REPLACE FUNCTION public.get_current_user_id() RETURNS uuid AS $$
 DECLARE
   user_id uuid;
