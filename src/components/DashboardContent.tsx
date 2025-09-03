@@ -316,16 +316,18 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
       if (creditCardsRes.ok) {
         const { creditCards: cards } = await creditCardsRes.json();
-        setCreditCards(cards);
+        // Ensure cards is always an array to prevent filter errors
+        const safeCards = Array.isArray(cards) ? cards : [];
+        setCreditCards(safeCards);
         
         // Set default shared card order if it hasn't been set yet (first load)
-        if (sharedCardOrder.length === 0 && cards.length > 0) {
-          const defaultOrder = getDefaultCardOrder(cards);
+        if (sharedCardOrder.length === 0 && safeCards.length > 0) {
+          const defaultOrder = getDefaultCardOrder(safeCards);
           setSharedCardOrder(defaultOrder);
           console.log('Setting default card order:', {
-            cardCount: cards.length,
+            cardCount: safeCards.length,
             defaultOrder,
-            cardNames: defaultOrder.map(id => cards.find(c => c.id === id)?.name)
+            cardNames: defaultOrder.map(id => safeCards.find(c => c.id === id)?.name)
           });
         }
       }
@@ -333,12 +335,15 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       if (billingCyclesRes.ok) {
         const { billingCycles: cycles } = await billingCyclesRes.json();
         
+        // Ensure cycles is always an array to prevent filter errors
+        const safeCycles = Array.isArray(cycles) ? cycles : [];
+        
         // Debug: Log what we receive from API
-        const amexCycles = cycles.filter((c: any) => 
+        const amexCycles = safeCycles.filter((c: any) => 
           c.creditCardName?.toLowerCase().includes('platinum')
         );
         console.log('🔍 DASHBOARD RECEIVED FROM API:', {
-          totalCycles: cycles.length,
+          totalCycles: safeCycles.length,
           amexCycles: amexCycles.length,
           amexCycleIds: amexCycles.slice(0, 5).map((c: any) => ({
             id: c.id?.substring(0, 8),
@@ -347,12 +352,14 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           }))
         });
         
-        setBillingCycles(cycles);
+        setBillingCycles(safeCycles);
       }
 
       if (transactionsRes.ok) {
         const { transactions } = await transactionsRes.json();
-        setCurrentMonthTransactions(transactions);
+        // Ensure transactions is always an array to prevent filter errors
+        const safeTransactions = Array.isArray(transactions) ? transactions : [];
+        setCurrentMonthTransactions(safeTransactions);
       }
 
       // Process connection health data
@@ -417,23 +424,29 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
       if (creditCardsRes.ok) {
         const { creditCards: cards } = await creditCardsRes.json();
-        setCreditCards(cards);
+        // Ensure cards is always an array to prevent filter errors during background sync
+        const safeCards = Array.isArray(cards) ? cards : [];
+        setCreditCards(safeCards);
         
         // Preserve existing card order if it exists, or set new default order
         if (sharedCardOrder.length === 0) {
-          const defaultOrder = getDefaultCardOrder(cards);
+          const defaultOrder = getDefaultCardOrder(safeCards);
           setSharedCardOrder(defaultOrder);
         }
       }
 
       if (billingCyclesRes.ok) {
-        const cycles = await billingCyclesRes.json();
-        setBillingCycles(cycles);
+        const { billingCycles: cycles } = await billingCyclesRes.json();
+        // Ensure cycles is always an array to prevent filter errors during background sync
+        const safeCycles = Array.isArray(cycles) ? cycles : [];
+        setBillingCycles(safeCycles);
       }
 
       if (transactionsRes.ok) {
-        const transactions = await transactionsRes.json();
-        setCurrentMonthTransactions(transactions);
+        const { transactions } = await transactionsRes.json();
+        // Ensure transactions is always an array to prevent filter errors during background sync
+        const safeTransactions = Array.isArray(transactions) ? transactions : [];
+        setCurrentMonthTransactions(safeTransactions);
       }
 
       if (connectionHealthRes.ok) {
@@ -807,8 +820,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   }, [isLoggedIn]);
 
-  const displayCards = isLoggedIn ? creditCards : mockCards;
-  const displayCycles = isLoggedIn ? billingCycles : mockCycles.map(cycle => ({
+  const displayCards = isLoggedIn ? (Array.isArray(creditCards) ? creditCards : []) : mockCards;
+  const displayCycles = isLoggedIn ? (Array.isArray(billingCycles) ? billingCycles : []) : mockCycles.map(cycle => ({
     ...cycle,
     startDate: new Date(cycle.startDate),
     endDate: new Date(cycle.endDate),
@@ -816,12 +829,12 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   }));
   
   // Debug: Log what we're actually passing to components
-  if (isLoggedIn && billingCycles.length > 0) {
-    const amexCycles = displayCycles.filter((c: any) => 
+  if (isLoggedIn && Array.isArray(billingCycles) && billingCycles.length > 0) {
+    const amexCycles = (Array.isArray(displayCycles) ? displayCycles : []).filter((c: any) => 
       c.creditCardName?.toLowerCase().includes('platinum')
     );
     console.log('🔍 DASHBOARD PASSING TO COMPONENT:', {
-      totalCycles: displayCycles.length,
+      totalCycles: Array.isArray(displayCycles) ? displayCycles.length : 0,
       amexCycles: amexCycles.length
     });
   }
@@ -830,20 +843,22 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const totalSpendThisMonth = (() => {
     if (!isLoggedIn) {
       // For mock data, show sum of all cycle spending
-      return displayCycles.reduce((sum, cycle) => sum + cycle.totalSpend, 0);
+      return Array.isArray(displayCycles) ? displayCycles.reduce((sum, cycle) => sum + cycle.totalSpend, 0) : 0;
     }
     
     // For real data, sum all transaction amounts from current month
     // Transaction amounts are positive for purchases/spending
-    return currentMonthTransactions.reduce((sum, transaction) => {
+    return Array.isArray(currentMonthTransactions) ? currentMonthTransactions.reduce((sum, transaction) => {
       // Only include positive amounts (spending), exclude payments/credits
       return transaction.amount > 0 ? sum + transaction.amount : sum;
-    }, 0);
+    }, 0) : 0;
   })();
-  const totalBalance = displayCards.reduce((sum, card) => 
+  const totalBalance = Array.isArray(displayCards) ? displayCards.reduce((sum, card) => 
     sum + Math.abs(card.balanceCurrent || 0), 0
-  );
+  ) : 0;
   const averageUtilization = (() => {
+    if (!Array.isArray(displayCards)) return 0;
+    
     const cardsWithLimits = displayCards.filter(card => {
       const effectiveLimit = card.ismanuallimit ? card.manualcreditlimit : card.balanceLimit;
       return effectiveLimit && effectiveLimit > 0 && isFinite(effectiveLimit);
