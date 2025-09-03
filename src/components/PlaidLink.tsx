@@ -65,7 +65,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               setTimeout(() => {
                 setLoading(false);
                 setSyncInProgress(false);
-                onSuccess?.();
+                // Add delay before refresh to ensure database has been updated
+                setTimeout(() => {
+                  onSuccess?.();
+                }, 1000); // Wait 1 second for database to be fully updated
               }, 2000);
             } else {
               const syncData = await syncResponse.json();
@@ -78,8 +81,11 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 setLoading(false);
                 setSyncInProgress(false);
                 
-                // Trigger immediate refresh to show the new card
-                onSuccess?.();
+                // Add delay before refresh to ensure database has been updated
+                setTimeout(() => {
+                  // Trigger immediate refresh to show the new card
+                  onSuccess?.();
+                }, 1000); // Wait 1 second for database to be fully updated
                 
                 // Poll for billing cycle completion and trigger second refresh
                 const pollForBillingCycles = async () => {
@@ -121,7 +127,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
             setTimeout(() => {
               setLoading(false);
               setSyncInProgress(false);
-              onSuccess?.();
+              // Add delay before refresh to ensure database has been updated
+              setTimeout(() => {
+                onSuccess?.();
+              }, 1000); // Wait 1 second for database to be fully updated
             }, 2000);
           }
         } else {
