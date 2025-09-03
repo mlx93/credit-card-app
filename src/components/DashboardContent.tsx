@@ -16,14 +16,14 @@ interface DashboardContentProps {
 
 export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   // Initialize state from localStorage if available
-  const [creditCards, setCreditCardsRaw] = useState<any[]>(() => {
+  const [creditCards, setCreditCards] = useState<any[]>(() => {
     if (typeof window !== 'undefined' && isLoggedIn) {
       const cached = localStorage.getItem('cached_credit_cards');
       return cached ? JSON.parse(cached) : [];
     }
     return [];
   });
-  const [billingCycles, setBillingCyclesRaw] = useState<any[]>(() => {
+  const [billingCycles, setBillingCycles] = useState<any[]>(() => {
     if (typeof window !== 'undefined' && isLoggedIn) {
       const cached = localStorage.getItem('cached_billing_cycles');
       return cached ? JSON.parse(cached) : [];
@@ -31,25 +31,18 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     return [];
   });
   
-  // Wrapper functions to also update localStorage when setting state
-  const setCreditCards = (cards: any) => {
-    const newCards = typeof cards === 'function' ? cards(creditCardsRaw) : cards;
-    setCreditCardsRaw(newCards);
-    if (typeof window !== 'undefined' && isLoggedIn) {
-      localStorage.setItem('cached_credit_cards', JSON.stringify(newCards));
+  // Save to localStorage whenever state changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isLoggedIn && creditCards.length > 0) {
+      localStorage.setItem('cached_credit_cards', JSON.stringify(creditCards));
     }
-  };
+  }, [creditCards, isLoggedIn]);
   
-  const setBillingCycles = (cycles: any) => {
-    const newCycles = typeof cycles === 'function' ? cycles(billingCyclesRaw) : cycles;
-    setBillingCyclesRaw(newCycles);
-    if (typeof window !== 'undefined' && isLoggedIn) {
-      localStorage.setItem('cached_billing_cycles', JSON.stringify(newCycles));
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isLoggedIn && billingCycles.length > 0) {
+      localStorage.setItem('cached_billing_cycles', JSON.stringify(billingCycles));
     }
-  };
-  
-  // Use the raw state values directly (no need to redeclare)
-  // creditCards = creditCardsRaw and billingCycles = billingCyclesRaw are used via the wrapper functions
+  }, [billingCycles, isLoggedIn]);
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
   const [connectionHealth, setConnectionHealth] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -792,7 +785,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     if (!isLoggedIn) return;
 
     // On first load, show loading spinner and fetch all data
-    const hasExistingData = creditCardsRaw.length > 0 || billingCyclesRaw.length > 0;
+    const hasExistingData = creditCards.length > 0 || billingCycles.length > 0;
     
     if (!hasExistingData) {
       // First load: show loading spinner
@@ -853,8 +846,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   }, [isLoggedIn]);
 
-  const displayCards = isLoggedIn ? (Array.isArray(creditCardsRaw) ? creditCardsRaw : []) : mockCards;
-  const displayCycles = isLoggedIn ? (Array.isArray(billingCyclesRaw) ? billingCyclesRaw : []) : mockCycles.map(cycle => ({
+  const displayCards = isLoggedIn ? (Array.isArray(creditCards) ? creditCards : []) : mockCards;
+  const displayCycles = isLoggedIn ? (Array.isArray(billingCycles) ? billingCycles : []) : mockCycles.map(cycle => ({
     ...cycle,
     startDate: new Date(cycle.startDate),
     endDate: new Date(cycle.endDate),
@@ -862,7 +855,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   }));
   
   // Debug: Log what we're actually passing to components
-  if (isLoggedIn && Array.isArray(billingCyclesRaw) && billingCyclesRaw.length > 0) {
+  if (isLoggedIn && Array.isArray(billingCycles) && billingCycles.length > 0) {
     const amexCycles = (Array.isArray(displayCycles) ? displayCycles : []).filter((c: any) => 
       c.creditCardName?.toLowerCase().includes('platinum')
     );
