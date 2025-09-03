@@ -769,7 +769,7 @@ export function DueDateCard({
         </div>
       )}
 
-      <div className="mb-2">
+      <div className="mb-2 mt-4">
         <div className="flex justify-between items-center text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
           <div className="flex items-center gap-2">
