@@ -582,8 +582,9 @@ export function DueDateCard({
                     <span>Last sync: {
                       lastSyncDaysAgo > 0 ? `${lastSyncDaysAgo}d ago` :
                       lastSyncHoursAgo > 0 ? `${lastSyncHoursAgo}h ago` :
-                      lastSyncMinutesAgo > 1 ? `${lastSyncMinutesAgo}m ago` :
-                      'Just now'
+                      lastSyncMinutesAgo >= 1 ? `${lastSyncMinutesAgo}m ago` :
+                      timeDiffMs && timeDiffMs < 30000 ? 'Just now' :
+                      'Less than 1m ago'
                     }</span>
                   ) : (
                     <span>Never synced</span>

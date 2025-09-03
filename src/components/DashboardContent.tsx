@@ -896,7 +896,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                         const hoursAgo = Math.floor(minutesAgo / 60);
                         const daysAgo = Math.floor(hoursAgo / 24);
                         
-                        if (minutesAgo <= 1) {
+                        if (timeDiff < 30000) { // Less than 30 seconds
                           return (
                             <div className="flex items-center text-green-600">
                               <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
