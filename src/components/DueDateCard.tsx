@@ -4,39 +4,40 @@ import { useState, useEffect } from 'react';
 
 // Utility function to intelligently truncate credit card names
 const truncateCardName = (cardName: string): string => {
-  const minLength = 15; // Always show at least 15 characters
-  const maxLength = 35; // Increased target maximum length
+  const minLength = 18; // Show more characters to avoid harsh truncation
+  const maxLength = 25; // Shorter max to keep cards consistent
   
   if (cardName.length <= maxLength) {
     return cardName;
   }
 
-  // Common patterns to shorten intelligently (more conservative)
+  // Common patterns to shorten intelligently
   const shortenPatterns = [
-    // Only remove redundant/unnecessary words
-    { from: /\bSignature\b/gi, to: '' },
+    // Remove card network names that don't add value
+    { from: /\bVisa Signature\b/gi, to: '' },
     { from: /\bVisa\b/gi, to: '' },
     { from: /\bMastercard\b/gi, to: '' },
     { from: /\bMasterCard\b/gi, to: '' },
+    { from: /\bSignature\b/gi, to: '' },
     
-    // Light abbreviations for very common terms
+    // Smart abbreviations for common terms
     { from: /\bCustomized\b/gi, to: 'Custom' },
+    { from: /\bRewards\b/gi, to: 'Rewards' }, // Keep "Rewards" as is
+    { from: /\bCash Rewards\b/gi, to: 'Cash' }, // But "Cash Rewards" becomes just "Cash"
     { from: /\bPreferred\b/gi, to: 'Pref' },
     { from: /\bUnlimited\b/gi, to: 'Unlmtd' },
     { from: /\bBusiness\b/gi, to: 'Biz' },
     
-    // Only abbreviate very long bank names
+    // Bank name abbreviations
     { from: /\bBank of America\b/gi, to: 'BofA' },
     { from: /\bAmerican Express\b/gi, to: 'Amex' },
   ];
 
   let shortened = cardName;
   
-  // Apply shortening patterns only if needed
+  // Apply shortening patterns
   for (const pattern of shortenPatterns) {
-    if (shortened.length > maxLength) {
-      shortened = shortened.replace(pattern.from, pattern.to);
-    }
+    shortened = shortened.replace(pattern.from, pattern.to);
   }
   
   // Clean up extra spaces
