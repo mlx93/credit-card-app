@@ -366,15 +366,16 @@ async function createOrUpdateCycle(
         totalSpend,
         updatedAt: new Date().toISOString(),
       })
-      .select()
-      .single();
+      .select();
 
-    if (createError || !newCycle) {
-      throw new Error(`Failed to create billing cycle: ${createError?.message}`);
+    if (createError || !newCycle || newCycle.length === 0) {
+      throw new Error(`Failed to create billing cycle: ${createError?.message || 'No data returned'}`);
     }
+    
+    const createdCycle = Array.isArray(newCycle) ? newCycle[0] : newCycle;
 
     cycles.push({
-      id: newCycle.id,
+      id: createdCycle.id,
       creditCardId: creditCard.id,
       creditCardName: creditCard.name,
       creditCardMask: creditCard.mask,
@@ -397,17 +398,20 @@ async function createOrUpdateCycle(
         minimumPayment,
         dueDate: dueDate?.toISOString() || null,
         totalSpend,
+        updatedAt: new Date().toISOString(),
       })
       .eq('id', existingCycle.id)
-      .select()
-      .single();
+      .select();
 
-    if (updateError || !updatedCycle) {
-      throw new Error(`Failed to update billing cycle: ${updateError?.message}`);
+    if (updateError || !updatedCycle || updatedCycle.length === 0) {
+      console.error(`Failed to update billing cycle ${existingCycle.id}:`, updateError);
+      throw new Error(`Failed to update billing cycle: ${updateError?.message || 'No rows affected'}`);
     }
+    
+    const modifiedCycle = Array.isArray(updatedCycle) ? updatedCycle[0] : updatedCycle;
 
     cycles.push({
-      id: updatedCycle.id,
+      id: modifiedCycle.id,
       creditCardId: creditCard.id,
       creditCardName: creditCard.name,
       creditCardMask: creditCard.mask,

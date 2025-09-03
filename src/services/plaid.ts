@@ -1068,7 +1068,9 @@ class PlaidServiceImpl implements PlaidService {
       maxPastDate.setFullYear(maxPastDate.getFullYear() - 2); // 2 years max
       
       if (startDate < maxPastDate) {
-        console.warn(`⚠️ Start date ${startDate.toISOString().split('T')[0]} is more than 2 years ago, may cause 400 error`);
+        console.warn(`⚠️ Start date ${startDate.toISOString().split('T')[0]} is more than 2 years ago, adjusting to 2 years max`);
+        startDate.setTime(maxPastDate.getTime()); // Cap at 2 years ago
+        console.log(`🔧 Adjusted start date to 2 years ago: ${startDate.toISOString().split('T')[0]}`);
       }
       
       if (endDate > now) {

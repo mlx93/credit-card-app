@@ -305,8 +305,9 @@ export function DueDateCard({
   
   // Calculate time since last sync
   const lastSyncTime = lastSuccessfulSync ? new Date(lastSuccessfulSync) : null;
-  const lastSyncHoursAgo = lastSyncTime ? Math.floor((Date.now() - lastSyncTime.getTime()) / (1000 * 60 * 60)) : null;
-  const lastSyncDaysAgo = lastSyncHoursAgo ? Math.floor(lastSyncHoursAgo / 24) : null;
+  const timeDiffMs = lastSyncTime ? Date.now() - lastSyncTime.getTime() : null;
+  const lastSyncHoursAgo = timeDiffMs ? Math.max(0, Math.floor(timeDiffMs / (1000 * 60 * 60))) : null;
+  const lastSyncDaysAgo = lastSyncHoursAgo !== null ? Math.floor(lastSyncHoursAgo / 24) : null;
   
   // Determine credit limit logic
   const isManualLimit = card.ismanuallimit || false;
@@ -552,6 +553,19 @@ export function DueDateCard({
                     </svg>
                   </div>
                   <p className="text-xs font-semibold text-gray-700">All Paid</p>
+                  {/* Show next due date if there's a current balance */}
+                  {card.balanceCurrent > 0 && card.nextPaymentDueDate && (
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      Next: {(() => {
+                        // Calculate approximate due date for current open cycle
+                        // Add ~1 month to the current due date
+                        const currentDueDate = new Date(card.nextPaymentDueDate);
+                        const nextCycleDueDate = new Date(currentDueDate);
+                        nextCycleDueDate.setMonth(nextCycleDueDate.getMonth() + 1);
+                        return formatDate(nextCycleDueDate);
+                      })()}
+                    </p>
+                  )}
                 </div>
               </div>
             ) : card.nextPaymentDueDate ? (

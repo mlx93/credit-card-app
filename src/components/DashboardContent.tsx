@@ -23,6 +23,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [refreshStep, setRefreshStep] = useState('');
+  const [backgroundSyncing, setBackgroundSyncing] = useState(false);
+  const [lastBackgroundSync, setLastBackgroundSync] = useState<Date | null>(null);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
@@ -370,6 +372,83 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   };
 
+  // Background sync function - updates data without blocking UI
+  const backgroundSync = async () => {
+    if (!isLoggedIn) return;
+    
+    try {
+      setBackgroundSyncing(true);
+      
+      // Get current month date range
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      
+      const [creditCardsRes, billingCyclesRes, transactionsRes, connectionHealthRes] = await Promise.all([
+        fetch('/api/user/credit-cards', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch('/api/user/billing-cycles', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch('/api/user/connection-health', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+      ]);
+
+      if (creditCardsRes.ok) {
+        const { creditCards: cards } = await creditCardsRes.json();
+        setCreditCards(cards);
+        
+        // Preserve existing card order if it exists, or set new default order
+        if (sharedCardOrder.length === 0) {
+          const defaultOrder = getDefaultCardOrder(cards);
+          setSharedCardOrder(defaultOrder);
+        }
+      }
+
+      if (billingCyclesRes.ok) {
+        const cycles = await billingCyclesRes.json();
+        setBillingCycles(cycles);
+      }
+
+      if (transactionsRes.ok) {
+        const transactions = await transactionsRes.json();
+        setCurrentMonthTransactions(transactions);
+      }
+
+      if (connectionHealthRes.ok) {
+        const health = await connectionHealthRes.json();
+        setConnectionHealth(health);
+      }
+      
+      setLastBackgroundSync(new Date());
+    } catch (error) {
+      console.error('Background sync error:', error);
+    } finally {
+      setBackgroundSyncing(false);
+    }
+  };
+
   const handleRefresh = async () => {
     console.log('=== HANDLEREFRESH CALLED ===');
     setRefreshing(true);
@@ -432,7 +511,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       setRefreshProgress(90);
       
       console.log('Fetching user data after sync...');
-      await fetchUserData();
+      await backgroundSync();
       
       setRefreshStep('Complete!');
       setRefreshProgress(100);
@@ -507,7 +586,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         
         // Add small delay to ensure database updates are complete before refreshing
         await new Promise(resolve => setTimeout(resolve, 1000));
-        await fetchUserData(); // Refresh data after sync
+        await backgroundSync(); // Refresh data after sync
         
         // Also refresh connection health specifically (it might have different timing)
         console.log('🔄 Manually refreshing connection health after sync...');
@@ -608,7 +687,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       const data = await response.json();
       
       if (data.success) {
-        await fetchUserData(); // Refresh data after removal
+        await backgroundSync(); // Refresh data after removal
         alert(data.message);
       } else {
         console.error('Failed to remove connection:', data.error);
@@ -664,9 +743,20 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   };
 
   useEffect(() => {
-    fetchUserData();
-    // Check connection health after initial data load
-    setTimeout(checkConnectionHealth, 1000);
+    if (!isLoggedIn) return;
+
+    // On first load, show loading spinner and fetch all data
+    const hasExistingData = creditCards.length > 0 || billingCycles.length > 0;
+    
+    if (!hasExistingData) {
+      // First load: show loading spinner
+      fetchUserData();
+      setTimeout(checkConnectionHealth, 1000);
+    } else {
+      // Subsequent loads: background sync without blocking UI
+      backgroundSync();
+      setTimeout(checkConnectionHealth, 1000);
+    }
   }, [isLoggedIn]);
 
   // Auto-close success popup after 5 seconds
@@ -798,10 +888,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                     }`}
                   >
                     <RefreshCw className={`h-4 w-4 transition-transform duration-200 ${
-                      refreshing ? 'animate-spin' : 'group-hover:rotate-45'
+                      (refreshing || backgroundSyncing) ? 'animate-spin' : 'group-hover:rotate-45'
                     }`} />
                     <span className="font-medium">
-                      {refreshing ? refreshStep || 'Refreshing...' : 'Refresh All'}
+                      {refreshing ? refreshStep || 'Refreshing...' : backgroundSyncing ? 'Syncing...' : 'Refresh All'}
                     </span>
                     
                     {/* Progress bar - iOS style with grey theme */}
@@ -819,6 +909,26 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
                     )}
                   </button>
+                  
+                  {/* Background sync status and last sync time */}
+                  {lastBackgroundSync && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {(() => {
+                        const timeDiff = Date.now() - lastBackgroundSync.getTime();
+                        const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
+                        const daysAgo = Math.floor(hoursAgo / 24);
+                        
+                        if (hoursAgo === 0) {
+                          return 'Last sync: Just now';
+                        } else if (daysAgo === 0) {
+                          return `Last sync: ${hoursAgo}h ago`;
+                        } else {
+                          return `Last sync: ${daysAgo}d ago`;
+                        }
+                      })()}
+                    </div>
+                  )}
+                  
                   <PlaidLink onSuccess={fetchUserData} />
                 </>
               ) : (
