@@ -361,6 +361,24 @@ export function DueDateCard({
   const lastSyncMinutesAgo = timeDiffMs ? Math.max(0, Math.floor(timeDiffMs / (1000 * 60))) : null;
   const lastSyncHoursAgo = lastSyncMinutesAgo !== null ? Math.floor(lastSyncMinutesAgo / 60) : null;
   const lastSyncDaysAgo = lastSyncHoursAgo !== null ? Math.floor(lastSyncHoursAgo / 24) : null;
+
+  // Debug sync time calculation
+  if (card.name.includes('Chase') || card.name.includes('Capital') || card.name.includes('Amex')) {
+    console.log(`🕐 SYNC TIME DEBUG [${card.name}]:`, {
+      primarySyncTime,
+      lastSyncTime: lastSyncTime?.toISOString(),
+      currentTime: new Date().toISOString(),
+      timeDiffMs,
+      lastSyncMinutesAgo,
+      lastSyncHoursAgo,
+      displayText: lastSyncDaysAgo !== null && lastSyncHoursAgo !== null && lastSyncMinutesAgo !== null ? 
+        (lastSyncDaysAgo > 0 ? `${lastSyncDaysAgo}d ago` :
+         lastSyncHoursAgo > 0 ? `${lastSyncHoursAgo}h ago` :
+         lastSyncMinutesAgo >= 1 ? `${lastSyncMinutesAgo}m ago` :
+         timeDiffMs && timeDiffMs < 30000 ? 'Just now' :
+         'Less than 1m ago') : 'Never synced'
+    });
+  }
   
   // Determine credit limit logic
   const isManualLimit = card.ismanuallimit || false;
@@ -711,7 +729,7 @@ export function DueDateCard({
             <p className="font-semibold text-sm text-blue-600">
               {formatCurrency(Math.abs(card.lastStatementBalance))}
             </p>
-            <p className="text-xs text-blue-500">Due on payment date</p>
+            <p className="text-xs text-blue-500 mb-2">Due on payment date</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-gray-600">Current Balance</p>
