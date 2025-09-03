@@ -30,7 +30,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">Introduction</h2>
             <p className="text-gray-700 leading-relaxed">
-              Welcome to CardCycle ("we," "our," or "us"). We are committed to protecting your privacy and personal information. 
+              Welcome to CardCycle. We are committed to protecting your privacy and personal information. 
               This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our 
               credit card management application at cardcycle.app.
             </p>
@@ -183,7 +183,7 @@ export default function PrivacyPolicy() {
             </p>
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-gray-700">
-                <strong>Email:</strong> privacy@cardcycle.app<br />
+                <strong>Email:</strong> myles93@sbcglobal.net<br />
                 <strong>Website:</strong> cardcycle.app
               </p>
             </div>
