@@ -892,14 +892,21 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
 
                       if (mostRecentSync) {
                         const timeDiff = Date.now() - mostRecentSync.getTime();
-                        const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
+                        const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+                        const hoursAgo = Math.floor(minutesAgo / 60);
                         const daysAgo = Math.floor(hoursAgo / 24);
                         
-                        if (hoursAgo === 0) {
+                        if (minutesAgo <= 1) {
                           return (
                             <div className="flex items-center text-green-600">
                               <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                               <span>Data current</span>
+                            </div>
+                          );
+                        } else if (hoursAgo === 0) {
+                          return (
+                            <div className="text-gray-500">
+                              Last sync: {minutesAgo}m ago
                             </div>
                           );
                         } else if (daysAgo === 0) {
