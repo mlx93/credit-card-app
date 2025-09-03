@@ -133,6 +133,14 @@ export async function GET() {
 
     // Combine all data and apply payment detection
     const formattedCreditCards = (creditCards || []).map(card => {
+      // Debug: Check card's payment data from database
+      console.log(`💰 Card data from database for ${card.name}:`, {
+        minimumPaymentAmount: card.minimumPaymentAmount,
+        lastStatementBalance: card.lastStatementBalance,
+        balanceCurrent: card.balanceCurrent,
+        nextPaymentDueDate: card.nextPaymentDueDate
+      });
+
       const adjustedCard = {
         ...card,
         plaidItem: plaidItemMap.get(card.plaidItemId) || null,
