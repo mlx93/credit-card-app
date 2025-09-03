@@ -295,16 +295,18 @@ export function DueDateCard({
     connection => connection.plaidItemId === card.plaidItem?.id
   );
   const connectionStatus = cardConnectionHealth?.status || 'unknown';
-  const lastSuccessfulSync = cardConnectionHealth?.lastSuccessfulSync;
   const apiConnectivity = cardConnectionHealth?.apiConnectivity;
+  
+  // Use card's own lastSyncAt as primary source, fallback to connection health
+  const primarySyncTime = card.plaidItem?.lastSyncAt || cardConnectionHealth?.lastSuccessfulSync;
   
   // Connection status indicators - skip for demo cards (no plaidItem)
   const hasConnectionIssue = card.plaidItem && (connectionStatus === 'requires_auth' || connectionStatus === 'error');
-  const isStale = card.plaidItem && (connectionStatus === 'unknown' || (lastSuccessfulSync && 
-    (new Date().getTime() - new Date(lastSuccessfulSync).getTime()) > 24 * 60 * 60 * 1000)); // 24 hours
+  const isStale = card.plaidItem && (connectionStatus === 'unknown' || (primarySyncTime && 
+    (new Date().getTime() - new Date(primarySyncTime).getTime()) > 24 * 60 * 60 * 1000)); // 24 hours
   
-  // Calculate time since last sync
-  const lastSyncTime = lastSuccessfulSync ? new Date(lastSuccessfulSync) : null;
+  // Calculate time since last sync using primary sync time
+  const lastSyncTime = primarySyncTime ? new Date(primarySyncTime) : null;
   const timeDiffMs = lastSyncTime ? Date.now() - lastSyncTime.getTime() : null;
   const lastSyncHoursAgo = timeDiffMs ? Math.max(0, Math.floor(timeDiffMs / (1000 * 60 * 60))) : null;
   const lastSyncDaysAgo = lastSyncHoursAgo !== null ? Math.floor(lastSyncHoursAgo / 24) : null;
@@ -362,7 +364,9 @@ export function DueDateCard({
       connectionStatus,
       hasConnectionIssue,
       isStale,
-      lastSuccessfulSync,
+      cardLastSyncAt: card.plaidItem?.lastSyncAt,
+      connectionLastSync: cardConnectionHealth?.lastSuccessfulSync,
+      primarySyncTime,
       lastSyncHoursAgo,
       lastSyncDaysAgo,
       apiConnectivity
