@@ -513,7 +513,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       setRefreshProgress(90);
       
       console.log('Fetching user data after sync...');
-      await backgroundSync();
+      await fetchAllUserData(' (refresh all)');
       
       setRefreshStep('Complete!');
       setRefreshProgress(100);
@@ -874,39 +874,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
             <div className="flex items-center space-x-3 flex-shrink-0">
               {isLoggedIn ? (
                 <>
-                  <button 
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className={`relative overflow-hidden font-medium py-3 px-6 rounded-2xl transition-all duration-200 flex items-center justify-center space-x-2 text-sm whitespace-nowrap transform focus:outline-none focus:ring-2 group border ${
-                      refreshing 
-                        ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed opacity-90 shadow-sm' 
-                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300 hover:shadow-md hover:scale-[1.02] focus:ring-gray-500/50 shadow-sm'
-                    }`}
-                  >
-                    <RefreshCw className={`h-4 w-4 transition-transform duration-200 ${
-                      (refreshing || backgroundSyncing) ? 'animate-spin' : 'group-hover:rotate-45'
-                    }`} />
-                    <span className="font-medium">
-                      {refreshing ? refreshStep || 'Refreshing...' : backgroundSyncing ? 'Syncing...' : 'Refresh All'}
-                    </span>
-                    
-                    {/* Progress bar - iOS style with grey theme */}
-                    {refreshing && (
-                      <div className="absolute inset-0 flex items-end">
-                        <div 
-                          className="h-1 bg-gradient-to-r from-gray-400 to-gray-600 rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${refreshProgress}%` }}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Shimmer effect when not refreshing */}
-                    {!refreshing && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
-                    )}
-                  </button>
-                  
-                  {/* Elegant sync status showing real database sync times */}
+                  {/* Elegant sync status showing real database sync times - moved to left of Refresh button */}
                   <div className="flex items-center space-x-2 text-xs">
                     {backgroundSyncing ? (
                       <div className="flex items-center text-blue-600">
@@ -959,6 +927,38 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                       }
                     })()}
                   </div>
+
+                  <button 
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className={`relative overflow-hidden font-medium py-3 px-6 rounded-2xl transition-all duration-200 flex items-center justify-center space-x-2 text-sm whitespace-nowrap transform focus:outline-none focus:ring-2 group border ${
+                      refreshing 
+                        ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed opacity-90 shadow-sm' 
+                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300 hover:shadow-md hover:scale-[1.02] focus:ring-gray-500/50 shadow-sm'
+                    }`}
+                  >
+                    <RefreshCw className={`h-4 w-4 transition-transform duration-200 ${
+                      (refreshing || backgroundSyncing) ? 'animate-spin' : 'group-hover:rotate-45'
+                    }`} />
+                    <span className="font-medium">
+                      {refreshing ? refreshStep || 'Refreshing...' : backgroundSyncing ? 'Syncing...' : 'Refresh All'}
+                    </span>
+                    
+                    {/* Progress bar - iOS style with grey theme */}
+                    {refreshing && (
+                      <div className="absolute inset-0 flex items-end">
+                        <div 
+                          className="h-1 bg-gradient-to-r from-gray-400 to-gray-600 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${refreshProgress}%` }}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Shimmer effect when not refreshing */}
+                    {!refreshing && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                    )}
+                  </button>
                   
                   <PlaidLink onSuccess={backgroundSync} />
                 </>

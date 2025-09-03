@@ -2,7 +2,6 @@ import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { createClient } from '@supabase/supabase-js';
-import { SupabaseAdapter } from '@next-auth/supabase-adapter';
 
 // Create Supabase client for NextAuth operations
 const supabase = createClient(
@@ -12,12 +11,8 @@ const supabase = createClient(
 
 export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
-  adapter: SupabaseAdapter({
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  }),
   session: {
-    strategy: 'jwt', // Keep JWT for compatibility
+    strategy: 'jwt',
   },
   providers: [
     GoogleProvider({
@@ -181,6 +176,32 @@ export const authOptions: NextAuthOptions = {
               .eq('email', user.email);
             
             user.id = existingUser.id;
+          }
+
+          // Store OAuth account info if this is an OAuth sign-in
+          if (account && account.provider !== 'credentials') {
+            console.log('📝 Storing OAuth account:', { 
+              provider: account.provider, 
+              userId: user.id 
+            });
+            
+            // Store or update account record
+            await supabase
+              .from('accounts')
+              .upsert({
+                userId: user.id,
+                type: account.type,
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+                access_token: account.access_token,
+                expires_at: account.expires_at,
+                id_token: account.id_token,
+                refresh_token: account.refresh_token,
+                token_type: account.token_type,
+                scope: account.scope,
+              }, {
+                onConflict: 'provider,providerAccountId'
+              });
           }
 
           console.log('User handled successfully:', user.email);
