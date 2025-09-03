@@ -411,16 +411,41 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   };
 
-  // Background sync function - updates data without blocking UI
+  // Background sync function - syncs with Plaid API silently, same as Refresh All but without blocking UI
   const backgroundSync = async () => {
     if (!isLoggedIn) return;
     
     try {
       setBackgroundSyncing(true);
+      
+      // Call /api/sync to actually sync with Plaid API (same as Refresh All)
+      console.log('🔄 Background sync: Starting Plaid API sync...');
+      const syncResponse = await fetch('/api/sync', { method: 'POST' });
+      
+      if (syncResponse.ok) {
+        const syncResult = await syncResponse.json();
+        console.log('✅ Background sync: Plaid sync completed successfully');
+        
+        // Handle any reconnection needs silently (don't auto-trigger for background sync)
+        const needsReconnection = syncResult.results?.some((result: any) => result.requiresReconnection);
+        if (needsReconnection) {
+          console.log('⚠️ Background sync: Some connections need reconnection (user can use Refresh All for auto-reconnect)');
+        }
+      } else {
+        console.warn('⚠️ Background sync: Plaid sync failed, falling back to database fetch');
+      }
+      
+      // Always fetch the latest data from database after sync attempt
       await fetchAllUserData(' (background sync)');
       setLastBackgroundSync(new Date());
     } catch (error) {
       console.error('Background sync error:', error);
+      // Fallback to database fetch if sync fails
+      try {
+        await fetchAllUserData(' (background sync fallback)');
+      } catch (fallbackError) {
+        console.error('Background sync fallback error:', fallbackError);
+      }
     } finally {
       setBackgroundSyncing(false);
     }
@@ -881,42 +906,58 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                     )}
                   </button>
                   
-                  {/* Elegant background sync status */}
+                  {/* Elegant sync status showing real database sync times */}
                   <div className="flex items-center space-x-2 text-xs">
                     {backgroundSyncing ? (
                       <div className="flex items-center text-blue-600">
                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-2"></div>
                         <span className="font-medium">Syncing data...</span>
                       </div>
-                    ) : lastBackgroundSync ? (
-                      <div className="text-gray-500">
-                        {(() => {
-                          const timeDiff = Date.now() - lastBackgroundSync.getTime();
-                          const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
-                          const daysAgo = Math.floor(hoursAgo / 24);
-                          
-                          if (hoursAgo === 0) {
-                            return (
-                              <div className="flex items-center">
-                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                <span>Data current</span>
-                              </div>
-                            );
-                          } else if (daysAgo === 0) {
-                            return `Synced ${hoursAgo}h ago`;
-                          } else {
-                            return `Synced ${daysAgo}d ago`;
-                          }
-                        })()}
-                      </div>
-                    ) : (
-                      <div className="text-gray-400">
-                        <div className="flex items-center">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
-                          <span>Ready to sync</span>
-                        </div>
-                      </div>
-                    )}
+                    ) : (() => {
+                      // Get the most recent sync time from all connected cards
+                      const mostRecentSync = Array.isArray(displayCards) && displayCards.length > 0 
+                        ? displayCards
+                            .filter(card => card.plaidItem?.lastSyncAt)
+                            .map(card => new Date(card.plaidItem.lastSyncAt))
+                            .sort((a, b) => b.getTime() - a.getTime())[0]
+                        : null;
+
+                      if (mostRecentSync) {
+                        const timeDiff = Date.now() - mostRecentSync.getTime();
+                        const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
+                        const daysAgo = Math.floor(hoursAgo / 24);
+                        
+                        if (hoursAgo === 0) {
+                          return (
+                            <div className="flex items-center text-green-600">
+                              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                              <span>Data current</span>
+                            </div>
+                          );
+                        } else if (daysAgo === 0) {
+                          return (
+                            <div className="text-gray-500">
+                              Last sync: {hoursAgo}h ago
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="text-gray-500">
+                              Last sync: {daysAgo}d ago
+                            </div>
+                          );
+                        }
+                      } else {
+                        return (
+                          <div className="text-gray-400">
+                            <div className="flex items-center">
+                              <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
+                              <span>No sync data</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
                   
                   <PlaidLink onSuccess={backgroundSync} />
