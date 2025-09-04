@@ -1148,18 +1148,43 @@ class PlaidServiceImpl implements PlaidService {
           (creditCards || []).map(card => [card.accountId, card.id])
         );
 
-        // Prepare transaction records
-        const transactionRecords = transactions.map(transaction => ({
-          transactionId: transaction.transaction_id,
-          creditCardId: accountToCardMap.get(transaction.account_id),
-          amount: transaction.amount,
-          date: transaction.date,
-          name: transaction.name,
-          merchantName: transaction.merchant_name,
-          category: transaction.personal_finance_category?.primary || 'OTHER',
-          pending: transaction.pending || false,
-          accountId: transaction.account_id
-        })).filter(t => t.creditCardId); // Only keep transactions for credit cards we have
+        // Prepare transaction records (matching full schema)
+        const transactionRecords = transactions.map(transaction => {
+          const creditCard = creditCards?.find(card => card.accountId === transaction.account_id);
+          if (!creditCard) return null;
+
+          // Use personal finance category if available, fall back to primary
+          let categoryName = null;
+          let categoryId = null;
+          let subcategory = null;
+          
+          if (transaction.personal_finance_category) {
+            categoryName = transaction.personal_finance_category.primary;
+            categoryId = transaction.personal_finance_category.detailed;
+            subcategory = transaction.personal_finance_category.detailed;
+          }
+
+          return {
+            id: crypto.randomUUID(),
+            transactionId: transaction.transaction_id,
+            plaidItemId: plaidItemRecord.id,
+            creditCardId: creditCard.id,
+            amount: transaction.amount,
+            plaidtransactionid: transaction.transaction_id,
+            isoCurrencyCode: transaction.iso_currency_code,
+            date: new Date(transaction.date).toISOString(),
+            authorizedDate: transaction.authorized_date 
+              ? new Date(transaction.authorized_date).toISOString()
+              : null,
+            name: transaction.name,
+            merchantName: transaction.merchant_name,
+            category: categoryName,
+            categoryId: categoryId,
+            subcategory: subcategory,
+            accountOwner: transaction.account_owner,
+            updatedAt: new Date().toISOString(),
+          };
+        }).filter(Boolean); // Remove null entries
 
         console.log(`⚡ Storing ${transactionRecords.length} recent transactions`);
 
