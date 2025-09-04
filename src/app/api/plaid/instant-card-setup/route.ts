@@ -49,7 +49,10 @@ export async function POST(request: NextRequest) {
       throw new Error(`Account sync failed: ${syncAccountsError.message}`);
     }
 
-    // Get the newly created credit cards
+    // Wait a moment for database to commit, then get the newly created credit cards
+    console.log('⏳ Waiting 1 second for database commit...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     const { data: creditCards, error: cardFetchError } = await supabaseAdmin
       .from('credit_cards')
       .select('*')
@@ -58,12 +61,30 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Credit cards found: ${creditCards?.length || 0} for plaidItemId: ${plaidItem.id}`);
     if (cardFetchError) {
       console.error('❌ Error fetching credit cards:', cardFetchError);
+      throw new Error(`Failed to fetch credit cards: ${cardFetchError.message}`);
     }
-    if (creditCards?.length) {
-      creditCards.forEach(card => {
-        console.log(`📋 Found card: ${card.name} (${card.accountId})`);
+    
+    // Critical: If syncAccounts reported cards but we can't find them, fail
+    if (!creditCards || creditCards.length === 0) {
+      if (accountSyncResult.creditCardsFound > 0) {
+        console.error(`❌ syncAccounts reported ${accountSyncResult.creditCardsFound} cards but database query found 0`);
+        throw new Error(`Card creation failed: syncAccounts reported ${accountSyncResult.creditCardsFound} cards but none found in database`);
+      }
+      console.warn('⚠️ No credit cards found for this institution');
+      // Return early with no cards found
+      return NextResponse.json({
+        success: false,
+        message: 'No credit cards found',
+        phase: 'no_cards',
+        creditCardsFound: 0,
+        backgroundSyncScheduled: false,
+        readyForDisplay: false
       });
     }
+    
+    creditCards.forEach(card => {
+      console.log(`📋 Found card: ${card.name} (${card.accountId})`);
+    });
 
     // Phase 1.5: Get recent transactions for current cycle estimation
     console.log('⚡ Phase 1.5: Fetching recent transactions for current cycle...');
@@ -74,27 +95,37 @@ export async function POST(request: NextRequest) {
       await plaidService.syncRecentTransactions(plaidItem, accessToken);
       console.log('✅ Recent transactions synced');
       
+      // Wait a moment for transaction storage to complete, then calculate cycles
+      console.log('⏳ Brief pause to ensure transactions are stored...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Calculate current + most recent closed billing cycles for immediate visibility
       const { calculateCurrentBillingCycle, calculateRecentClosedCycle } = await import('@/utils/billingCycles');
       
       let cyclesCalculated = 0;
       for (const card of creditCards || []) {
         try {
+          console.log(`🔄 Calculating cycles for ${card.name} (id: ${card.id})...`);
+          
           // Calculate current open cycle
           const currentCycle = await calculateCurrentBillingCycle(card.id);
           if (currentCycle) {
             cyclesCalculated += 1;
-            console.log(`✅ Card ${card.name}: Current billing cycle calculated`);
+            console.log(`✅ Card ${card.name}: Current billing cycle calculated (${currentCycle.startDate} to ${currentCycle.endDate})`);
+          } else {
+            console.warn(`⚠️ Card ${card.name}: No current billing cycle returned`);
           }
           
           // Calculate most recent closed cycle 
           const recentClosedCycle = await calculateRecentClosedCycle(card.id);
           if (recentClosedCycle) {
             cyclesCalculated += 1;
-            console.log(`✅ Card ${card.name}: Recent closed billing cycle calculated`);
+            console.log(`✅ Card ${card.name}: Recent closed billing cycle calculated (${recentClosedCycle.startDate} to ${recentClosedCycle.endDate})`);
+          } else {
+            console.warn(`⚠️ Card ${card.name}: No recent closed cycle returned`);
           }
         } catch (cycleError) {
-          console.warn(`⚠️ Could not calculate cycles for ${card.name}:`, cycleError);
+          console.error(`❌ Failed to calculate cycles for ${card.name}:`, cycleError);
           // Continue - missing cycle data shouldn't block card visibility
         }
       }
@@ -109,27 +140,53 @@ export async function POST(request: NextRequest) {
     // Phase 2: Schedule comprehensive background processing
     console.log('⚡ Scheduling comprehensive background sync...');
     
-    // Trigger full historical sync in background (non-blocking)
+    // Schedule comprehensive background sync (direct call, not HTTP)
     setTimeout(async () => {
       try {
         console.log('🔄 Background: Starting comprehensive sync for full history...');
         
-        // Call comprehensive sync endpoint for full historical processing
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/plaid/comprehensive-sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ itemId })
-        });
+        // Direct comprehensive sync (no HTTP call - prevents authentication and timeout issues)
+        await plaidService.syncTransactions(plaidItem, accessToken);
+        console.log('✅ Background: Full transaction history synced');
         
-        if (response.ok) {
-          console.log('✅ Background comprehensive sync completed');
-        } else {
-          console.error('❌ Background sync failed:', await response.text());
+        // Calculate complete billing cycle history
+        const { calculateBillingCycles } = await import('@/utils/billingCycles');
+        
+        // Get credit cards for this item
+        const { data: backgroundCreditCards } = await supabaseAdmin
+          .from('credit_cards')
+          .select('*')
+          .eq('plaidItemId', plaidItem.id);
+
+        let totalCyclesCalculated = 0;
+        for (const card of backgroundCreditCards || []) {
+          try {
+            console.log(`🔄 Background: Calculating full billing history for ${card.name}...`);
+            
+            // Get existing cycles to preserve the ones created by instant-setup
+            const { data: existingCycles } = await supabaseAdmin
+              .from('billing_cycles')
+              .select('*')
+              .eq('creditCardId', card.id);
+            
+            console.log(`🔄 Background: Updating billing history for ${card.name} (preserving ${existingCycles?.length || 0} existing cycles)...`);
+            
+            // Calculate complete billing cycle history (preserves existing ones)
+            const cycles = await calculateBillingCycles(card.id);
+            totalCyclesCalculated += cycles.length;
+            
+            console.log(`✅ Background: Card ${card.name}: ${cycles.length} total billing cycles (${existingCycles?.length || 0} updated, ${cycles.length - (existingCycles?.length || 0)} new)`);
+          } catch (cycleError) {
+            console.error(`❌ Background: Failed to calculate cycles for ${card.name}:`, cycleError);
+          }
         }
+        
+        console.log(`✅ Background comprehensive sync completed: ${totalCyclesCalculated} total cycles calculated`);
+        
       } catch (error) {
         console.error('❌ Background sync error:', error);
       }
-    }, 2000); // Start comprehensive sync 2 seconds after instant setup completes
+    }, 5000); // Increased delay to 5 seconds to ensure instant setup is fully complete
 
     console.log(`✅ Instant card setup completed: ${creditCards?.length || 0} credit cards found`);
     
