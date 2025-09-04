@@ -770,7 +770,7 @@ export function DueDateCard({
         </div>
       )}
 
-      <div className="mt-auto">
+      <div className="mt-auto pt-3">
         <div className="flex justify-between items-center text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
           <div className="flex items-center gap-2">
