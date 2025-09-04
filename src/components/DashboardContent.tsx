@@ -673,13 +673,26 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   };
 
   const handleCardRemove = async (itemId: string) => {
-    const confirmed = window.confirm(
-      'Are you sure you want to remove this credit card connection? This will delete all associated data and cannot be undone.'
-    );
-    
-    if (!confirmed) return;
-
     try {
+      // Immediately update UI - optimistic update
+      setCreditCards(prevCards => prevCards.filter(card => card.plaidItem?.itemId !== itemId));
+      
+      // Also update billing cycles to remove cycles for this card
+      setBillingCycles(prevCycles => {
+        const removedCard = creditCards.find(card => card.plaidItem?.itemId === itemId);
+        if (removedCard) {
+          return prevCycles.filter(cycle => cycle.creditCardId !== removedCard.id);
+        }
+        return prevCycles;
+      });
+      
+      // Update card order to remove the deleted card
+      const removedCard = creditCards.find(card => card.plaidItem?.itemId === itemId);
+      if (removedCard) {
+        setSharedCardOrder(prevOrder => prevOrder.filter(id => id !== removedCard.id));
+      }
+      
+      // Make API call to remove from backend
       const response = await fetch('/api/plaid/remove-connection', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -688,16 +701,28 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       
       const data = await response.json();
       
-      if (data.success) {
-        await backgroundSync(); // Refresh data after removal
-        alert(data.message);
-      } else {
+      if (!data.success) {
         console.error('Failed to remove connection:', data.error);
-        alert('Failed to remove connection. Please try again.');
+        // Revert the optimistic update on failure
+        await fetchUserData();
+        throw new Error(data.error || 'Failed to remove connection');
       }
+      
+      // Clear from localStorage cache as well
+      if (typeof window !== 'undefined') {
+        const cachedCards = localStorage.getItem('cached_credit_cards');
+        if (cachedCards) {
+          const cards = JSON.parse(cachedCards);
+          const updatedCards = cards.filter((card: any) => card.plaidItem?.itemId !== itemId);
+          localStorage.setItem('cached_credit_cards', JSON.stringify(updatedCards));
+        }
+      }
+      
+      console.log(`Successfully removed card connection: ${data.message}`);
     } catch (error) {
       console.error('Error removing connection:', error);
-      alert('Network error. Please try again.');
+      // The error will be handled by the calling component
+      throw error;
     }
   };
 
