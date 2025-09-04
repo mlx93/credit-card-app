@@ -69,8 +69,14 @@ export async function POST(request: NextRequest) {
     console.log('⚡ Phase 1.5: Fetching recent transactions for current cycle...');
     
     try {
-      // Sync recent transactions (syncTransactions handles the date range internally)
-      await plaidService.syncTransactions(plaidItem, accessToken);
+      // Sync recent transactions with timeout for instant setup (30 seconds max)
+      console.log('🔄 Starting recent transaction sync (30s timeout)...');
+      const transactionSyncPromise = plaidService.syncTransactions(plaidItem, accessToken);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Transaction sync timeout')), 30000)
+      );
+      
+      await Promise.race([transactionSyncPromise, timeoutPromise]);
       console.log('✅ Recent transactions synced');
       
       // Calculate current + most recent closed billing cycles for immediate visibility
@@ -100,7 +106,12 @@ export async function POST(request: NextRequest) {
       
       console.log(`⚡ Phase 1 complete: ${cyclesCalculated} essential cycles calculated (current + recent closed)`);
     } catch (transactionError) {
-      console.warn('⚠️ Recent transaction sync failed, continuing without cycles:', transactionError);
+      if (transactionError.message === 'Transaction sync timeout') {
+        console.warn('⏰ Recent transaction sync timed out after 30s - continuing without cycles for instant visibility');
+        console.warn('💡 This is expected for slower institutions like Wells Fargo - full sync will happen in background');
+      } else {
+        console.warn('⚠️ Recent transaction sync failed, continuing without cycles:', transactionError);
+      }
       // Continue without cycles - card should still be visible
     }
 

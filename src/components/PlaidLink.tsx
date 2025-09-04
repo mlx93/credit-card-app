@@ -107,11 +107,18 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           setLoadingSubMessage('Creating card with essential data...');
           
           try {
+            // Add timeout to instant-card-setup request (60 seconds)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            
             const syncResponse = await fetch('/api/plaid/instant-card-setup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ itemId: data.itemId })
-          });
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ itemId: data.itemId }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
             
             if (syncResponse.ok) {
               const syncData = await syncResponse.json();
@@ -126,7 +133,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 // Poll the database until the new card is actually available  
                 const pollForNewCard = async () => {
                   let attempts = 0;
-                  const maxAttempts = 10; // Only 10 seconds max since instant setup should be very fast
+                  const maxAttempts = 45; // Increase to 45 seconds to handle slower institutions like WF
                   
                   while (attempts < maxAttempts) {
                     try {
@@ -228,8 +235,15 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
             
           } catch (syncError) {
             console.error('Sync request failed:', syncError);
-            setLoadingMessage('Card connected');
-            setLoadingSubMessage('Basic card info available, full sync will retry');
+            
+            if (syncError.name === 'AbortError') {
+              console.error('⏰ Instant card setup timed out after 60 seconds');
+              setLoadingMessage('Setup taking longer than expected');
+              setLoadingSubMessage('Card may appear shortly, or try refreshing...');
+            } else {
+              setLoadingMessage('Card connected');
+              setLoadingSubMessage('Basic card info available, full sync will retry');
+            }
             
             setTimeout(() => {
               setLoading(false);
