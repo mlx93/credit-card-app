@@ -17,6 +17,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
   const [loadingMessage, setLoadingMessage] = useState('Connecting to your bank');
   const [loadingSubMessage, setLoadingSubMessage] = useState('This may take a few moments...');
   const [syncInProgress, setSyncInProgress] = useState(false);
+  const [initialCardCount, setInitialCardCount] = useState<number>(0);
 
   // Check for OAuth resumption parameters on mount
   useEffect(() => {
@@ -135,7 +136,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 // Poll the database until the new card is actually available
                 const pollForNewCard = async () => {
                   let attempts = 0;
-                  const maxAttempts = 20; // 20 seconds max
+                  const maxAttempts = 45; // 45 seconds max to account for slower processing
                   
                   while (attempts < maxAttempts) {
                     try {
@@ -151,20 +152,24 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                       
                       if (response.ok) {
                         const { creditCards } = await response.json();
+                        const currentCardCount = creditCards?.length || 0;
                         
-                        // Check if we have more cards than we started with
-                        // (This assumes we're adding a new card, not reconnecting)
-                        if (creditCards && creditCards.length > 0) {
-                          console.log('✅ New card data found in database!');
+                        console.log(`📊 Card count check: initial=${initialCardCount}, current=${currentCardCount}`);
+                        
+                        // Only proceed if we have MORE cards than we started with
+                        if (currentCardCount > initialCardCount) {
+                          console.log('✅ New card data confirmed in database!');
                           setLoadingMessage('Card ready!');
                           setLoadingSubMessage('Your new credit card is now available');
                           
                           // Brief pause to show the success message
                           setTimeout(() => {
-                            console.log('🎯 PlaidLink: Database confirmed new card, refreshing page...');
+                            console.log('🎯 PlaidLink: Database confirmed new card count increased, refreshing page...');
                             window.location.reload();
                           }, 1000);
                           return;
+                        } else {
+                          console.log(`⏳ Still waiting... need ${initialCardCount + 1} cards, have ${currentCardCount}`);
                         }
                       }
                       
@@ -328,6 +333,21 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
       setLoading(true);
       setLoadingMessage('Initializing secure connection');
       setLoadingSubMessage('Preparing Plaid Link...');
+      
+      // Capture initial card count before starting
+      console.log('📊 Capturing initial card count...');
+      try {
+        const cardCountResponse = await fetch('/api/user/credit-cards', { cache: 'no-store' });
+        if (cardCountResponse.ok) {
+          const { creditCards } = await cardCountResponse.json();
+          setInitialCardCount(creditCards?.length || 0);
+          console.log('📊 Initial card count:', creditCards?.length || 0);
+        }
+      } catch (error) {
+        console.warn('Could not fetch initial card count, defaulting to 0');
+        setInitialCardCount(0);
+      }
+      
       console.log('Fetching link token...');
       
       const response = await fetch('/api/plaid/link-token', {
