@@ -101,18 +101,16 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           setLoadingMessage('Preparing your new card');
           setLoadingSubMessage('Loading card details and recent transactions...');
           
-          // Small delay to ensure database transaction is committed before sync
-          console.log('⏳ Waiting for database commit before targeted sync...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Use fast card setup for essential data only
+          console.log('⚡ Starting fast card setup for itemId:', data.itemId);
+          setLoadingMessage('Setting up your card');
+          setLoadingSubMessage('Calculating current billing cycle...');
           
-          // Target sync for ONLY the new card - not all cards
-          try {
-            console.log('🎯 Starting targeted sync for itemId:', data.itemId);
-            const syncResponse = await fetch('/api/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ itemId: data.itemId })
-            });
+          const syncResponse = await fetch('/api/plaid/fast-card-setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId: data.itemId })
+          });
             
             if (syncResponse.ok) {
               const syncData = await syncResponse.json();
