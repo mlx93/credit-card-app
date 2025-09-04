@@ -106,7 +106,8 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           setLoadingMessage('Setting up your card');
           setLoadingSubMessage('Calculating current billing cycle...');
           
-          const syncResponse = await fetch('/api/plaid/fast-card-setup', {
+          try {
+            const syncResponse = await fetch('/api/plaid/fast-card-setup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ itemId: data.itemId })
@@ -226,7 +227,6 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               window.location.reload();
             }, 1500);
           }
-          
         } else {
           console.error('Token exchange failed:', data.error);
           setLoadingMessage('Connection failed');
@@ -349,4 +349,4 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
       </button>
     </>
   );
-}// Force production refresh
+}
