@@ -15,7 +15,7 @@ import {
 } from 'plaid';
 
 export interface PlaidService {
-  createLinkToken(userId: string): Promise<string>;
+  createLinkToken(userId: string, oauth_state_id?: string): Promise<string>;
   createUpdateLinkToken(userId: string, itemId: string): Promise<string>;
   exchangePublicToken(publicToken: string, userId: string): Promise<{ accessToken: string; itemId: string }>;
   removeItem(accessToken: string): Promise<void>;
@@ -40,7 +40,7 @@ class PlaidServiceImpl implements PlaidService {
     return institutionMatch || accountMatch;
   }
 
-  async createLinkToken(userId: string): Promise<string> {
+  async createLinkToken(userId: string, oauth_state_id?: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
     
     const request: LinkTokenCreateRequest = {
@@ -51,11 +51,18 @@ class PlaidServiceImpl implements PlaidService {
       products: ['liabilities', 'transactions'],
       country_codes: ['US'],
       language: 'en',
+      redirect_uri: 'https://cardcycle.app/api/plaid/callback', // API endpoint, not page
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
       transactions: {
         days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)
       },
     };
+
+    // Add oauth_state_id if provided (for resuming OAuth flows)
+    if (oauth_state_id) {
+      console.log('🔗 Adding oauth_state_id to link token request:', oauth_state_id);
+      (request as any).oauth_state_id = oauth_state_id;
+    }
 
     console.log('Creating link token for environment:', process.env.PLAID_ENV);
     console.log('Request payload:', JSON.stringify(request, null, 2));
@@ -1428,6 +1435,7 @@ class PlaidServiceImpl implements PlaidService {
       products: ['liabilities', 'transactions'],
       country_codes: ['US'],
       language: 'en',
+      redirect_uri: 'https://cardcycle.app/api/plaid/callback',
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
       transactions: {
         days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)

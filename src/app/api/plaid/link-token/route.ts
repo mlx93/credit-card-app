@@ -11,7 +11,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const linkToken = await plaidService.createLinkToken(session.user.id);
+    // Parse request body for oauth_state_id if provided
+    let oauth_state_id: string | undefined;
+    try {
+      const body = await request.json();
+      oauth_state_id = body?.oauth_state_id;
+      
+      if (oauth_state_id) {
+        console.log('📋 Link token request with oauth_state_id:', oauth_state_id);
+      }
+    } catch {
+      // No body or invalid JSON - that's fine, continue without oauth_state_id
+    }
+
+    const linkToken = await plaidService.createLinkToken(session.user.id, oauth_state_id);
     
     return NextResponse.json({ link_token: linkToken });
   } catch (error: any) {

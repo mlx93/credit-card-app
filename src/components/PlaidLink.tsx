@@ -18,6 +18,54 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
   const [loadingSubMessage, setLoadingSubMessage] = useState('This may take a few moments...');
   const [syncInProgress, setSyncInProgress] = useState(false);
 
+  // Check for OAuth resumption parameters on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const oauthStateId = urlParams.get('oauth_state_id');
+      
+      if (oauthStateId && !linkToken) {
+        console.log('🔗 OAuth resumption detected, creating link token with oauth_state_id:', oauthStateId);
+        handleOAuthResumption(oauthStateId);
+        
+        // Clean up URL parameters
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('oauth_state_id');
+        cleanUrl.searchParams.delete('link_session_id');
+        window.history.replaceState({}, document.title, cleanUrl.toString());
+      }
+    }
+  }, [linkToken]);
+
+  const handleOAuthResumption = async (oauthStateId: string) => {
+    try {
+      setLoading(true);
+      setLoadingMessage('Resuming connection');
+      setLoadingSubMessage('Continuing where you left off...');
+      
+      const response = await fetch('/api/plaid/link-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oauth_state_id: oauthStateId }),
+      });
+
+      const data = await response.json();
+      
+      if (data.link_token) {
+        console.log('OAuth resumption link token received');
+        setLinkToken(data.link_token);
+      } else {
+        console.error('Failed to get OAuth resumption link token:', data.error);
+        setLoading(false);
+        alert('Failed to resume connection. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error resuming OAuth:', error);
+      setLoading(false);
+      alert('Network error during OAuth resumption. Please try again.');
+    }
+  };
+
   const { open, ready } = usePlaidLink({
     token: linkToken,
     env: process.env.NEXT_PUBLIC_PLAID_ENV as 'sandbox' | 'development' | 'production' || 'production',
@@ -31,7 +79,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         account_subtypes: ['credit card']
       }
     },
-    receivedRedirectUri: null,
+    receivedRedirectUri: null, // Keep inline flow as primary, but redirect URI is configured for institutions that require it
     onSuccess: async (public_token, metadata) => {
       try {
         console.log('Plaid Link success:', { public_token, metadata });
