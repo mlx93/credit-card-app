@@ -102,31 +102,31 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       id: 'mock-card-1',
       name: 'Chase Sapphire Preferred',
       mask: '1234',
-      balanceCurrent: -2650.75, // Higher than statement balance (1850.25) + current spending
+      balanceCurrent: -1248.50, // Higher than statement balance (872) + current spending
       balanceLimit: 15000,
-      lastStatementBalance: -1850.25, // Statement balance from closed cycle (closed Aug 15)
+      lastStatementBalance: -872.00, // Statement balance from closed cycle (closed Aug 15)
       nextPaymentDueDate: '2025-09-09', // Due 25 days after statement close (Aug 15 + 25 days)
-      minimumPaymentAmount: 125.00,
+      minimumPaymentAmount: 59.00,
     },
     {
       id: 'mock-card-2', 
       name: 'Capital One Venture',
       mask: '5678',
-      balanceCurrent: -895.42, // Matches current statement balance for this example
+      balanceCurrent: -422.00, // Matches current statement balance for this example
       balanceLimit: 10000,
-      lastStatementBalance: -642.18, // Statement balance from closed cycle (closed Aug 20)
+      lastStatementBalance: -302.50, // Statement balance from closed cycle (closed Aug 20)
       nextPaymentDueDate: '2025-09-14', // Due 25 days after statement close (Aug 20 + 25 days)
-      minimumPaymentAmount: 45.00,
+      minimumPaymentAmount: 21.00,
     },
     {
       id: 'mock-card-3',
       name: 'American Express Gold',
       mask: '9012',
-      balanceCurrent: -1545.89, // Outstanding statement (1245.89) + new spending (300.00)
+      balanceCurrent: -729.00, // Outstanding statement (587.50) + new spending (141.50)
       balanceLimit: 8000,
-      lastStatementBalance: -1245.89, // OVERDUE statement balance from July-Aug cycle
+      lastStatementBalance: -587.50, // OVERDUE statement balance from July-Aug cycle
       nextPaymentDueDate: '2025-08-24', // Overdue - was due 9 days ago (July 30 + 25 days)
-      minimumPaymentAmount: 85.00,
+      minimumPaymentAmount: 40.00,
     },
   ];
 
@@ -138,7 +138,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'American Express Gold',
       startDate: '2025-08-07',
       endDate: '2025-09-06', // Currently open cycle - pushed forward a week
-      totalSpend: 300.00, // New spending since overdue payment - component should handle this
+      totalSpend: 141.50, // New spending since overdue payment - component should handle this
       transactionCount: 8,
       // No dueDate yet - cycle not closed
       // No statementBalance yet - cycle still open
@@ -151,7 +151,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-08-16',
       endDate: '2025-09-15', // Currently open cycle
-      totalSpend: 800.50, // Current spending in open cycle
+      totalSpend: 376.50, // Current spending in open cycle
       transactionCount: 12,
       // No dueDate yet - cycle not closed
       // No statementBalance yet - cycle still open
@@ -164,7 +164,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Capital One Venture',
       startDate: '2025-08-21',
       endDate: '2025-09-20', // Currently open cycle
-      totalSpend: 253.24, // Current spending in open cycle
+      totalSpend: 119.50, // Current spending in open cycle
       transactionCount: 7,
       // No dueDate yet - cycle not closed
       // No statementBalance yet - cycle still open
@@ -177,10 +177,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-07-16',
       endDate: '2025-08-15', // Statement closed Aug 15
-      totalSpend: 1850.25,
+      totalSpend: 872.00,
       transactionCount: 23,
       dueDate: '2025-09-09', // Due 25 days after close (Aug 15 + 25 days)
-      statementBalance: 1850.25,
+      statementBalance: 872.00,
       paymentStatus: 'due', // Active statement balance, no checkmark
     },
     {
@@ -189,10 +189,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-06-16',
       endDate: '2025-07-15',
-      totalSpend: 2134.67,
+      totalSpend: 1005.50,
       transactionCount: 28,
       dueDate: '2025-07-05',
-      statementBalance: 2134.67,
+      statementBalance: 1005.50,
       paymentStatus: 'paid',
     },
     // CLOSED Cycle - Capital One Venture (Active statement balance, due in future)
@@ -202,10 +202,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Capital One Venture',
       startDate: '2025-07-21',
       endDate: '2025-08-20', // Statement closed Aug 20
-      totalSpend: 642.18,
+      totalSpend: 302.50,
       transactionCount: 15,
       dueDate: '2025-09-14', // Due 25 days after close (Aug 20 + 25 days)
-      statementBalance: 642.18,
+      statementBalance: 302.50,
       paymentStatus: 'due', // Active statement balance, no checkmark
     },
     // OVERDUE Cycle - American Express Gold (Outstanding from August 2025 - 9 days late)
@@ -215,10 +215,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'American Express Gold',
       startDate: '2025-06-30',
       endDate: '2025-07-30', // Statement closed July 30
-      totalSpend: 1245.89,
+      totalSpend: 587.50,
       transactionCount: 19,
       dueDate: '2025-08-24', // Due 25 days after close (July 30 + 25 days) - 9 days overdue
-      statementBalance: 1245.89,
+      statementBalance: 587.50,
       paymentStatus: 'outstanding', // Red dot
     },
     {
@@ -227,10 +227,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'American Express Gold',
       startDate: '2025-06-10',
       endDate: '2025-07-09',
-      totalSpend: 987.45,
+      totalSpend: 465.00,
       transactionCount: 14,
       dueDate: '2025-07-10',
-      statementBalance: 987.45,
+      statementBalance: 465.00,
       paymentStatus: 'paid', // Checkmark
     },
     // Historical Cycles - Chase Sapphire Preferred
@@ -240,10 +240,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-05-16',
       endDate: '2025-06-15',
-      totalSpend: 3245.89,
+      totalSpend: 1529.00,
       transactionCount: 35,
       dueDate: '2025-06-05',
-      statementBalance: 3245.89,
+      statementBalance: 1529.00,
       paymentStatus: 'paid',
     },
     {
@@ -252,10 +252,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Chase Sapphire Preferred',
       startDate: '2025-04-16',
       endDate: '2025-05-15',
-      totalSpend: 1789.45,
+      totalSpend: 843.00,
       transactionCount: 21,
       dueDate: '2025-05-05',
-      statementBalance: 1789.45,
+      statementBalance: 843.00,
       paymentStatus: 'paid',
     },
     // Historical Cycles - Capital One Venture
@@ -265,10 +265,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Capital One Venture',
       startDate: '2025-06-20',
       endDate: '2025-07-19',
-      totalSpend: 1456.78,
+      totalSpend: 686.50,
       transactionCount: 24,
       dueDate: '2025-07-10',
-      statementBalance: 1456.78,
+      statementBalance: 686.50,
       paymentStatus: 'paid',
     },
     {
@@ -277,10 +277,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'Capital One Venture',
       startDate: '2025-05-20',
       endDate: '2025-06-19',
-      totalSpend: 723.56,
+      totalSpend: 341.00,
       transactionCount: 12,
       dueDate: '2025-06-10',
-      statementBalance: 723.56,
+      statementBalance: 341.00,
       paymentStatus: 'paid',
     },
     // Historical Cycles - American Express Gold
@@ -290,10 +290,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'American Express Gold',
       startDate: '2025-05-10',
       endDate: '2025-06-09',
-      totalSpend: 1124.89,
+      totalSpend: 530.00,
       transactionCount: 19,
       dueDate: '2025-06-10',
-      statementBalance: 1124.89,
+      statementBalance: 530.00,
       paymentStatus: 'paid',
     },
     {
@@ -302,10 +302,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       creditCardName: 'American Express Gold',
       startDate: '2025-04-10',
       endDate: '2025-05-09',
-      totalSpend: 834.45,
+      totalSpend: 393.00,
       transactionCount: 16,
       dueDate: '2025-05-10',
-      statementBalance: 834.45,
+      statementBalance: 393.00,
       paymentStatus: 'paid',
     },
   ];

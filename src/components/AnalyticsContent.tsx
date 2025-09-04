@@ -21,32 +21,32 @@ export function AnalyticsContent({ isLoggedIn }: AnalyticsContentProps) {
   const [isMonthlySpendExpanded, setIsMonthlySpendExpanded] = useState(false);
 
   const mockData = {
-    totalSpendThisMonth: 1353.74, // Sum of current open cycles: 800.50 + 253.24 + 300.00  
+    totalSpendThisMonth: 637.50, // Sum of current open cycles: 376.50 + 119.50 + 141.50  
     monthlySpend: [
-      { month: 'Jun 2025', amount: 3867 },
-      { month: 'Jul 2025', amount: 4234 },
-      { month: 'Aug 2025', amount: 4156 }, // Closed statements from Aug
-      { month: 'Sep 2025', amount: 1354 }, // Current month - early Sep (partial)
+      { month: 'Jun 2025', amount: 1822 },
+      { month: 'Jul 2025', amount: 1994 },
+      { month: 'Aug 2025', amount: 1958 }, // Closed statements from Aug
+      { month: 'Sep 2025', amount: 638 }, // Current month - early Sep (partial)
     ],
     categories: [
-      { name: 'Dining', amount: 550, percentage: 40.6 },
-      { name: 'Shopping', amount: 340, percentage: 25.1 },
-      { name: 'Groceries', amount: 250, percentage: 18.5 },
-      { name: 'Gas', amount: 148, percentage: 10.9 },
-      { name: 'Travel', amount: 60, percentage: 4.4 },
-      { name: 'Other', amount: 5.74, percentage: 0.4 },
+      { name: 'Dining', amount: 259, percentage: 40.6 },
+      { name: 'Shopping', amount: 160, percentage: 25.1 },
+      { name: 'Groceries', amount: 118, percentage: 18.5 },
+      { name: 'Gas', amount: 70, percentage: 11.0 },
+      { name: 'Travel', amount: 28, percentage: 4.4 },
+      { name: 'Other', amount: 2.50, percentage: 0.4 },
     ],
     cardSpending: [
-      { name: 'Chase Sapphire Preferred', amount: 800.50, color: 'bg-blue-500' }, // Open cycle
-      { name: 'Capital One Venture', amount: 253.24, color: 'bg-green-500' }, // Open cycle
-      { name: 'American Express Gold', amount: 300.00, color: 'bg-orange-500' }, // Open cycle
+      { name: 'Chase Sapphire Preferred', amount: 376.50, color: 'bg-blue-500' }, // Open cycle
+      { name: 'Capital One Venture', amount: 119.50, color: 'bg-green-500' }, // Open cycle
+      { name: 'American Express Gold', amount: 141.50, color: 'bg-orange-500' }, // Open cycle
     ],
     monthlyComparison: [
-      { category: 'Dining', thisMonth: 550, lastMonth: 1456, change: -62.2 }, // Sep vs Aug
-      { category: 'Shopping', thisMonth: 340, lastMonth: 1245, change: -72.7 }, // Sep vs Aug
-      { category: 'Groceries', thisMonth: 250, lastMonth: 1089, change: -77.0 }, // Sep vs Aug  
-      { category: 'Travel', thisMonth: 60, lastMonth: 245, change: -75.5 }, // Sep vs Aug
-      { category: 'Gas', thisMonth: 148, lastMonth: 421, change: -64.8 }, // Sep vs Aug
+      { category: 'Dining', thisMonth: 259, lastMonth: 686, change: -62.2 }, // Sep vs Aug
+      { category: 'Shopping', thisMonth: 160, lastMonth: 586, change: -72.7 }, // Sep vs Aug
+      { category: 'Groceries', thisMonth: 118, lastMonth: 513, change: -77.0 }, // Sep vs Aug  
+      { category: 'Travel', thisMonth: 28, lastMonth: 115, change: -75.5 }, // Sep vs Aug
+      { category: 'Gas', thisMonth: 70, lastMonth: 198, change: -64.6 }, // Sep vs Aug
     ],
     transactionCount: 27, // Sum of transaction counts from current open cycles (12 + 7 + 8)
   };
