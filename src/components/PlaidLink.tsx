@@ -101,13 +101,13 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           setLoadingMessage('Preparing your new card');
           setLoadingSubMessage('Loading card details and recent transactions...');
           
-          // Use fast card setup for essential data only
-          console.log('⚡ Starting fast card setup for itemId:', data.itemId);
+          // Use instant card setup for immediate visibility
+          console.log('⚡ Starting instant card setup for itemId:', data.itemId);
           setLoadingMessage('Setting up your card');
-          setLoadingSubMessage('Calculating current billing cycle...');
+          setLoadingSubMessage('Creating card with essential data...');
           
           try {
-            const syncResponse = await fetch('/api/plaid/fast-card-setup', {
+            const syncResponse = await fetch('/api/plaid/instant-card-setup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ itemId: data.itemId })
@@ -115,18 +115,18 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
             
             if (syncResponse.ok) {
               const syncData = await syncResponse.json();
-              console.log('✅ Fast card setup completed successfully:', syncData);
+              console.log('✅ Instant card setup completed successfully:', syncData);
               
-              // Check if fast setup found credit cards
-              if (syncData.success && syncData.creditCardsFound > 0) {
-                console.log('✅ Verified: Sync created credit card accounts');
-                setLoadingMessage('Finalizing your card...');
-                setLoadingSubMessage('Verifying card data is ready...');
+              // Check if instant setup found credit cards
+              if (syncData.success && syncData.creditCardsFound > 0 && syncData.readyForDisplay) {
+                console.log('✅ Verified: Cards are ready for immediate display with essential cycles');
+                setLoadingMessage('Card ready!');
+                setLoadingSubMessage('Your credit card is now available with recent billing cycles! Full history loading in background.');
                 
-                // Poll the database until the new card is actually available
+                // Poll the database until the new card is actually available  
                 const pollForNewCard = async () => {
                   let attempts = 0;
-                  const maxAttempts = 45; // 45 seconds max to account for slower processing
+                  const maxAttempts = 10; // Only 10 seconds max since instant setup should be very fast
                   
                   while (attempts < maxAttempts) {
                     try {
@@ -150,13 +150,19 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                         if (currentCardCount > initialCardCount) {
                           console.log('✅ New card data confirmed in database!');
                           setLoadingMessage('Card ready!');
-                          setLoadingSubMessage('Your new credit card is now available');
+                          setLoadingSubMessage('Your new credit card is available! Full transaction history will load in background.');
                           
-                          // Brief pause to show the success message
+                          // Brief pause to show the success message, then call onSuccess
                           setTimeout(() => {
-                            console.log('🎯 PlaidLink: Database confirmed new card count increased, refreshing page...');
-                            window.location.reload();
-                          }, 1000);
+                            console.log('🎯 PlaidLink: Database confirmed new card - calling onSuccess callback');
+                            setLoading(false);
+                            setSyncInProgress(false);
+                            
+                            // Call the Dashboard's refresh function instead of page reload
+                            if (onSuccess) {
+                              onSuccess();
+                            }
+                          }, 800); // Brief pause to show success message
                           return;
                         } else {
                           console.log(`⏳ Still waiting... need ${initialCardCount + 1} cards, have ${currentCardCount}`);
@@ -174,11 +180,15 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   }
                   
                   // Fallback if polling times out
-                  console.warn('⚠️ Polling timeout - refreshing anyway');
+                  console.warn('⚠️ Polling timeout - calling onSuccess anyway');
                   setLoadingMessage('Card should be ready...');
                   setLoadingSubMessage('Loading your dashboard');
                   setTimeout(() => {
-                    window.location.reload();
+                    setLoading(false);
+                    setSyncInProgress(false);
+                    if (onSuccess) {
+                      onSuccess();
+                    }
                   }, 1000);
                 };
                 
@@ -197,19 +207,21 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               
             } else {
               const syncError = await syncResponse.json();
-              console.warn('⚠️ Fast setup had issues:', syncError);
+              console.warn('⚠️ Instant setup had issues:', syncError);
               console.warn('⚠️ Response status:', syncResponse.status);
               
               setLoadingMessage('Connection established');
-              setLoadingSubMessage('Card setup may need additional time...');
+              setLoadingSubMessage('Card will appear shortly...');
               
               setTimeout(() => {
                 setLoading(false);
                 setSyncInProgress(false);
                 
-                // Refresh page to show what we have
-                console.log('🎯 PlaidLink: Fast setup had issues, refreshing to check results...');
-                window.location.reload();
+                // Call onSuccess to show what we have
+                console.log('🎯 PlaidLink: Instant setup had issues, calling onSuccess to check results...');
+                if (onSuccess) {
+                  onSuccess();
+                }
               }, 2000);
             }
             
@@ -222,9 +234,11 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               setLoading(false);
               setSyncInProgress(false);
               
-              // Refresh page to show new card
-              console.log('🎯 PlaidLink: Card connected (sync failed), refreshing page...');
-              window.location.reload();
+              // Call onSuccess to show new card
+              console.log('🎯 PlaidLink: Card connected (sync failed), calling onSuccess...');
+              if (onSuccess) {
+                onSuccess();
+              }
             }, 1500);
           }
         } else {

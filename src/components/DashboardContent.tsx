@@ -1420,9 +1420,31 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     )}
                   </button>
                   
-                  <PlaidLink onSuccess={() => {
-                    // Page refresh is now handled directly in PlaidLink after loading screen
-                    console.log('🎯 DashboardContent: PlaidLink onSuccess callback (page refresh handled by PlaidLink)');
+                  <PlaidLink onSuccess={async () => {
+                    console.log('🎯 DashboardContent: PlaidLink onSuccess - refreshing data without page reload');
+                    
+                    // Directly refresh the Dashboard data instead of page reload
+                    try {
+                      setRecentCardAddition(true); // Prevent background sync interference
+                      
+                      // Wait a moment for database commits to complete
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      
+                      // Refresh data with the new card
+                      await fetchDatabaseDataOnly('New card added: ');
+                      
+                      console.log('✅ Dashboard data refreshed with new card');
+                      
+                      // Clear the recent addition flag after a delay
+                      setTimeout(() => {
+                        setRecentCardAddition(false);
+                      }, 5000);
+                      
+                    } catch (error) {
+                      console.error('❌ Failed to refresh Dashboard data:', error);
+                      // Fallback to page refresh if direct refresh fails
+                      window.location.reload();
+                    }
                   }} />
                   
                   {/* Account Settings Button */}

@@ -565,3 +565,320 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
 
   return allCycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
 }
+
+/**
+ * Calculate only the current/most recent billing cycle for fast loading
+ * Used for instant card setup to show immediate card data
+ */
+export async function calculateCurrentBillingCycle(creditCardId: string): Promise<BillingCycleData | null> {
+  try {
+    // Get credit card data
+    const { data: creditCard, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .eq('id', creditCardId)
+      .single();
+
+    if (cardError || !creditCard) {
+      console.warn('Credit card not found for current cycle calculation');
+      return null;
+    }
+
+    // Get only recent transactions (last 60 days) for current cycle
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    const { data: recentTransactions, error: transactionsError } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .eq('creditCardId', creditCardId)
+      .gte('date', sixtyDaysAgo.toISOString())
+      .order('date', { ascending: true });
+
+    if (transactionsError) {
+      console.warn('Failed to fetch recent transactions for current cycle:', transactionsError);
+      return null;
+    }
+
+    // Convert date strings to Date objects
+    const transactionsWithDates = (recentTransactions || []).map(t => ({
+      ...t,
+      date: new Date(t.date),
+      authorizedDate: t.authorizedDate ? new Date(t.authorizedDate) : null,
+    }));
+
+    // Calculate current/most recent cycle
+    let currentCycleStart: Date;
+    let currentCycleEnd: Date;
+
+    if (creditCard.lastStatementIssueDate) {
+      // Use statement date as base for current cycle
+      const lastStatementDate = new Date(creditCard.lastStatementIssueDate);
+      currentCycleStart = lastStatementDate;
+      currentCycleEnd = new Date(lastStatementDate);
+      currentCycleEnd.setMonth(currentCycleEnd.getMonth() + 1);
+    } else {
+      // Estimate current cycle from transaction patterns
+      const now = new Date();
+      currentCycleEnd = now;
+      currentCycleStart = new Date(now);
+      currentCycleStart.setMonth(currentCycleStart.getMonth() - 1);
+    }
+
+    // Get transactions for this cycle
+    const cycleTransactions = transactionsWithDates.filter(t => 
+      t.date >= currentCycleStart && t.date <= currentCycleEnd
+    );
+
+    // Calculate spending for this cycle (exclude payments)
+    const totalSpend = cycleTransactions
+      .filter(t => !isPaymentTransaction(t.name || '') && t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    // Create or update the current billing cycle
+    const cycleId = `${creditCardId}_${currentCycleStart.toISOString().split('T')[0]}_${currentCycleEnd.toISOString().split('T')[0]}`;
+
+    const { data: existingCycle } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .eq('creditCardId', creditCardId)
+      .eq('startDate', currentCycleStart.toISOString().split('T')[0])
+      .eq('endDate', currentCycleEnd.toISOString().split('T')[0])
+      .single();
+
+    if (existingCycle) {
+      // Update existing cycle
+      const { data: updatedCycle, error: updateError } = await supabaseAdmin
+        .from('billing_cycles')
+        .update({
+          totalSpend,
+          transactionCount: cycleTransactions.length,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', existingCycle.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Failed to update current billing cycle:', updateError);
+        return null;
+      }
+
+      return {
+        id: updatedCycle.id,
+        creditCardId: creditCard.id,
+        creditCardName: creditCard.name,
+        creditCardMask: creditCard.mask,
+        startDate: currentCycleStart,
+        endDate: currentCycleEnd,
+        statementBalance: updatedCycle.statementBalance || undefined,
+        minimumPayment: updatedCycle.minimumPayment || undefined,
+        dueDate: updatedCycle.dueDate ? new Date(updatedCycle.dueDate) : undefined,
+        totalSpend,
+        transactionCount: cycleTransactions.length,
+      };
+    } else {
+      // Create new current cycle
+      const { data: newCycle, error: insertError } = await supabaseAdmin
+        .from('billing_cycles')
+        .insert({
+          id: cycleId,
+          creditCardId: creditCard.id,
+          startDate: currentCycleStart.toISOString().split('T')[0],
+          endDate: currentCycleEnd.toISOString().split('T')[0],
+          totalSpend,
+          transactionCount: cycleTransactions.length,
+          paymentStatus: 'current', // Current cycle is always in progress
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Failed to create current billing cycle:', insertError);
+        return null;
+      }
+
+      return {
+        id: newCycle.id,
+        creditCardId: creditCard.id,
+        creditCardName: creditCard.name,
+        creditCardMask: creditCard.mask,
+        startDate: currentCycleStart,
+        endDate: currentCycleEnd,
+        totalSpend,
+        transactionCount: cycleTransactions.length,
+      };
+    }
+  } catch (error) {
+    console.error('Error calculating current billing cycle:', error);
+    return null;
+  }
+}
+
+/**
+ * Calculate the most recent closed billing cycle for fast loading
+ * Used for instant card setup to show the recently closed cycle with totalSpend
+ */
+export async function calculateRecentClosedCycle(creditCardId: string): Promise<BillingCycleData | null> {
+  try {
+    // Get credit card data
+    const { data: creditCard, error: cardError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*')
+      .eq('id', creditCardId)
+      .single();
+
+    if (cardError || !creditCard) {
+      console.warn('Credit card not found for recent closed cycle calculation');
+      return null;
+    }
+
+    // Get recent transactions (last 90 days) to capture the closed cycle
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const { data: recentTransactions, error: transactionsError } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .eq('creditCardId', creditCardId)
+      .gte('date', ninetyDaysAgo.toISOString())
+      .order('date', { ascending: true });
+
+    if (transactionsError) {
+      console.warn('Failed to fetch recent transactions for closed cycle:', transactionsError);
+      return null;
+    }
+
+    // Convert date strings to Date objects
+    const transactionsWithDates = (recentTransactions || []).map(t => ({
+      ...t,
+      date: new Date(t.date),
+      authorizedDate: t.authorizedDate ? new Date(t.authorizedDate) : null,
+    }));
+
+    // Calculate recent closed cycle (previous month)
+    let closedCycleStart: Date;
+    let closedCycleEnd: Date;
+
+    if (creditCard.lastStatementIssueDate) {
+      // Use statement date as base - go back one cycle
+      const lastStatementDate = new Date(creditCard.lastStatementIssueDate);
+      closedCycleEnd = lastStatementDate;
+      closedCycleStart = new Date(lastStatementDate);
+      closedCycleStart.setMonth(closedCycleStart.getMonth() - 1);
+    } else {
+      // Estimate closed cycle from current date - go back one month
+      const now = new Date();
+      closedCycleStart = new Date(now);
+      closedCycleStart.setMonth(closedCycleStart.getMonth() - 2); // 2 months back for start
+      closedCycleEnd = new Date(now);
+      closedCycleEnd.setMonth(closedCycleEnd.getMonth() - 1); // 1 month back for end
+    }
+
+    // Get transactions for this closed cycle
+    const cycleTransactions = transactionsWithDates.filter(t => 
+      t.date >= closedCycleStart && t.date <= closedCycleEnd
+    );
+
+    // Skip if no transactions found for this period
+    if (cycleTransactions.length === 0) {
+      console.log('No transactions found for recent closed cycle period');
+      return null;
+    }
+
+    // Calculate spending for this cycle (exclude payments)
+    const totalSpend = cycleTransactions
+      .filter(t => !isPaymentTransaction(t.name || '') && t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    // Create or update the closed billing cycle
+    const cycleId = `${creditCardId}_${closedCycleStart.toISOString().split('T')[0]}_${closedCycleEnd.toISOString().split('T')[0]}`;
+
+    const { data: existingCycle } = await supabaseAdmin
+      .from('billing_cycles')
+      .select('*')
+      .eq('creditCardId', creditCardId)
+      .eq('startDate', closedCycleStart.toISOString().split('T')[0])
+      .eq('endDate', closedCycleEnd.toISOString().split('T')[0])
+      .single();
+
+    if (existingCycle) {
+      // Update existing closed cycle
+      const { data: updatedCycle, error: updateError } = await supabaseAdmin
+        .from('billing_cycles')
+        .update({
+          totalSpend,
+          transactionCount: cycleTransactions.length,
+          // For closed cycles, try to get statement balance from Plaid data
+          statementBalance: creditCard.lastStatementBalance || totalSpend,
+          paymentStatus: 'due', // Closed cycles are typically due
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', existingCycle.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Failed to update recent closed billing cycle:', updateError);
+        return null;
+      }
+
+      return {
+        id: updatedCycle.id,
+        creditCardId: creditCard.id,
+        creditCardName: creditCard.name,
+        creditCardMask: creditCard.mask,
+        startDate: closedCycleStart,
+        endDate: closedCycleEnd,
+        statementBalance: updatedCycle.statementBalance || undefined,
+        minimumPayment: updatedCycle.minimumPayment || undefined,
+        dueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate) : undefined,
+        totalSpend,
+        transactionCount: cycleTransactions.length,
+      };
+    } else {
+      // Create new closed cycle
+      const { data: newCycle, error: insertError } = await supabaseAdmin
+        .from('billing_cycles')
+        .insert({
+          id: cycleId,
+          creditCardId: creditCard.id,
+          startDate: closedCycleStart.toISOString().split('T')[0],
+          endDate: closedCycleEnd.toISOString().split('T')[0],
+          totalSpend,
+          transactionCount: cycleTransactions.length,
+          statementBalance: creditCard.lastStatementBalance || totalSpend,
+          dueDate: creditCard.nextPaymentDueDate ? creditCard.nextPaymentDueDate.toISOString().split('T')[0] : null,
+          paymentStatus: 'due', // Closed cycles are typically due
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Failed to create recent closed billing cycle:', insertError);
+        return null;
+      }
+
+      return {
+        id: newCycle.id,
+        creditCardId: creditCard.id,
+        creditCardName: creditCard.name,
+        creditCardMask: creditCard.mask,
+        startDate: closedCycleStart,
+        endDate: closedCycleEnd,
+        statementBalance: newCycle.statementBalance || undefined,
+        minimumPayment: newCycle.minimumPayment || undefined,
+        dueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate) : undefined,
+        totalSpend,
+        transactionCount: cycleTransactions.length,
+      };
+    }
+  } catch (error) {
+    console.error('Error calculating recent closed billing cycle:', error);
+    return null;
+  }
+}
