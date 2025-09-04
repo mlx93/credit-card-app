@@ -57,16 +57,19 @@ export async function POST(request: NextRequest) {
       console.log(`🔄 Calculating full billing history for ${card.name}...`);
       
       try {
-        // Delete existing billing cycles to force complete regeneration
-        await supabaseAdmin
+        // Get existing cycles to preserve the ones created by instant-setup
+        const { data: existingCycles } = await supabaseAdmin
           .from('billing_cycles')
-          .delete()
+          .select('*')
           .eq('creditCardId', card.id);
         
-        // Calculate complete billing cycle history
+        console.log(`🔄 Updating billing history for ${card.name} (preserving ${existingCycles?.length || 0} existing cycles)...`);
+        
+        // Calculate complete billing cycle history (calculateBillingCycles will update existing ones)
         const cycles = await calculateBillingCycles(card.id);
         totalCyclesCalculated += cycles.length;
-        console.log(`✅ Card ${card.name}: ${cycles.length} total billing cycles calculated`);
+        
+        console.log(`✅ Card ${card.name}: ${cycles.length} total billing cycles (${existingCycles?.length || 0} updated, ${cycles.length - (existingCycles?.length || 0)} new)`);
       } catch (cycleError) {
         console.error(`❌ Failed to calculate cycles for ${card.name}:`, cycleError);
       }
