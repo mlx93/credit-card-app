@@ -12,5 +12,5 @@ export default async function Dashboard() {
   }
 
   // Show real data for logged in users
-  return <DashboardContent isLoggedIn={true} />;
+  return <DashboardContent isLoggedIn={true} userEmail={session.user.email} />;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2, CheckCircle } from 'lucide-react';
+import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2, CheckCircle, Settings, User } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/utils/format';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard, DueDateCards } from '@/components/DueDateCard';
@@ -12,12 +12,14 @@ import { PlaidUpdateLink } from '@/components/PlaidUpdateLink';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { DeletionProgressDialog } from '@/components/DeletionProgressDialog';
 import { SuccessNotification } from '@/components/SuccessNotification';
+import { AccountSettings } from '@/components/AccountSettings';
 
 interface DashboardContentProps {
   isLoggedIn: boolean;
+  userEmail?: string;
 }
 
-export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
+export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProps) {
   // Initialize state from localStorage if available
   const [creditCards, setCreditCards] = useState<any[]>(() => {
     if (typeof window !== 'undefined' && isLoggedIn) {
@@ -77,6 +79,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [deletionProgress, setDeletionProgress] = useState(0);
   const [deletionStep, setDeletionStep] = useState('');
   const [showDeletionSuccess, setShowDeletionSuccess] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
 
   // Create consistent default card ordering based on due dates and card names
   const getDefaultCardOrder = (cards: any[]): string[] => {
@@ -1219,6 +1222,19 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                       });
                     }, 500); // Small delay to ensure sync completion
                   }} />
+                  
+                  {/* Account Settings Button */}
+                  <button
+                    onClick={() => setShowAccountSettings(true)}
+                    className="relative overflow-hidden font-medium py-3 px-4 rounded-2xl transition-all duration-200 flex items-center justify-center space-x-2 text-sm whitespace-nowrap transform focus:outline-none focus:ring-2 group border bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300 hover:shadow-md hover:scale-[1.02] focus:ring-gray-500/50 shadow-sm"
+                    title="Account Settings"
+                  >
+                    <Settings className="h-4 w-4 transition-transform duration-200 group-hover:rotate-45" />
+                    <span className="hidden sm:inline font-medium">Settings</span>
+                    
+                    {/* Shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                  </button>
                 </>
               ) : (
                 <div className="text-center py-2">
@@ -1433,6 +1449,13 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         message={`${cardToDelete?.name || 'Card'} has been successfully removed`}
         duration={3000}
         onClose={() => setShowDeletionSuccess(false)}
+      />
+
+      {/* Account Settings Modal */}
+      <AccountSettings
+        isOpen={showAccountSettings}
+        onClose={() => setShowAccountSettings(false)}
+        userEmail={userEmail}
       />
     </div>
   );

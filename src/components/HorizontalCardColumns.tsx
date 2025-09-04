@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import { ChevronDown, ChevronUp, GripVertical, ChevronRight } from 'lucide-react';
 import { DueDateCard } from './DueDateCard';
 import { CardBillingCycles } from './CardBillingCycles';
 
@@ -248,6 +248,11 @@ export function HorizontalCardColumns({
     return new Set(cards.map(card => card.id));
   });
   
+  // Scroll indicator state
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -318,6 +323,46 @@ export function HorizontalCardColumns({
     });
   };
 
+  // Check if there are more cards to scroll to
+  const checkScrollIndicator = () => {
+    if (!scrollContainerRef.current) return;
+    
+    const container = scrollContainerRef.current;
+    const isScrollable = container.scrollWidth > container.clientWidth;
+    const isAtEnd = container.scrollLeft >= container.scrollWidth - container.clientWidth - 10; // 10px threshold
+    
+    setShowScrollIndicator(isScrollable && !isAtEnd && !hasInteracted);
+  };
+
+  // Handle scroll events
+  const handleScroll = () => {
+    setHasInteracted(true);
+    checkScrollIndicator();
+  };
+
+  // Check scroll indicator when component mounts or cards change
+  useEffect(() => {
+    checkScrollIndicator();
+    
+    // Add resize observer to check when container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      setTimeout(checkScrollIndicator, 100); // Small delay to ensure layout is complete
+    });
+    
+    if (scrollContainerRef.current) {
+      resizeObserver.observe(scrollContainerRef.current);
+    }
+    
+    return () => resizeObserver.disconnect();
+  }, [cards, hasInteracted]);
+
+  // Reset interaction state when cards change significantly
+  useEffect(() => {
+    if (cards.length > 1) {
+      setHasInteracted(false);
+    }
+  }, [cards.length]);
+
   const orderedCards = cardOrder
     .map(id => cards.find(card => card.id === id))
     .filter(Boolean) as CreditCardInfo[];
@@ -378,27 +423,57 @@ export function HorizontalCardColumns({
             items={cardOrder}
             strategy={horizontalListSortingStrategy}
           >
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-premium min-h-[300px]">
-              {orderedCards.map((card, index) => {
-                const colorIndex = getCardColorIndex(card.name, card.id);
-                return (
-                  <SortableCardColumn
-                    key={card.id}
-                    card={card}
-                    cycles={getCardCycles(card.id)}
-                    connectionHealth={connectionHealth}
-                    isExpanded={expandedCards.has(card.id)}
-                    onToggleExpand={() => toggleCardExpansion(card.id)}
-                    onSync={onSync}
-                    onReconnect={onReconnect}
-                    onRemove={onRemove}
-                    onRequestDelete={onRequestDelete}
-                    onCreditLimitUpdated={onCreditLimitUpdated}
-                    colorIndex={colorIndex}
-                    billingCycleGradient={getBillingCycleGradient(colorIndex)}
-                  />
-                );
-              })}
+            <div className="relative">
+              <div 
+                ref={scrollContainerRef}
+                className="flex gap-4 overflow-x-auto pb-4 scrollbar-premium min-h-[300px]"
+                onScroll={handleScroll}
+              >
+                {orderedCards.map((card, index) => {
+                  const colorIndex = getCardColorIndex(card.name, card.id);
+                  return (
+                    <SortableCardColumn
+                      key={card.id}
+                      card={card}
+                      cycles={getCardCycles(card.id)}
+                      connectionHealth={connectionHealth}
+                      isExpanded={expandedCards.has(card.id)}
+                      onToggleExpand={() => toggleCardExpansion(card.id)}
+                      onSync={onSync}
+                      onReconnect={onReconnect}
+                      onRemove={onRemove}
+                      onRequestDelete={onRequestDelete}
+                      onCreditLimitUpdated={onCreditLimitUpdated}
+                      colorIndex={colorIndex}
+                      billingCycleGradient={getBillingCycleGradient(colorIndex)}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Elegant Scroll Indicator - iOS-inspired */}
+              {showScrollIndicator && (
+                <div className="absolute top-0 right-0 bottom-4 w-16 pointer-events-none z-10">
+                  {/* Fade-out gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-l from-white via-white/80 to-transparent"></div>
+                  
+                  {/* Subtle animated chevron hint */}
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center space-y-1">
+                    <div className="animate-pulse">
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <div className="w-1 h-1 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.5s' }}></div>
+                    <div className="w-1 h-1 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '1s' }}></div>
+                  </div>
+                  
+                  {/* Subtle text hint that fades in after a delay */}
+                  <div className="absolute bottom-8 right-3 opacity-0 animate-fade-in-delayed">
+                    <div className="bg-black/80 text-white text-xs px-2 py-1 rounded-lg whitespace-nowrap backdrop-blur-sm">
+                      Scroll for more →
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </SortableContext>
         </DndContext>
