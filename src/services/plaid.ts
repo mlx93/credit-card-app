@@ -47,7 +47,7 @@ class PlaidServiceImpl implements PlaidService {
       user: {
         client_user_id: userId,
       },
-      client_name: "Credit Card Tracker",
+      client_name: "CardCycle",
       products: ['liabilities', 'transactions'],
       country_codes: ['US'],
       language: 'en',
@@ -1424,7 +1424,7 @@ class PlaidServiceImpl implements PlaidService {
       user: {
         client_user_id: userId,
       },
-      client_name: "Credit Card Tracker",
+      client_name: "CardCycle",
       products: ['liabilities', 'transactions'],
       country_codes: ['US'],
       language: 'en',
