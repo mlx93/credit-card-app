@@ -332,11 +332,6 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const fetchAllUserData = async (logPrefix: string = '') => {
     if (!isLoggedIn) return;
     
-    // Show brief loading indicator for new card refresh
-    if (logPrefix.includes('PLAID_SUCCESS')) {
-      setLoading(true);
-    }
-    
     // Get current month date range
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -445,11 +440,6 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       const errorText = await connectionHealthRes.text();
       console.warn(`Failed to fetch connection health data${logPrefix}:`, connectionHealthRes.status, errorText);
       setConnectionHealth(null);
-    }
-    
-    // Clear loading state if this was triggered by PlaidLink success
-    if (logPrefix.includes('PLAID_SUCCESS')) {
-      setLoading(false);
     }
   };
 
@@ -898,11 +888,59 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
   };
 
-  // Check connection health - be much more conservative about auto-sync
-  const checkConnectionHealth = async () => {
+  // Check if it's time for scheduled sync (9:30 AM or 9:30 PM EST)
+  const isScheduledSyncTime = (): boolean => {
+    const now = new Date();
+    
+    // Convert to EST
+    const estOffset = -5; // EST is UTC-5 (or UTC-4 in DST, but keeping it simple)
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const est = new Date(utc + (estOffset * 3600000));
+    
+    const hours = est.getHours();
+    const minutes = est.getMinutes();
+    
+    // Check if it's 9:30 AM or 9:30 PM EST (within a 30-minute window)
+    const isTargetTime = (hours === 9 || hours === 21) && minutes >= 30 && minutes < 60;
+    
+    if (isTargetTime) {
+      // Check if we've already synced in the last hour to avoid multiple syncs
+      const lastSync = localStorage.getItem('lastScheduledSync');
+      if (lastSync) {
+        const lastSyncTime = new Date(lastSync);
+        const hoursSinceLastSync = (now.getTime() - lastSyncTime.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceLastSync < 1) {
+          console.log('⏭️ Scheduled sync already performed in the last hour, skipping');
+          return false;
+        }
+      }
+      
+      console.log(`⏰ It's scheduled sync time (${hours === 9 ? '9:30 AM' : '9:30 PM'} EST)`);
+      return true;
+    }
+    
+    return false;
+  };
+
+  // Check connection health and perform scheduled sync if needed
+  const checkConnectionHealthAndScheduledSync = async () => {
     if (!isLoggedIn) return;
 
     try {
+      // First check if it's time for scheduled sync
+      if (isScheduledSyncTime()) {
+        console.log('🕘 Starting scheduled sync...');
+        
+        // Mark that we've performed the scheduled sync
+        localStorage.setItem('lastScheduledSync', new Date().toISOString());
+        
+        // Perform background sync
+        await backgroundSync();
+        return; // Exit early after scheduled sync
+      }
+
+      // Regular connection health check (no auto-sync)
       const response = await fetch('/api/user/credit-cards', {
         cache: 'no-store',
         headers: {
@@ -910,11 +948,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           'Pragma': 'no-cache'
         }
       });
+      
       if (response.ok) {
         const { creditCards: cards } = await response.json();
         
         // Only consider connections truly broken if they have explicit error status
-        // AND haven't been synced in over 24 hours (not just 14 days)
         const trulyBrokenConnections = cards.filter((card: any) => {
           if (!card.plaidItem) return false;
           
@@ -922,18 +960,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           const lastSync = card.plaidItem.lastSyncAt ? new Date(card.plaidItem.lastSyncAt) : null;
           const hoursAgo = lastSync ? (Date.now() - lastSync.getTime()) / (1000 * 60 * 60) : Infinity;
           
-          // Only auto-sync if connection has explicit error AND hasn't synced in 24+ hours
           return hasErrorStatus && hoursAgo > 24;
         });
 
         if (trulyBrokenConnections.length > 0) {
-          console.log(`⚠️ ${trulyBrokenConnections.length} truly broken connections detected (error status + 24h+ since sync)`);
-          console.log('ℹ️ Consider manually reconnecting these cards instead of auto-sync');
-          
-          // Don't auto-trigger sync - just log for user awareness
-          // User can manually refresh if needed
+          console.log(`⚠️ ${trulyBrokenConnections.length} connections need attention (use manual refresh or reconnect)`);
         } else {
-          console.log('✅ All connections appear healthy - no auto-sync needed');
+          console.log('✅ All connections appear healthy');
         }
       }
     } catch (error) {
@@ -977,15 +1010,14 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         console.warn('Failed to load cached data:', error);
       }
       
-      // After instant cache load, start background sync (truly in background)
-      console.log('🔄 Starting background data sync...');
+      // After instant cache load, check for scheduled sync (no automatic sync)
+      console.log('🔄 Checking for scheduled sync...');
       setTimeout(() => {
-        backgroundSync();
+        checkConnectionHealthAndScheduledSync();
       }, 100); // Small delay to ensure cache load completes first
     };
     
     loadCachedDataFirst();
-    setTimeout(checkConnectionHealth, 1000);
   }, [isLoggedIn]);
 
   // Auto-close success popup after 5 seconds
