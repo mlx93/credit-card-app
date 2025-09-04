@@ -1,0 +1,29 @@
+🔧 DIALOG POSITIONING ARCHITECTURE FIX
+
+## Issue Resolved:
+Card deletion confirmation dialog was flickering and positioning inconsistently due to being rendered at the card component level, causing interference from:
+- CSS transforms on card hover states
+- Relative positioning within card containers
+- Mouse movement triggering card effects
+
+## Solution Implemented:
+✅ Moved all dialogs from DueDateCard to DashboardContent (page level)
+✅ Implemented callback architecture: onRequestDelete(card) → page-level dialog
+✅ Enhanced positioning with z-index: 100 and explicit position: fixed
+✅ Proper backdrop and dialog layering throughout component hierarchy
+
+## Components Updated:
+- DueDateCard.tsx: Removed local dialog state, added onRequestDelete callback
+- HorizontalCardColumns.tsx: Pass-through callback architecture
+- DashboardContent.tsx: Centralized dialog management at page level
+- ConfirmationDialog.tsx: Enhanced positioning with inline styles
+- DeletionProgressDialog.tsx: Consistent z-index and positioning
+- SuccessNotification.tsx: Fixed positioning for notifications
+
+## Result:
+- 🎯 No more dialog flickering or position jumping
+- 📱 Consistent behavior regardless of card location
+- 🖱️ Mouse movement doesn't interfere with dialog display
+- 🎨 Smooth, professional dialog experience across all screens
+
+This architectural change ensures dialogs render predictably above all content.
