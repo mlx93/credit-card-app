@@ -133,7 +133,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 // Poll the database until the new card is actually available  
                 const pollForNewCard = async () => {
                   let attempts = 0;
-                  const maxAttempts = 45; // Increase to 45 seconds to handle slower institutions like WF
+                  const maxAttempts = 15; // 15 seconds should be enough with optimized transaction sync
                   
                   while (attempts < maxAttempts) {
                     try {

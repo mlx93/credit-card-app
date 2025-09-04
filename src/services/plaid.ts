@@ -1087,6 +1087,54 @@ class PlaidServiceImpl implements PlaidService {
    * - Only creates/updates, never deletes
    * - Logs preserved vs new transaction counts for transparency
    */
+
+  /**
+   * Optimized transaction sync for instant card setup - only fetches recent transactions
+   * needed for current + most recent closed billing cycles (3 months max)
+   */
+  async syncRecentTransactions(plaidItemRecord: any, accessToken: string): Promise<void> {
+    console.log('⚡ RECENT TRANSACTION SYNC (for instant setup)', { itemId: plaidItemRecord.itemId });
+    
+    // Validate access token format
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) {
+      throw new Error(`Invalid access token: ${accessToken ? 'too short' : 'missing'}`);
+    }
+    
+    console.log(`✅ Access token validation passed for recent sync`);
+    
+    try {
+      console.log(`⚡ Starting RECENT transaction sync for itemId: ${plaidItemRecord.itemId}`);
+      
+      // Small delay to respect rate limits
+      await this.delay(200);
+      
+      const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      if (isCapitalOneItem) {
+        // Capital One: 3 months for recent sync
+        startDate.setMonth(startDate.getMonth() - 3);
+        console.log('⚡ Capital One: Requesting 3 months for instant setup');
+      } else {
+        // Standard institutions: Only 3 months for instant setup (vs 12 months for full sync)
+        startDate.setMonth(startDate.getMonth() - 3);
+        console.log('⚡ Standard institution: Requesting 3 months for instant setup (vs 12 for full sync)');
+      }
+      
+      console.log(`⚡ RECENT SYNC DATE RANGE: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+      
+      // Use the same transaction fetching logic but with shorter date range
+      await this.fetchAndStoreTransactions(plaidItemRecord, accessToken, startDate, endDate, isCapitalOneItem);
+      
+      console.log('✅ Recent transaction sync completed for instant setup');
+      
+    } catch (error: any) {
+      console.error('❌ Recent transaction sync failed:', error);
+      throw error;
+    }
+  }
+
   async syncTransactions(plaidItemRecord: any, accessToken: string): Promise<void> {
     console.log('🚀 TRANSACTION SYNC METHOD CALLED!', { itemId: plaidItemRecord.itemId, hasAccessToken: !!accessToken });
     
