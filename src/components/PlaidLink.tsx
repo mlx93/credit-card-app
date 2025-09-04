@@ -114,19 +114,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
             
             if (syncResponse.ok) {
               const syncData = await syncResponse.json();
-              console.log('✅ New card sync completed successfully:', syncData);
+              console.log('✅ Fast card setup completed successfully:', syncData);
               
-              // Verify sync actually created cards before claiming success
-              const hasSuccessfulResults = syncData.results?.some((result: any) => 
-                result.status === 'success' && result.creditCardsFound > 0
-              );
-
-              // Check if no credit cards were found across all results
-              const noCreditCardsFound = syncData.results?.every((result: any) => 
-                result.status === 'success' && result.creditCardsFound === 0
-              );
-              
-              if (hasSuccessfulResults) {
+              // Check if fast setup found credit cards
+              if (syncData.success && syncData.creditCardsFound > 0) {
                 console.log('✅ Verified: Sync created credit card accounts');
                 setLoadingMessage('Finalizing your card...');
                 setLoadingSubMessage('Verifying card data is ready...');
@@ -191,7 +182,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 };
                 
                 pollForNewCard();
-              } else if (noCreditCardsFound) {
+              } else {
                 console.warn('⚠️ No credit cards found at connected institution');
                 setLoadingMessage('No credit cards found');
                 setLoadingSubMessage('This institution may not have credit card accounts available');
@@ -201,67 +192,24 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   setSyncInProgress(false);
                   alert('No credit cards were found at this institution. You may have connected a bank account instead of a credit card account, or this institution may not support credit card data through Plaid.');
                 }, 2000);
-              } else {
-                console.warn('⚠️ Sync completed but no cards were created, treating as partial success');
-                setLoadingMessage('Connection established');
-                setLoadingSubMessage('Card setup may take a moment to complete...');
-                
-                setTimeout(() => {
-                  setLoading(false);
-                  setSyncInProgress(false);
-                  
-                  // Refresh page to show new card
-                  console.log('🎯 PlaidLink: Card connected (partial sync), refreshing page...');
-                  window.location.reload();
-                }, 1200);
               }
               
             } else {
               const syncError = await syncResponse.json();
-              console.warn('⚠️ Sync had issues but card is connected:', syncError);
-              console.warn('⚠️ Sync response status:', syncResponse.status);
-              console.warn('⚠️ Full sync error details:', JSON.stringify(syncError, null, 2));
+              console.warn('⚠️ Fast setup had issues:', syncError);
+              console.warn('⚠️ Response status:', syncResponse.status);
               
-              // Check if it's the orphaned item error
-              if (syncError.message?.includes('not found') || syncError.message?.includes('Cannot coerce')) {
-                console.error('🚨 ORPHANED ITEM ERROR - Database timing issue detected');
-                setLoadingMessage('Finalizing card setup');
-                setLoadingSubMessage('Card is ready, completing final steps...');
-                
-                // Even with sync error, the card should be created from syncAccounts
-                // Just show the card without full transaction sync
-                setTimeout(() => {
-                  setLoading(false);
-                  setSyncInProgress(false);
-                  
-                  // Refresh page to show new card
-                  console.log('🎯 PlaidLink: Card connected (sync error), refreshing page...');
-                  window.location.reload();
-                }, 1000);
-                return;
-              }
-              
-              // Check if it's just rate limits vs real connection failure
-              const hasRateLimit = syncError.results?.some((r: any) => 
-                r.error?.toLowerCase().includes('rate limit')
-              );
-              
-              if (hasRateLimit) {
-                setLoadingMessage('Card connected with rate limits');
-                setLoadingSubMessage('Card is ready, transaction history may be limited');
-              } else {
-                setLoadingMessage('Card connected with sync issues');
-                setLoadingSubMessage('Card is available, some data may sync later');
-              }
+              setLoadingMessage('Connection established');
+              setLoadingSubMessage('Card setup may need additional time...');
               
               setTimeout(() => {
                 setLoading(false);
                 setSyncInProgress(false);
                 
-                // Refresh page to show new card
-                console.log('🎯 PlaidLink: Card connected (rate limits), refreshing page...');
+                // Refresh page to show what we have
+                console.log('🎯 PlaidLink: Fast setup had issues, refreshing to check results...');
                 window.location.reload();
-              }, 800);
+              }, 2000);
             }
             
           } catch (syncError) {
