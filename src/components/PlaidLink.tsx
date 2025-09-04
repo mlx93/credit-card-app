@@ -196,6 +196,17 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 };
                 
                 pollForNewCard();
+              } else if (syncData.error === 'OAUTH_INVALID_TOKEN' || syncData.requiresReauth) {
+                console.warn('⚠️ OAuth authentication required');
+                console.warn('⚠️ Instant setup response:', syncData);
+                setLoadingMessage('Re-authentication Required');
+                setLoadingSubMessage('Please reconnect your account to continue');
+                
+                setTimeout(() => {
+                  setLoading(false);
+                  setSyncInProgress(false);
+                  alert('Your bank requires re-authentication. The connection was successful, but you may need to reconnect for full functionality. Please refresh the page and try again.');
+                }, 3000);
               } else {
                 console.warn('⚠️ No credit cards found at connected institution');
                 console.warn('⚠️ Instant setup response:', syncData);

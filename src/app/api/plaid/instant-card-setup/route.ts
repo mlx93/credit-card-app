@@ -46,6 +46,26 @@ export async function POST(request: NextRequest) {
       console.log('✅ Credit card records created:', accountSyncResult);
     } catch (syncAccountsError) {
       console.error('❌ Failed to sync accounts:', syncAccountsError);
+      
+      // Check if this is an OAuth error - these are common and should be handled gracefully
+      if (syncAccountsError.message?.includes('OAUTH_INVALID_TOKEN') || 
+          syncAccountsError.message?.includes('ITEM_LOGIN_REQUIRED')) {
+        console.warn('⚠️ OAuth error during account sync - this is common with some institutions');
+        console.warn('💡 User will need to re-authenticate, but we should still return success');
+        
+        // Return early with OAuth error status but don't fail completely
+        return NextResponse.json({
+          success: false,
+          message: 'Authentication required',
+          phase: 'oauth_required',
+          creditCardsFound: 0,
+          backgroundSyncScheduled: false,
+          readyForDisplay: false,
+          requiresReauth: true,
+          error: 'OAUTH_INVALID_TOKEN'
+        });
+      }
+      
       throw new Error(`Account sync failed: ${syncAccountsError.message}`);
     }
 
