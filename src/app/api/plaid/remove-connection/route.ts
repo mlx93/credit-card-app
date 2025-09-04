@@ -48,24 +48,72 @@ export async function DELETE(request: NextRequest) {
       // Continue with local cleanup even if Plaid removal fails
     }
 
-    // Clear manual credit limits for all cards associated with this connection
-    // This ensures that when users reconnect, they start fresh without old manual overrides
-    const { error: clearLimitsError } = await supabaseAdmin
+    // Get all credit cards associated with this plaid item before deletion
+    const { data: creditCards, error: cardsError } = await supabaseAdmin
       .from('credit_cards')
-      .update({
-        ismanuallimit: false,
-        manualcreditlimit: null,
-        updatedAt: new Date().toISOString()
-      })
+      .select('id')
       .eq('plaidItemId', plaidItem.id);
     
-    if (clearLimitsError) {
-      console.warn('Failed to clear manual credit limits (continuing with deletion):', clearLimitsError.message);
-    } else {
-      console.log('Cleared manual credit limits for cards in this connection');
+    if (cardsError) {
+      console.error('Error fetching credit cards for deletion:', cardsError);
+      return NextResponse.json({ error: 'Failed to fetch cards for deletion' }, { status: 500 });
     }
 
-    // Remove from local database (cascading deletes will handle related data)
+    const creditCardIds = (creditCards || []).map(card => card.id);
+    console.log(`Found ${creditCardIds.length} credit cards to delete:`, creditCardIds);
+
+    // Step 1: Delete related data explicitly to ensure complete cleanup
+    if (creditCardIds.length > 0) {
+      // Delete APRs
+      const { error: aprsDeleteError } = await supabaseAdmin
+        .from('aprs')
+        .delete()
+        .in('creditCardId', creditCardIds);
+      
+      if (aprsDeleteError) {
+        console.error('Error deleting APRs:', aprsDeleteError);
+        return NextResponse.json({ error: 'Failed to delete APR data' }, { status: 500 });
+      }
+      console.log(`Deleted APR data for ${creditCardIds.length} cards`);
+
+      // Delete billing cycles
+      const { error: billingCyclesDeleteError } = await supabaseAdmin
+        .from('billing_cycles')
+        .delete()
+        .in('creditCardId', creditCardIds);
+      
+      if (billingCyclesDeleteError) {
+        console.error('Error deleting billing cycles:', billingCyclesDeleteError);
+        return NextResponse.json({ error: 'Failed to delete billing cycle data' }, { status: 500 });
+      }
+      console.log(`Deleted billing cycles for ${creditCardIds.length} cards`);
+
+      // Delete transactions
+      const { error: transactionsDeleteError } = await supabaseAdmin
+        .from('transactions')
+        .delete()
+        .in('creditCardId', creditCardIds);
+      
+      if (transactionsDeleteError) {
+        console.error('Error deleting transactions:', transactionsDeleteError);
+        return NextResponse.json({ error: 'Failed to delete transaction data' }, { status: 500 });
+      }
+      console.log(`Deleted transactions for ${creditCardIds.length} cards`);
+    }
+
+    // Step 2: Delete credit cards
+    const { error: creditCardsDeleteError } = await supabaseAdmin
+      .from('credit_cards')
+      .delete()
+      .eq('plaidItemId', plaidItem.id);
+    
+    if (creditCardsDeleteError) {
+      console.error('Error deleting credit cards:', creditCardsDeleteError);
+      return NextResponse.json({ error: 'Failed to delete credit card data' }, { status: 500 });
+    }
+    console.log(`Deleted ${creditCardIds.length} credit cards`);
+
+    // Step 3: Finally delete the plaid item
     const { error: deleteError } = await supabaseAdmin
       .from('plaid_items')
       .delete()
@@ -75,6 +123,7 @@ export async function DELETE(request: NextRequest) {
       console.error('Error deleting plaid item:', deleteError);
       return NextResponse.json({ error: 'Failed to remove connection' }, { status: 500 });
     }
+    console.log(`Deleted plaid item: ${plaidItem.institutionName}`);
 
     console.log(`Successfully removed connection for ${plaidItem.institutionName}`);
 
