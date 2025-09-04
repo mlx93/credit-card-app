@@ -128,10 +128,8 @@ class PlaidServiceImpl implements PlaidService {
       throw new Error(`Failed to create plaid item: ${createError.message}`);
     }
 
-    // Only sync accounts (create credit card records) during token exchange
-    // Full transaction sync will happen later via targeted sync
-    await this.syncAccounts(access_token, item_id);
-    
+    // Account sync will happen via instant-card-setup after token exchange
+    // This prevents race conditions between token exchange and instant setup
     return { accessToken: access_token, itemId: item_id };
   }
 
