@@ -1000,6 +1000,103 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     return false;
   };
 
+  // Database-only data fetch for initial load (no API calls)
+  const fetchDatabaseDataOnly = async (logPrefix: string = '') => {
+    if (!isLoggedIn) return;
+    
+    console.log(`📀 ${logPrefix}Loading data from database only (no API calls)`);
+    
+    // Get current month date range
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    
+    try {
+      const [creditCardsRes, billingCyclesRes, transactionsRes, connectionHealthRes] = await Promise.all([
+        fetch('/api/user/credit-cards', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch('/api/user/billing-cycles', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch('/api/user/connection-health', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+      ]);
+
+      if (creditCardsRes.ok) {
+        const { creditCards: cards } = await creditCardsRes.json();
+        const safeCards = Array.isArray(cards) ? cards : [];
+        setCreditCards(safeCards);
+        
+        // Update shared card order to include new cards
+        if (safeCards.length > 0) {
+          const currentCardIds = new Set(sharedCardOrder);
+          const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
+          
+          if (newCards.length > 0) {
+            const newCardIds = newCards.map(card => card.id);
+            const updatedOrder = [...newCardIds, ...sharedCardOrder];
+            setSharedCardOrder(updatedOrder);
+            console.log(`🆕 Adding ${newCards.length} new cards to front of order${logPrefix}:`, {
+              newCardNames: newCards.map(c => c.name),
+              updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
+            });
+          } else if (sharedCardOrder.length === 0) {
+            const defaultOrder = getDefaultCardOrder(safeCards);
+            setSharedCardOrder(defaultOrder);
+            console.log(`Setting default card order${logPrefix}:`, {
+              cardCount: safeCards.length,
+              defaultOrder,
+              cardNames: defaultOrder.map(id => safeCards.find(c => c.id === id)?.name)
+            });
+          }
+        }
+      }
+
+      if (billingCyclesRes.ok) {
+        const { billingCycles: cycles } = await billingCyclesRes.json();
+        const safeCycles = Array.isArray(cycles) ? cycles : [];
+        setBillingCycles(safeCycles);
+      }
+
+      if (transactionsRes.ok) {
+        const { transactions } = await transactionsRes.json();
+        const safeTransactions = Array.isArray(transactions) ? transactions : [];
+        setCurrentMonthTransactions(safeTransactions);
+      }
+
+      if (connectionHealthRes.ok) {
+        const healthData = await connectionHealthRes.json();
+        console.log(`📊 Connection health data loaded from database${logPrefix}:`, healthData);
+        setConnectionHealth(healthData);
+      }
+      
+      console.log(`✅ ${logPrefix}Database data loaded successfully`);
+    } catch (error) {
+      console.error(`❌ ${logPrefix}Error loading database data:`, error);
+    }
+  };
+
   // Check connection health and perform scheduled sync if needed
   const checkConnectionHealthAndScheduledSync = async () => {
     if (!isLoggedIn) return;
@@ -1017,56 +1114,33 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         return; // Exit early after scheduled sync
       }
 
-      // Regular connection health check (no auto-sync)
-      const response = await fetch('/api/user/credit-cards', {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      if (response.ok) {
-        const { creditCards: cards } = await response.json();
-        
-        // Only consider connections truly broken if they have explicit error status
-        const trulyBrokenConnections = cards.filter((card: any) => {
-          if (!card.plaidItem) return false;
-          
-          const hasErrorStatus = ['expired', 'error'].includes(card.plaidItem.status);
-          const lastSync = card.plaidItem.lastSyncAt ? new Date(card.plaidItem.lastSyncAt) : null;
-          const hoursAgo = lastSync ? (Date.now() - lastSync.getTime()) / (1000 * 60 * 60) : Infinity;
-          
-          return hasErrorStatus && hoursAgo > 24;
-        });
-
-        if (trulyBrokenConnections.length > 0) {
-          console.log(`⚠️ ${trulyBrokenConnections.length} connections need attention (use manual refresh or reconnect)`);
-        } else {
-          console.log('✅ All connections appear healthy');
-        }
-      }
+      // For initial load, just load from database - no health checking that might trigger syncs
+      console.log('✅ Initial load complete - database data available. Use "Refresh All" for latest API data.');
     } catch (error) {
-      console.error('Error checking connection health:', error);
+      console.error('Error during initial data check:', error);
     }
   };
 
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    // First, immediately load any cached data to show instant UI
-    const loadCachedDataFirst = async () => {
+    const loadInitialData = async () => {
       try {
-        console.log('🚀 Loading cached data for instant UI...');
-        // Force immediate data load from cache without API calls
+        console.log('🚀 Starting initial data load on sign-in...');
+        
+        // Step 1: Load cached data immediately for instant UI
+        console.log('📦 Step 1: Loading cached data for instant UI...');
         const cachedCards = localStorage.getItem('cached_credit_cards');
         const cachedCycles = localStorage.getItem('cached_billing_cycles');
+        
+        let hasCachedData = false;
         
         if (cachedCards) {
           const cards = JSON.parse(cachedCards);
           if (Array.isArray(cards) && cards.length > 0) {
             setCreditCards(cards);
             console.log(`✅ Loaded ${cards.length} cards from cache instantly`);
+            hasCachedData = true;
             
             // Set initial card order for cached cards
             if (sharedCardOrder.length === 0) {
@@ -1083,18 +1157,38 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             console.log(`✅ Loaded ${cycles.length} billing cycles from cache instantly`);
           }
         }
+        
+        // Step 2: Load fresh database data (no API calls)
+        console.log('📀 Step 2: Loading fresh data from database (no API calls)...');
+        await fetchDatabaseDataOnly('Initial load: ');
+        
+        // Step 3: Check for scheduled sync only
+        console.log('🕘 Step 3: Checking for scheduled sync requirements...');
+        setTimeout(() => {
+          checkConnectionHealthAndScheduledSync();
+        }, 100);
+        
+        console.log('✅ Initial data load complete - showing most recent database data');
+        
       } catch (error) {
-        console.warn('Failed to load cached data:', error);
+        console.error('❌ Failed to load initial data:', error);
+        // Even on error, try to load from cache as fallback
+        const cachedCards = localStorage.getItem('cached_credit_cards');
+        if (cachedCards) {
+          try {
+            const cards = JSON.parse(cachedCards);
+            if (Array.isArray(cards) && cards.length > 0) {
+              setCreditCards(cards);
+              console.log(`🔄 Fallback: Loaded ${cards.length} cards from cache`);
+            }
+          } catch (cacheError) {
+            console.warn('Failed to load cached data as fallback:', cacheError);
+          }
+        }
       }
-      
-      // After instant cache load, check for scheduled sync (no automatic sync)
-      console.log('🔄 Checking for scheduled sync...');
-      setTimeout(() => {
-        checkConnectionHealthAndScheduledSync();
-      }, 100); // Small delay to ensure cache load completes first
     };
     
-    loadCachedDataFirst();
+    loadInitialData();
   }, [isLoggedIn]);
 
   // Auto-close success popup after 5 seconds
