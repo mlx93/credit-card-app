@@ -129,18 +129,65 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               
               if (hasSuccessfulResults) {
                 console.log('✅ Verified: Sync created credit card accounts');
-                setLoadingMessage('Card ready!');
-                setLoadingSubMessage('Your new credit card is now available');
+                setLoadingMessage('Finalizing your card...');
+                setLoadingSubMessage('Verifying card data is ready...');
                 
-                // Quick transition to showing the card  
-                setTimeout(() => {
-                  setLoading(false);
-                  setSyncInProgress(false);
+                // Poll the database until the new card is actually available
+                const pollForNewCard = async () => {
+                  let attempts = 0;
+                  const maxAttempts = 20; // 20 seconds max
                   
-                  // Refresh page to show new card instead of calling onSuccess
-                  console.log('🎯 PlaidLink: New card verified, refreshing page to show it...');
-                  window.location.reload();
-                }, 800);
+                  while (attempts < maxAttempts) {
+                    try {
+                      console.log(`🔍 Polling attempt ${attempts + 1} for new card data...`);
+                      
+                      const response = await fetch('/api/user/credit-cards', {
+                        cache: 'no-store',
+                        headers: {
+                          'Cache-Control': 'no-cache',
+                          'Pragma': 'no-cache'
+                        }
+                      });
+                      
+                      if (response.ok) {
+                        const { creditCards } = await response.json();
+                        
+                        // Check if we have more cards than we started with
+                        // (This assumes we're adding a new card, not reconnecting)
+                        if (creditCards && creditCards.length > 0) {
+                          console.log('✅ New card data found in database!');
+                          setLoadingMessage('Card ready!');
+                          setLoadingSubMessage('Your new credit card is now available');
+                          
+                          // Brief pause to show the success message
+                          setTimeout(() => {
+                            console.log('🎯 PlaidLink: Database confirmed new card, refreshing page...');
+                            window.location.reload();
+                          }, 1000);
+                          return;
+                        }
+                      }
+                      
+                      attempts++;
+                      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between polls
+                      
+                    } catch (error) {
+                      console.error('Error polling for new card:', error);
+                      attempts++;
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                  }
+                  
+                  // Fallback if polling times out
+                  console.warn('⚠️ Polling timeout - refreshing anyway');
+                  setLoadingMessage('Card should be ready...');
+                  setLoadingSubMessage('Loading your dashboard');
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 1000);
+                };
+                
+                pollForNewCard();
               } else if (noCreditCardsFound) {
                 console.warn('⚠️ No credit cards found at connected institution');
                 setLoadingMessage('No credit cards found');
