@@ -226,6 +226,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               window.location.reload();
             }, 1500);
           }
+          
         } else {
           console.error('Token exchange failed:', data.error);
           setLoadingMessage('Connection failed');
