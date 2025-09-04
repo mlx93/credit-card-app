@@ -483,6 +483,83 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
   };
 
+  // Hybrid refresh for new card addition - uses cache for existing cards, fetches new card data only
+  const refreshWithNewCard = async () => {
+    if (!isLoggedIn) return;
+    
+    try {
+      console.log('🔄 Hybrid refresh: Using cache for existing cards, fetching new card data');
+      
+      // Set flag to prevent automatic background sync
+      setRecentCardAddition(true);
+      
+      // Get current cached cards count for comparison
+      const currentCardCount = creditCards.length;
+      console.log(`📊 Current card count: ${currentCardCount}`);
+      
+      // Fetch only credit cards to check for new ones (lightweight API call)
+      const cardsResponse = await fetch('/api/user/credit-cards', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      
+      if (cardsResponse.ok) {
+        const { creditCards: freshCards } = await cardsResponse.json();
+        const safeCards = Array.isArray(freshCards) ? freshCards : [];
+        
+        console.log(`📊 Fresh card count: ${safeCards.length}`);
+        
+        if (safeCards.length > currentCardCount) {
+          // New card(s) detected - update state with fresh data
+          console.log('🆕 New card(s) detected, updating card state');
+          setCreditCards(safeCards);
+          
+          // Update card order to put new cards at front
+          const currentCardIds = new Set(creditCards.map(c => c.id));
+          const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
+          
+          if (newCards.length > 0) {
+            const newCardIds = newCards.map(card => card.id);
+            const updatedOrder = [...newCardIds, ...sharedCardOrder];
+            setSharedCardOrder(updatedOrder);
+            console.log(`🆕 Added ${newCards.length} new cards to front of order:`, {
+              newCardNames: newCards.map(c => c.name),
+              updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
+            });
+          }
+          
+          // Fetch billing cycles for completeness (but keep it lightweight)
+          const cyclesResponse = await fetch('/api/user/billing-cycles', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          });
+          
+          if (cyclesResponse.ok) {
+            const { billingCycles: cycles } = await cyclesResponse.json();
+            const safeCycles = Array.isArray(cycles) ? cycles : [];
+            setBillingCycles(safeCycles);
+            console.log(`✅ Updated billing cycles: ${safeCycles.length} cycles`);
+          }
+          
+          console.log('✅ Hybrid refresh completed - new card visible');
+        } else {
+          console.log('⏳ No new cards detected yet, keeping current state');
+        }
+      }
+      
+      // Clear the flag after 10 seconds to allow normal background syncing to resume
+      setTimeout(() => {
+        console.log('🔄 Clearing recent card addition flag - background sync can resume');
+        setRecentCardAddition(false);
+      }, 10000);
+      
+    } catch (error) {
+      console.error('Error in hybrid refresh after card addition:', error);
+      // Clear flag even on error to prevent permanently blocking background sync
+      setRecentCardAddition(false);
+    }
+  };
+
   // Background sync function - syncs with Plaid API silently, same as Refresh All but without blocking UI
   const backgroundSync = async () => {
     if (!isLoggedIn) return;
@@ -1250,31 +1327,28 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                   </button>
                   
                   <PlaidLink onSuccess={async () => {
-                    console.log('🎯 PlaidLink onSuccess: New card connected, refreshing dashboard...');
+                    console.log('🎯 PlaidLink onSuccess: New card connected, using hybrid refresh...');
                     
-                    // Simple approach: Wait a moment for database commit, then refresh all data
-                    // This is more reliable than polling for count changes
+                    // Hybrid approach: Wait for database commit, then use cache + new card fetch
                     try {
                       // Wait a bit for database operations to complete
                       console.log('⏳ Waiting for database commit...');
                       await new Promise(resolve => setTimeout(resolve, 2000));
                       
-                      // Force refresh all data with cache busting
-                      console.log('🔄 Refreshing all dashboard data...');
-                      await fetchAllUserData('PLAID_SUCCESS: ');
+                      // Use hybrid refresh - keeps existing cards from cache, fetches new card data
+                      console.log('🔄 Starting hybrid refresh (cache + new card)...');
+                      await refreshWithNewCard();
                       
-                      console.log('✅ Dashboard refresh completed after new card addition');
+                      console.log('✅ Hybrid refresh completed - new card should be visible');
                     } catch (error) {
-                      console.error('❌ Error refreshing dashboard after new card:', error);
-                      // Fallback: try once more after a longer delay
-                      setTimeout(async () => {
-                        try {
-                          console.log('🔄 Fallback refresh attempt...');
-                          await fetchAllUserData('PLAID_FALLBACK: ');
-                        } catch (fallbackError) {
-                          console.error('❌ Fallback refresh also failed:', fallbackError);
-                        }
-                      }, 3000);
+                      console.error('❌ Error in hybrid refresh after new card:', error);
+                      // Fallback to full refresh if hybrid fails
+                      try {
+                        console.log('🔄 Fallback to full refresh...');
+                        await fetchAllUserData('PLAID_FALLBACK: ');
+                      } catch (fallbackError) {
+                        console.error('❌ Fallback refresh also failed:', fallbackError);
+                      }
                     }
                   }} />
                   
