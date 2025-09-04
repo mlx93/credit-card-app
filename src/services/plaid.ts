@@ -78,7 +78,7 @@ class PlaidServiceImpl implements PlaidService {
     }
   }
 
-  async exchangePublicToken(publicToken: string, userId: string): Promise<string> {
+  async exchangePublicToken(publicToken: string, userId: string): Promise<{ accessToken: string; itemId: string }> {
     const request: ItemPublicTokenExchangeRequest = {
       public_token: publicToken,
     };
@@ -120,9 +120,11 @@ class PlaidServiceImpl implements PlaidService {
       throw new Error(`Failed to create plaid item: ${createError.message}`);
     }
 
+    // Only sync accounts (create credit card records) during token exchange
+    // Full transaction sync will happen later via targeted sync
     await this.syncAccounts(access_token, item_id);
     
-    return access_token;
+    return { accessToken: access_token, itemId: item_id };
   }
 
   // Rate limiting helper

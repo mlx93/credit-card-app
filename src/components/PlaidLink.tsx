@@ -41,31 +41,33 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         const data = await response.json();
         
         if (data.success) {
-          console.log('Token exchange successful');
-          setLoadingMessage('Syncing your card data');
-          setLoadingSubMessage('Getting transactions and billing cycles...');
+          console.log('Token exchange successful, itemId:', data.itemId);
+          setLoadingMessage('Preparing your new card');
+          setLoadingSubMessage('Loading card details and recent transactions...');
           
-          // Do proper sync BEFORE showing the card - user is willing to wait 3-5 seconds for complete data
+          // Target sync for ONLY the new card - not all cards
           try {
             const syncResponse = await fetch('/api/sync', {
               method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ itemId: data.itemId })
             });
             
             if (syncResponse.ok) {
               const syncData = await syncResponse.json();
-              console.log('✅ Full sync completed successfully');
+              console.log('✅ New card sync completed successfully');
               
-              setLoadingMessage('Success!');
-              setLoadingSubMessage('Your card is ready with complete data');
+              setLoadingMessage('Card ready!');
+              setLoadingSubMessage('Your new credit card is now available');
               
-              // Brief success message, then complete
+              // Quick transition to showing the card
               setTimeout(() => {
                 setLoading(false);
                 setSyncInProgress(false);
                 
-                // Single refresh with complete data
+                // Refresh to show the new card
                 onSuccess?.();
-              }, 1000);
+              }, 500);
               
             } else {
               const syncError = await syncResponse.json();
@@ -88,7 +90,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 setLoading(false);
                 setSyncInProgress(false);
                 onSuccess?.();
-              }, 1500);
+              }, 800);
             }
             
           } catch (syncError) {

@@ -437,6 +437,18 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     }
   };
 
+  // Lightweight refresh for new card addition - only fetches data, no syncing
+  const refreshDataOnly = async () => {
+    if (!isLoggedIn) return;
+    
+    try {
+      console.log('🔄 Refreshing data after new card addition (no syncing)');
+      await fetchAllUserData('NEW_CARD_REFRESH: ');
+    } catch (error) {
+      console.error('Error refreshing data after card addition:', error);
+    }
+  };
+
   // Background sync function - syncs with Plaid API silently, same as Refresh All but without blocking UI
   const backgroundSync = async () => {
     if (!isLoggedIn) return;
@@ -1066,8 +1078,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                       localStorage.removeItem('cached_billing_cycles');
                     }
                     
-                    // Immediate refresh focused on credit cards
-                    fetchUserData();
+                    // Lightweight refresh - only fetch data, no background syncing
+                    refreshDataOnly();
                   }} />
                 </>
               ) : (

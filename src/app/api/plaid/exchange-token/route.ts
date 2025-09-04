@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Public token required' }, { status: 400 });
     }
 
-    const accessToken = await plaidService.exchangePublicToken(public_token, session.user.id);
+    const { accessToken, itemId } = await plaidService.exchangePublicToken(public_token, session.user.id);
     
-    return NextResponse.json({ success: true, access_token: accessToken });
+    return NextResponse.json({ success: true, access_token: accessToken, itemId });
   } catch (error) {
     console.error('Token exchange error:', error);
     return NextResponse.json({ error: 'Failed to exchange token' }, { status: 500 });
