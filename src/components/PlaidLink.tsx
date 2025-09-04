@@ -79,8 +79,8 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         account_subtypes: ['credit card']
       }
     },
-    // Capital One often requires OAuth redirect flow for multiple account selection
-    receivedRedirectUri: 'https://cardcycle.app/plaid/callback',
+    // Use redirect flow for all institutions - points to API callback endpoint
+    receivedRedirectUri: 'https://www.cardcycle.app/api/plaid/callback',
     onSuccess: async (public_token, metadata) => {
       try {
         console.log('Plaid Link success:', { public_token, metadata });

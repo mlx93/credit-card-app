@@ -829,7 +829,7 @@ export function DueDateCard({
         </div>
         
         {editingLimit && (
-          <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200 relative z-50">
             <div className="flex items-center gap-2 mb-2">
               <input
                 type="text"
