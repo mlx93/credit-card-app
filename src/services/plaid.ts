@@ -1124,8 +1124,60 @@ class PlaidServiceImpl implements PlaidService {
       
       console.log(`⚡ RECENT SYNC DATE RANGE: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
       
-      // Use the same transaction fetching logic but with shorter date range
-      await this.fetchAndStoreTransactions(plaidItemRecord, accessToken, startDate, endDate, isCapitalOneItem);
+      // Get transactions for the shorter date range
+      const transactions = await this.getTransactions(
+        accessToken,
+        startDate,
+        endDate,
+        isCapitalOneItem
+      );
+
+      console.log(`⚡ Got ${transactions.length} recent transactions for instant setup`);
+      
+      if (transactions.length === 0) {
+        console.warn('⚠️ No recent transactions found - card will show without transaction data');
+      }
+      
+      // Store the transactions (same logic as full sync)
+      if (transactions.length > 0) {
+        // Batch fetch all credit cards for this plaid item
+        const { data: creditCards } = await supabaseAdmin
+          .from('credit_cards')
+          .select('id, accountId')
+          .eq('plaidItemId', plaidItemRecord.id);
+
+        const accountToCardMap = new Map(
+          (creditCards || []).map(card => [card.accountId, card.id])
+        );
+
+        // Prepare transaction records
+        const transactionRecords = transactions.map(transaction => ({
+          transactionId: transaction.transaction_id,
+          creditCardId: accountToCardMap.get(transaction.account_id),
+          amount: transaction.amount,
+          date: transaction.date,
+          name: transaction.name,
+          merchantName: transaction.merchant_name,
+          category: transaction.personal_finance_category?.primary || 'OTHER',
+          pending: transaction.pending || false,
+          accountId: transaction.account_id
+        })).filter(t => t.creditCardId); // Only keep transactions for credit cards we have
+
+        console.log(`⚡ Storing ${transactionRecords.length} recent transactions`);
+
+        // Use upsert to add/update transactions
+        const { error: insertError } = await supabaseAdmin
+          .from('transactions')
+          .upsert(transactionRecords, {
+            onConflict: 'transactionId',
+            ignoreDuplicates: false
+          });
+
+        if (insertError) {
+          console.error('❌ Error storing recent transactions:', insertError);
+          throw insertError;
+        }
+      }
       
       console.log('✅ Recent transaction sync completed for instant setup');
       
