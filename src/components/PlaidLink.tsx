@@ -92,16 +92,6 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   console.log('🎯 PlaidLink: Calling onSuccess with verified sync completion');
                   onSuccess?.();
                 }, 800);
-              } else {
-                console.warn('⚠️ Sync completed but no cards were created, treating as partial success');
-                setLoadingMessage('Connection established');
-                setLoadingSubMessage('Card setup may take a moment to complete...');
-                
-                setTimeout(() => {
-                  setLoading(false);
-                  setSyncInProgress(false);
-                  onSuccess?.();
-                }, 1200);
               } else if (noCreditCardsFound) {
                 console.warn('⚠️ No credit cards found at connected institution');
                 setLoadingMessage('No credit cards found');
@@ -112,6 +102,16 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   setSyncInProgress(false);
                   alert('No credit cards were found at this institution. You may have connected a bank account instead of a credit card account, or this institution may not support credit card data through Plaid.');
                 }, 2000);
+              } else {
+                console.warn('⚠️ Sync completed but no cards were created, treating as partial success');
+                setLoadingMessage('Connection established');
+                setLoadingSubMessage('Card setup may take a moment to complete...');
+                
+                setTimeout(() => {
+                  setLoading(false);
+                  setSyncInProgress(false);
+                  onSuccess?.();
+                }, 1200);
               }
               
             } else {
