@@ -67,7 +67,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 
                 // Refresh to show the new card
                 onSuccess?.();
-              }, 500);
+              }, 1000);
               
             } else {
               const syncError = await syncResponse.json();

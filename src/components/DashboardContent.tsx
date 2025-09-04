@@ -54,6 +54,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   const [refreshStep, setRefreshStep] = useState('');
   const [backgroundSyncing, setBackgroundSyncing] = useState(false);
   const [lastBackgroundSync, setLastBackgroundSync] = useState<Date | null>(null);
+  const [recentCardAddition, setRecentCardAddition] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
@@ -443,15 +444,36 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     
     try {
       console.log('🔄 Refreshing data after new card addition (no syncing)');
+      
+      // Set flag to prevent automatic background sync
+      setRecentCardAddition(true);
+      
       await fetchAllUserData('NEW_CARD_REFRESH: ');
+      
+      console.log('✅ New card data refresh completed');
+      
+      // Clear the flag after 10 seconds to allow normal background syncing to resume
+      setTimeout(() => {
+        console.log('🔄 Clearing recent card addition flag - background sync can resume');
+        setRecentCardAddition(false);
+      }, 10000);
+      
     } catch (error) {
       console.error('Error refreshing data after card addition:', error);
+      // Clear flag even on error to prevent permanently blocking background sync
+      setRecentCardAddition(false);
     }
   };
 
   // Background sync function - syncs with Plaid API silently, same as Refresh All but without blocking UI
   const backgroundSync = async () => {
     if (!isLoggedIn) return;
+    
+    // Skip background sync if card was recently added to avoid interfering with targeted sync
+    if (recentCardAddition) {
+      console.log('⏭️ Skipping background sync - recent card addition in progress');
+      return;
+    }
     
     try {
       setBackgroundSyncing(true);
