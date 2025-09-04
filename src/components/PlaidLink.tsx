@@ -137,9 +137,9 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   setLoading(false);
                   setSyncInProgress(false);
                   
-                  // Only call onSuccess if we have verified card creation
-                  console.log('🎯 PlaidLink: Calling onSuccess with verified sync completion');
-                  onSuccess?.();
+                  // Refresh page to show new card instead of calling onSuccess
+                  console.log('🎯 PlaidLink: New card verified, refreshing page to show it...');
+                  window.location.reload();
                 }, 800);
               } else if (noCreditCardsFound) {
                 console.warn('⚠️ No credit cards found at connected institution');
@@ -159,7 +159,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 setTimeout(() => {
                   setLoading(false);
                   setSyncInProgress(false);
-                  onSuccess?.();
+                  
+                  // Refresh page to show new card
+                  console.log('🎯 PlaidLink: Card connected (partial sync), refreshing page...');
+                  window.location.reload();
                 }, 1200);
               }
               
@@ -180,7 +183,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 setTimeout(() => {
                   setLoading(false);
                   setSyncInProgress(false);
-                  onSuccess?.();
+                  
+                  // Refresh page to show new card
+                  console.log('🎯 PlaidLink: Card connected (sync error), refreshing page...');
+                  window.location.reload();
                 }, 1000);
                 return;
               }
@@ -201,7 +207,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               setTimeout(() => {
                 setLoading(false);
                 setSyncInProgress(false);
-                onSuccess?.();
+                
+                // Refresh page to show new card
+                console.log('🎯 PlaidLink: Card connected (rate limits), refreshing page...');
+                window.location.reload();
               }, 800);
             }
             
@@ -213,7 +222,10 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
             setTimeout(() => {
               setLoading(false);
               setSyncInProgress(false);
-              onSuccess?.();
+              
+              // Refresh page to show new card
+              console.log('🎯 PlaidLink: Card connected (sync failed), refreshing page...');
+              window.location.reload();
             }, 1500);
           }
         } else {

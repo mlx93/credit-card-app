@@ -1420,25 +1420,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     )}
                   </button>
                   
-                  <PlaidLink onSuccess={async () => {
-                    console.log('🎯 PlaidLink onSuccess: New card connected, refreshing page...');
-                    
-                    // Simple and reliable approach: Wait for database commit, then refresh page
-                    // Since page refresh no longer triggers automatic sync, this is now safe and efficient
-                    try {
-                      // Wait a bit for database operations to complete
-                      console.log('⏳ Waiting for database commit...');
-                      await new Promise(resolve => setTimeout(resolve, 3000));
-                      
-                      // Simple page refresh - loads cached data instantly, no unnecessary syncs
-                      console.log('🔄 Refreshing page to show new card...');
-                      window.location.reload();
-                      
-                    } catch (error) {
-                      console.error('❌ Error in post-card flow:', error);
-                      // Even on error, refresh the page to show what we have
-                      window.location.reload();
-                    }
+                  <PlaidLink onSuccess={() => {
+                    // Page refresh is now handled directly in PlaidLink after loading screen
+                    console.log('🎯 DashboardContent: PlaidLink onSuccess callback (page refresh handled by PlaidLink)');
                   }} />
                   
                   {/* Account Settings Button */}
