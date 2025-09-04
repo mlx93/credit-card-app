@@ -78,8 +78,12 @@ export async function POST(request: NextRequest) {
         const decryptedAccessToken = decrypt(item.accessToken);
         
         console.log('Step 1: Syncing accounts...');
-        await plaidService.syncAccounts(decryptedAccessToken, item.itemId);
+        const accountSyncResult = await plaidService.syncAccounts(decryptedAccessToken, item.itemId);
         console.log('Step 1: Account sync completed');
+        
+        // Track account sync details for response
+        const accountsProcessed = accountSyncResult?.accountsProcessed || 0;
+        const creditCardsFound = accountSyncResult?.creditCardsFound || 0;
         
         console.log('Step 2: Syncing transactions...');
         console.log('About to call plaidService.syncTransactions with:', { itemId: item.itemId, hasAccessToken: !!decryptedAccessToken });
@@ -175,7 +179,13 @@ export async function POST(request: NextRequest) {
         }
         
         console.log(`=== SYNC DEBUG: Completed sync for ${item.institutionName} ===`);
-        return { itemId: item.itemId, status: 'success' };
+        return { 
+          itemId: item.itemId, 
+          status: 'success',
+          accountsProcessed,
+          creditCardsFound,
+          institutionName: item.institutionName
+        };
       } catch (error) {
         console.error(`=== SYNC ERROR for ${item.institutionName} (${item.itemId}):`, error);
         

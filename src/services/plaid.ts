@@ -427,7 +427,7 @@ class PlaidServiceImpl implements PlaidService {
     }
   }
 
-  async syncAccounts(accessToken: string, itemId: string): Promise<void> {
+  async syncAccounts(accessToken: string, itemId: string): Promise<{ accountsProcessed: number; creditCardsFound: number }> {
     console.log(`🔄 Starting syncAccounts for itemId: ${itemId}`);
     
     const liabilitiesData = await this.getLiabilities(accessToken);
@@ -456,10 +456,15 @@ class PlaidServiceImpl implements PlaidService {
     }
     
     console.log(`🏦 Processing accounts for ${plaidItem.institutionName}`);
+    console.log(`📊 Found ${liabilitiesData.accounts.length} accounts total`);
+    
     const isCapitalOneInstitution = this.isCapitalOne(plaidItem.institutionName);
+    let creditCardCount = 0;
+    let nonCreditCardCount = 0;
 
     for (const account of liabilitiesData.accounts) {
       if (account.subtype === 'credit card') {
+        creditCardCount++;
         const liability = liabilitiesData.liabilities.credit.find(
           (c: any) => c.account_id === account.account_id
         );
@@ -1024,8 +1029,34 @@ class PlaidServiceImpl implements PlaidService {
             }
           }
         }
+      } else {
+        // Account is not a credit card - log for debugging but don't process
+        nonCreditCardCount++;
+        console.log(`⏭️ Skipping non-credit card account: ${account.name} (${account.subtype || 'unknown subtype'})`);
       }
     }
+
+    // Provide summary of account processing
+    console.log(`📊 Account processing summary for ${plaidItem.institutionName}:`);
+    console.log(`   ✅ Credit cards processed: ${creditCardCount}`);
+    console.log(`   ⏭️ Non-credit accounts skipped: ${nonCreditCardCount}`);
+    
+    // If no credit cards were found, this could be a problem
+    if (creditCardCount === 0) {
+      console.warn(`⚠️ No credit cards found at ${plaidItem.institutionName}. This may indicate:`);
+      console.warn(`   • User connected a bank account or investment account instead of credit cards`);
+      console.warn(`   • Institution doesn't support credit card data via Plaid`);
+      console.warn(`   • User doesn't have any credit cards at this institution`);
+      
+      // Don't throw error - let the calling code handle the empty result
+      // This allows users to still see connection status and potentially remove it
+    }
+
+    // Return the account processing summary
+    return {
+      accountsProcessed: creditCardCount + nonCreditCardCount,
+      creditCardsFound: creditCardCount
+    };
   }
 
   /**

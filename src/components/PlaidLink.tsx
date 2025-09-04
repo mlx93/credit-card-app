@@ -21,10 +21,16 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
   const { open, ready } = usePlaidLink({
     token: linkToken,
     env: process.env.NEXT_PUBLIC_PLAID_ENV as 'sandbox' | 'development' | 'production' || 'production',
-    // Additional configurations for sandbox
+    // Only request credit card products
     product: ['liabilities', 'transactions'],
-    // Disable guest mode - force real authentication
+    // Enable account selection so users can pick specific credit cards
     selectAccount: true,
+    // Filter to only show credit card accounts in the selection interface
+    accountFilters: {
+      credit: {
+        account_subtypes: ['credit card']
+      }
+    },
     receivedRedirectUri: null,
     onSuccess: async (public_token, metadata) => {
       try {
@@ -64,7 +70,12 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               
               // Verify sync actually created cards before claiming success
               const hasSuccessfulResults = syncData.results?.some((result: any) => 
-                result.status === 'success' && result.accountsProcessed > 0
+                result.status === 'success' && result.creditCardsFound > 0
+              );
+
+              // Check if no credit cards were found across all results
+              const noCreditCardsFound = syncData.results?.every((result: any) => 
+                result.status === 'success' && result.creditCardsFound === 0
               );
               
               if (hasSuccessfulResults) {
@@ -91,6 +102,16 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   setSyncInProgress(false);
                   onSuccess?.();
                 }, 1200);
+              } else if (noCreditCardsFound) {
+                console.warn('⚠️ No credit cards found at connected institution');
+                setLoadingMessage('No credit cards found');
+                setLoadingSubMessage('This institution may not have credit card accounts available');
+                
+                setTimeout(() => {
+                  setLoading(false);
+                  setSyncInProgress(false);
+                  alert('No credit cards were found at this institution. You may have connected a bank account instead of a credit card account, or this institution may not support credit card data through Plaid.');
+                }, 2000);
               }
               
             } else {
