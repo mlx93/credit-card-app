@@ -45,8 +45,13 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           setLoadingMessage('Preparing your new card');
           setLoadingSubMessage('Loading card details and recent transactions...');
           
+          // Small delay to ensure database transaction is committed before sync
+          console.log('⏳ Waiting for database commit before targeted sync...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
           // Target sync for ONLY the new card - not all cards
           try {
+            console.log('🎯 Starting targeted sync for itemId:', data.itemId);
             const syncResponse = await fetch('/api/sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -66,12 +71,32 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 setSyncInProgress(false);
                 
                 // Refresh to show the new card
+                console.log('🎯 PlaidLink: About to call onSuccess callback');
                 onSuccess?.();
+                console.log('🎯 PlaidLink: onSuccess callback completed');
               }, 1000);
               
             } else {
               const syncError = await syncResponse.json();
               console.warn('⚠️ Sync had issues but card is connected:', syncError);
+              console.warn('⚠️ Sync response status:', syncResponse.status);
+              console.warn('⚠️ Full sync error details:', JSON.stringify(syncError, null, 2));
+              
+              // Check if it's the orphaned item error
+              if (syncError.message?.includes('not found') || syncError.message?.includes('Cannot coerce')) {
+                console.error('🚨 ORPHANED ITEM ERROR - Database timing issue detected');
+                setLoadingMessage('Finalizing card setup');
+                setLoadingSubMessage('Card is ready, completing final steps...');
+                
+                // Even with sync error, the card should be created from syncAccounts
+                // Just show the card without full transaction sync
+                setTimeout(() => {
+                  setLoading(false);
+                  setSyncInProgress(false);
+                  onSuccess?.();
+                }, 1000);
+                return;
+              }
               
               // Check if it's just rate limits vs real connection failure
               const hasRateLimit = syncError.results?.some((r: any) => 

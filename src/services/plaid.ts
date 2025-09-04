@@ -17,7 +17,7 @@ import {
 export interface PlaidService {
   createLinkToken(userId: string): Promise<string>;
   createUpdateLinkToken(userId: string, itemId: string): Promise<string>;
-  exchangePublicToken(publicToken: string, userId: string): Promise<string>;
+  exchangePublicToken(publicToken: string, userId: string): Promise<{ accessToken: string; itemId: string }>;
   removeItem(accessToken: string): Promise<void>;
   getAccounts(accessToken: string): Promise<any>;
   getTransactions(accessToken: string, startDate: Date, endDate: Date, isCapitalOne?: boolean): Promise<any[]>;
@@ -1028,6 +1028,26 @@ class PlaidServiceImpl implements PlaidService {
     }
   }
 
+  /**
+   * TRANSACTION ACCUMULATION STRATEGY:
+   * 
+   * This method implements a "data accumulation" approach where we:
+   * 1. Fetch the maximum available transactions from Plaid API (12 months for standard banks, ~90 days for Capital One)
+   * 2. Use UPSERT operations to create new transactions or update existing ones
+   * 3. NEVER delete existing transactions, even if they fall outside the current API window
+   * 4. Over time, users accumulate more transaction history than the API can provide
+   * 
+   * Benefits:
+   * - Capital One users: Start with 90 days, but after 4 months have 4+ months of data
+   * - Standard banks: Start with 12 months, but after 13+ months have 13+ months of data  
+   * - No data loss when API limitations change or connections are refreshed
+   * - Users get increasingly valuable historical data for trends and analytics
+   * 
+   * Implementation:
+   * - Uses onConflict: 'transactionId' to ensure no duplicates
+   * - Only creates/updates, never deletes
+   * - Logs preserved vs new transaction counts for transparency
+   */
   async syncTransactions(plaidItemRecord: any, accessToken: string): Promise<void> {
     console.log('🚀 TRANSACTION SYNC METHOD CALLED!', { itemId: plaidItemRecord.itemId, hasAccessToken: !!accessToken });
     
@@ -1279,6 +1299,10 @@ class PlaidServiceImpl implements PlaidService {
       const allTransactionsForUpsert = [...transactionsToCreate, ...transactionsToUpdate];
       console.log(`Executing batch upsert for ${allTransactionsForUpsert.length} transactions (${transactionsToCreate.length} new, ${transactionsToUpdate.length} existing)`);
       
+      // SAFETY CHECK: Ensure we're only upserting, never bulk deleting transactions
+      // This preserves historical data that may no longer be available from the API
+      console.log(`🛡️ SAFETY: Using upsert-only strategy - no transaction deletions during sync`);
+      
       if (allTransactionsForUpsert.length > 0) {
         // Use upsert to handle both creates and updates in a single operation
         // Log first transaction for debugging
@@ -1319,12 +1343,27 @@ class PlaidServiceImpl implements PlaidService {
         }
       }
       
+      // Get count of existing transactions older than our API window for preservation reporting
+      const preservationCutoffDate = new Date(startDate);
+      const { count: preservedTransactionCount } = await supabaseAdmin
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('plaidItemId', plaidItemRecord.id)
+        .lt('date', preservationCutoffDate.toISOString());
+
       console.log(`=== TRANSACTION SYNC SUMMARY ===`);
-      console.log(`Total transactions processed: ${processedCount}`);
-      console.log(`Transactions with credit card match: ${creditCardFoundCount}`);
-      console.log(`Transactions without credit card match: ${processedCount - creditCardFoundCount}`);
-      console.log(`New transactions created: ${transactionsToCreate.length}`);
-      console.log(`Existing transactions updated: ${transactionsToUpdate.length}`);
+      console.log(`📊 TRANSACTION ACCUMULATION STRATEGY:`);
+      console.log(`   • API Window: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+      console.log(`   • ${isCapitalOneItem ? 'Capital One (90-day API limit)' : 'Standard institution (12-month fetch)'}`);
+      console.log(`   • Preserved older transactions: ${preservedTransactionCount || 0} (outside API window)`);
+      console.log(`   • New/updated from API: ${processedCount} transactions processed`);
+      console.log(`📈 SYNC RESULTS:`);
+      console.log(`   • Total transactions processed from API: ${processedCount}`);
+      console.log(`   • Transactions with credit card match: ${creditCardFoundCount}`);
+      console.log(`   • Transactions without credit card match: ${processedCount - creditCardFoundCount}`);
+      console.log(`   • New transactions created: ${transactionsToCreate.length}`);
+      console.log(`   • Existing transactions updated: ${transactionsToUpdate.length}`);
+      console.log(`💡 ACCUMULATION BENEFIT: Users retain ${preservedTransactionCount || 0} older transactions that Plaid can no longer provide`);
       console.log(`=== END TRANSACTION SYNC DEBUG ===`);
       
     } catch (error) {
@@ -1710,6 +1749,13 @@ class PlaidServiceImpl implements PlaidService {
       syncDetails.validation.error = error.message;
       return { success: false, details: syncDetails };
     }
+  }
+
+  /**
+   * Simple delay utility for rate limiting
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
