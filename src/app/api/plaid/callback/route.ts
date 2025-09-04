@@ -2,40 +2,64 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔗 Plaid OAuth callback API endpoint hit');
+    console.log('🔗 Plaid OAuth callback GET endpoint hit');
     
     const searchParams = request.nextUrl.searchParams;
     const oauth_state_id = searchParams.get('oauth_state_id');
     const link_session_id = searchParams.get('link_session_id');
     
-    console.log('OAuth callback params:', {
+    console.log('OAuth callback GET params:', {
       oauth_state_id,
       link_session_id,
       allParams: Object.fromEntries(searchParams.entries())
     });
 
-    // For OAuth flow, we need to redirect to the frontend page to resume Link
-    // The frontend page will handle the actual token exchange
-    const callbackUrl = new URL('/plaid/callback', request.url);
-    
-    // Pass through all query parameters to the frontend
-    for (const [key, value] of searchParams.entries()) {
-      callbackUrl.searchParams.set(key, value);
+    // Always return 200 OK (Plaid requirement)
+    // Use HTML response that redirects via JavaScript if we have OAuth params
+    if (oauth_state_id || link_session_id) {
+      const callbackUrl = new URL('/plaid/callback', request.url);
+      for (const [key, value] of searchParams.entries()) {
+        callbackUrl.searchParams.set(key, value);
+      }
+      
+      // Return HTML with JavaScript redirect
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Plaid OAuth Callback</title>
+  <meta charset="utf-8">
+</head>
+<body>
+  <script>
+    console.log('Plaid OAuth callback - redirecting to: ${callbackUrl.toString()}');
+    window.location.href = '${callbackUrl.toString()}';
+  </script>
+  <p>Redirecting...</p>
+</body>
+</html>`;
+      
+      return new Response(html, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' }
+      });
+    } else {
+      // Return 200 OK even without query params (as required by Plaid)
+      return NextResponse.json({ 
+        success: true,
+        message: 'Plaid OAuth callback endpoint ready',
+        timestamp: new Date().toISOString()
+      }, { status: 200 });
     }
-
-    console.log('Redirecting to frontend callback:', callbackUrl.toString());
-
-    // Return 302 redirect to frontend callback page
-    return NextResponse.redirect(callbackUrl);
     
   } catch (error) {
-    console.error('OAuth callback API error:', error);
+    console.error('OAuth callback GET error:', error);
     
-    // On error, redirect to dashboard with error parameter
-    const errorUrl = new URL('/dashboard', request.url);
-    errorUrl.searchParams.set('plaid_error', 'oauth_callback_failed');
-    
-    return NextResponse.redirect(errorUrl);
+    // Always return 200, even on error (Plaid requirement)
+    return NextResponse.json({ 
+      success: false,
+      error: 'Internal error but endpoint is available',
+      timestamp: new Date().toISOString()
+    }, { status: 200 });
   }
 }
 
