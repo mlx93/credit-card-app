@@ -42,101 +42,48 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         
         if (data.success) {
           console.log('Token exchange successful');
-          setLoadingMessage('Syncing your accounts');
-          setLoadingSubMessage('Fetching credit card information...');
+          setLoadingMessage('Card connected successfully!');
+          setLoadingSubMessage('Your credit card is now available');
           
-          // Sync data after successful connection
-          try {
-            setSyncInProgress(true);
-            setLoadingMessage('Syncing your data');
-            setLoadingSubMessage('This may take up to 30 seconds...');
+          // Complete the connection flow immediately - card is already created during token exchange
+          setTimeout(() => {
+            setLoading(false);
+            setSyncInProgress(false);
             
-            const syncResponse = await fetch('/api/sync', {
-              method: 'POST',
-            });
+            // Immediate refresh to show the new card
+            onSuccess?.();
             
-            if (!syncResponse.ok) {
-              const syncError = await syncResponse.json();
-              console.error('Sync failed:', syncError);
-              setLoadingMessage('Connected with sync warnings');
-              setLoadingSubMessage('Account connected, some data may sync later');
-              
-              // Still show success after brief delay since connection succeeded
-              setTimeout(() => {
-                setLoading(false);
-                setSyncInProgress(false);
-                // Add delay before refresh to ensure database has been updated
-                setTimeout(() => {
+            // Start background sync for transaction data (non-blocking)
+            setTimeout(async () => {
+              try {
+                console.log('🔄 Starting background sync for transaction data...');
+                const syncResponse = await fetch('/api/sync', {
+                  method: 'POST',
+                });
+                
+                if (syncResponse.ok) {
+                  console.log('✅ Background sync completed successfully');
+                  // Trigger another refresh to update with transaction data
                   onSuccess?.();
-                }, 1000); // Wait 1 second for database to be fully updated
-              }, 2000);
-            } else {
-              const syncData = await syncResponse.json();
-              console.log('Sync successful:', syncData);
-              setLoadingMessage('Success!');
-              setLoadingSubMessage('Your accounts have been connected and synced');
-              
-              // Brief delay to show success message, then complete
-              setTimeout(() => {
-                setLoading(false);
-                setSyncInProgress(false);
-                
-                // Add delay before refresh to ensure database has been updated
-                setTimeout(() => {
-                  // Trigger immediate refresh to show the new card
-                  onSuccess?.();
-                }, 1000); // Wait 1 second for database to be fully updated
-                
-                // Poll for billing cycle completion and trigger second refresh
-                const pollForBillingCycles = async () => {
-                  try {
-                    setLoadingMessage('Finalizing billing cycles...');
-                    setLoadingSubMessage('This may take a few more seconds');
-                    
-                    const maxAttempts = 10; // Poll for up to 30 seconds
-                    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                      const response = await fetch('/api/billing-cycles/status');
-                      if (response.ok) {
-                        const status = await response.json();
-                        if (status.ready) {
-                          console.log('✅ Billing cycles ready, triggering final refresh');
-                          onSuccess?.(); // Second refresh when cycles are ready
-                          break;
-                        }
-                      }
-                      
-                      if (attempt < maxAttempts) {
-                        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds between polls
-                      }
-                    }
-                  } catch (error) {
-                    console.error('Error polling for billing cycles:', error);
-                  }
-                };
-                
-                // Start polling in background (don't block completion)
-                pollForBillingCycles();
-              }, 1500);
-            }
-          } catch (syncError) {
-            console.error('Sync request failed:', syncError);
-            setLoadingMessage('Connected with sync issues');
-            setLoadingSubMessage('Account connected, sync will retry automatically');
+                } else {
+                  const syncError = await syncResponse.json();
+                  console.warn('⚠️ Background sync had issues:', syncError);
+                  // Don't block UI - card is still visible and functional
+                }
+              } catch (error) {
+                console.warn('⚠️ Background sync failed:', error);
+                // Don't block UI - card is still visible and functional
+              }
+            }, 2000); // Start background sync after UI has updated
             
-            // Still complete the flow since connection succeeded
-            setTimeout(() => {
-              setLoading(false);
-              setSyncInProgress(false);
-              // Add delay before refresh to ensure database has been updated
-              setTimeout(() => {
-                onSuccess?.();
-              }, 1000); // Wait 1 second for database to be fully updated
-            }, 2000);
-          }
+          }, 1000); // Brief delay to show success message
         } else {
           console.error('Token exchange failed:', data.error);
-          alert('Failed to connect account. Please try again.');
-          setLoading(false);
+          setLoadingMessage('Connection failed');
+          setLoadingSubMessage('Please try again');
+          setTimeout(() => {
+            setLoading(false);
+          }, 2000);
         }
       } catch (error) {
         console.error('Error in Plaid Link success handler:', error);

@@ -1005,7 +1005,16 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                     )}
                   </button>
                   
-                  <PlaidLink onSuccess={backgroundSync} />
+                  <PlaidLink onSuccess={() => {
+                    // Clear localStorage cache to ensure fresh data
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('cached_credit_cards');
+                      localStorage.removeItem('cached_billing_cycles');
+                    }
+                    
+                    // Immediate refresh focused on credit cards
+                    fetchUserData();
+                  }} />
                 </>
               ) : (
                 <div className="text-center py-2">

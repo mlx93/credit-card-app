@@ -96,7 +96,21 @@ export async function POST(request: NextRequest) {
             code: syncError.error_code,
             type: syncError.error_type
           });
-          throw syncError; // Re-throw to be caught by outer try-catch
+          
+          // Check if it's a rate limit error
+          const isRateLimit = syncError?.response?.status === 429 || 
+                             syncError.message?.toLowerCase().includes('rate limit');
+          
+          if (isRateLimit) {
+            console.warn('⚠️ Rate limit hit during transaction sync - continuing with account data only');
+            // Don't fail the entire sync - cards are already created and visible
+            // Just log the rate limit and continue
+          } else {
+            // For other errors, still continue but mark as partial success
+            console.warn('⚠️ Non-rate-limit transaction sync error - continuing with account data');
+          }
+          
+          // Don't throw - let the sync complete with account data
         }
         
         console.log('Step 3: Regenerating billing cycles with new transaction data...');
