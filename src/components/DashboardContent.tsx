@@ -937,6 +937,18 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         }
         
         console.log('🎉 Card deletion completed successfully');
+        
+        // Clear from localStorage cache as well
+        if (typeof window !== 'undefined') {
+          const cachedCards = localStorage.getItem('cached_credit_cards');
+          if (cachedCards) {
+            const cards = JSON.parse(cachedCards);
+            const updatedCards = cards.filter((card: any) => card.plaidItem?.itemId !== itemId);
+            localStorage.setItem('cached_credit_cards', JSON.stringify(updatedCards));
+          }
+        }
+        
+        console.log(`Successfully removed card connection: ${data.message}`);
       } catch (fetchError) {
         clearTimeout(timeoutId);
         console.error('🚨 Fetch error during deletion:', fetchError);
@@ -946,18 +958,6 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         }
         throw fetchError;
       }
-      
-      // Clear from localStorage cache as well
-      if (typeof window !== 'undefined') {
-        const cachedCards = localStorage.getItem('cached_credit_cards');
-        if (cachedCards) {
-          const cards = JSON.parse(cachedCards);
-          const updatedCards = cards.filter((card: any) => card.plaidItem?.itemId !== itemId);
-          localStorage.setItem('cached_credit_cards', JSON.stringify(updatedCards));
-        }
-      }
-      
-      console.log(`Successfully removed card connection: ${data.message}`);
     } catch (error) {
       console.error('Error removing connection:', error);
       // The error will be handled by the calling component
