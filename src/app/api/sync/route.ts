@@ -127,26 +127,37 @@ export async function POST(request: NextRequest) {
           throw new Error(`Failed to fetch credit cards: ${cardsError.message}`);
         }
         
-        // Start billing cycle regeneration asynchronously (don't block sync completion)
-        console.log('Step 3: Starting async billing cycle regeneration...');
+        // Generate billing cycles synchronously for complete card data
+        console.log('Step 3: Generating billing cycles for complete card data...');
         const cyclePromises = (creditCards || []).map(async (card) => {
           console.log(`Regenerating billing cycles for ${card.name}...`);
           try {
             const cycles = await calculateBillingCycles(card.id);
             console.log(`Generated ${cycles.length} billing cycles for ${card.name}`);
+            return { cardName: card.name, cycles: cycles.length, success: true };
           } catch (cycleError) {
             console.error(`Failed to generate billing cycles for ${card.name}:`, cycleError);
+            return { cardName: card.name, cycles: 0, success: false, error: cycleError.message };
           }
         });
         
-        // Don't wait for cycles to complete - let them run in background
-        Promise.all(cyclePromises).then(() => {
-          console.log('✅ Background billing cycle regeneration completed');
-        }).catch((error) => {
-          console.error('❌ Background billing cycle regeneration had errors:', error);
-        });
+        // Wait for billing cycles to complete before returning success
+        try {
+          const cycleResults = await Promise.all(cyclePromises);
+          const successfulCycles = cycleResults.filter(r => r.success);
+          const failedCycles = cycleResults.filter(r => !r.success);
+          
+          console.log(`✅ Billing cycle generation completed: ${successfulCycles.length} successful, ${failedCycles.length} failed`);
+          
+          if (failedCycles.length > 0) {
+            console.warn('Some billing cycles failed to generate:', failedCycles);
+          }
+        } catch (cycleError) {
+          console.error('❌ Billing cycle generation had errors:', cycleError);
+          // Don't fail the entire sync, but log the issue
+        }
         
-        console.log('Step 3: Billing cycle regeneration started in background');
+        console.log('Step 3: Billing cycle generation completed');
         
         // Update connection status to active on successful sync
         const { error: updateError } = await supabaseAdmin

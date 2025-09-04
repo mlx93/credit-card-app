@@ -42,41 +42,66 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         
         if (data.success) {
           console.log('Token exchange successful');
-          setLoadingMessage('Card connected successfully!');
-          setLoadingSubMessage('Your credit card is now available');
+          setLoadingMessage('Syncing your card data');
+          setLoadingSubMessage('Getting transactions and billing cycles...');
           
-          // Complete the connection flow immediately - card is already created during token exchange
-          setTimeout(() => {
-            setLoading(false);
-            setSyncInProgress(false);
+          // Do proper sync BEFORE showing the card - user is willing to wait 3-5 seconds for complete data
+          try {
+            const syncResponse = await fetch('/api/sync', {
+              method: 'POST',
+            });
             
-            // Immediate refresh to show the new card
-            onSuccess?.();
-            
-            // Start background sync for transaction data (non-blocking)
-            setTimeout(async () => {
-              try {
-                console.log('🔄 Starting background sync for transaction data...');
-                const syncResponse = await fetch('/api/sync', {
-                  method: 'POST',
-                });
+            if (syncResponse.ok) {
+              const syncData = await syncResponse.json();
+              console.log('✅ Full sync completed successfully');
+              
+              setLoadingMessage('Success!');
+              setLoadingSubMessage('Your card is ready with complete data');
+              
+              // Brief success message, then complete
+              setTimeout(() => {
+                setLoading(false);
+                setSyncInProgress(false);
                 
-                if (syncResponse.ok) {
-                  console.log('✅ Background sync completed successfully');
-                  // Trigger another refresh to update with transaction data
-                  onSuccess?.();
-                } else {
-                  const syncError = await syncResponse.json();
-                  console.warn('⚠️ Background sync had issues:', syncError);
-                  // Don't block UI - card is still visible and functional
-                }
-              } catch (error) {
-                console.warn('⚠️ Background sync failed:', error);
-                // Don't block UI - card is still visible and functional
+                // Single refresh with complete data
+                onSuccess?.();
+              }, 1000);
+              
+            } else {
+              const syncError = await syncResponse.json();
+              console.warn('⚠️ Sync had issues but card is connected:', syncError);
+              
+              // Check if it's just rate limits vs real connection failure
+              const hasRateLimit = syncError.results?.some((r: any) => 
+                r.error?.toLowerCase().includes('rate limit')
+              );
+              
+              if (hasRateLimit) {
+                setLoadingMessage('Card connected with rate limits');
+                setLoadingSubMessage('Card is ready, transaction history may be limited');
+              } else {
+                setLoadingMessage('Card connected with sync issues');
+                setLoadingSubMessage('Card is available, some data may sync later');
               }
-            }, 2000); // Start background sync after UI has updated
+              
+              setTimeout(() => {
+                setLoading(false);
+                setSyncInProgress(false);
+                onSuccess?.();
+              }, 1500);
+            }
             
-          }, 1000); // Brief delay to show success message
+          } catch (syncError) {
+            console.error('Sync request failed:', syncError);
+            setLoadingMessage('Card connected');
+            setLoadingSubMessage('Basic card info available, full sync will retry');
+            
+            setTimeout(() => {
+              setLoading(false);
+              setSyncInProgress(false);
+              onSuccess?.();
+            }, 1500);
+          }
         } else {
           console.error('Token exchange failed:', data.error);
           setLoadingMessage('Connection failed');

@@ -1,9 +1,6 @@
 import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/utils/format';
 import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical, Edit3, Check, X, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { ConfirmationDialog } from './ConfirmationDialog';
-import { DeletionProgressDialog } from './DeletionProgressDialog';
-import { SuccessNotification } from './SuccessNotification';
 
 // Utility function to intelligently truncate credit card names
 const truncateCardName = (cardName: string): string => {
@@ -124,6 +121,7 @@ interface DueDateCardProps {
   connectionHealth?: ConnectionHealthData | null;
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
+  onRequestDelete?: (card: CreditCardInfo) => void;
   onSync?: (itemId: string) => void;
   onCreditLimitUpdated?: (data: {
     newLimit: number;
@@ -189,6 +187,7 @@ function SortableDueDateCard({
         colorIndex={colorIndex}
         onReconnect={onReconnect}
         onRemove={onRemove}
+        onRequestDelete={onRequestDelete}
         onSync={onSync}
         onCreditLimitUpdated={onCreditLimitUpdated}
         dragHandleProps={{ ...attributes, ...listeners }}
@@ -202,6 +201,7 @@ interface DueDateCardsProps {
   cards: CreditCardInfo[];
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
+  onRequestDelete?: (card: CreditCardInfo) => void;
   onSync?: (itemId: string) => void;
   onOrderChange?: (cardOrder: string[]) => void;
   initialCardOrder?: string[];
@@ -214,7 +214,7 @@ interface DueDateCardsProps {
   }) => void;
 }
 
-export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChange, initialCardOrder, onCreditLimitUpdated }: DueDateCardsProps) {
+export function DueDateCards({ cards, onReconnect, onRemove, onRequestDelete, onSync, onOrderChange, initialCardOrder, onCreditLimitUpdated }: DueDateCardsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
 
   // Initialize card order only once when component mounts or when cards first become available
@@ -313,6 +313,7 @@ export function DueDateCards({ cards, onReconnect, onRemove, onSync, onOrderChan
                 colorIndex={colorIndex}
                 onReconnect={onReconnect}
                 onRemove={onRemove}
+                onRequestDelete={onRequestDelete}
                 onSync={onSync}
                 onCreditLimitUpdated={onCreditLimitUpdated}
               />
@@ -330,6 +331,7 @@ export function DueDateCard({
   connectionHealth,
   onReconnect, 
   onRemove, 
+  onRequestDelete,
   onSync,
   onCreditLimitUpdated,
   dragHandleProps 
@@ -339,11 +341,6 @@ export function DueDateCard({
   const [editingLimit, setEditingLimit] = useState(false);
   const [limitInput, setLimitInput] = useState('');
   const [updatingLimit, setUpdatingLimit] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deletionProgress, setDeletionProgress] = useState(0);
-  const [deletionStep, setDeletionStep] = useState('');
-  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const daysUntilDue = card.nextPaymentDueDate ? getDaysUntil(card.nextPaymentDueDate) : null;
   const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
   const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue >= 0;
@@ -642,7 +639,7 @@ export function DueDateCard({
                   <p className="text-xs font-semibold text-gray-700">All Paid</p>
                   {/* Show next due date if there's a current balance */}
                   {card.balanceCurrent > 0 && card.nextPaymentDueDate && (
-                    <p className="text-[10px] text-gray-500 mt-0.5">
+                    <p className="text-xs text-gray-500 mt-0.5">
                       Next: {(() => {
                         // Calculate approximate due date for current open cycle
                         // Add ~1 month to the current due date
@@ -716,12 +713,11 @@ export function DueDateCard({
                 )}
               </button>
               
-              {onRemove && (
+              {(onRemove || onRequestDelete) && (
                 <button
-                  onClick={() => setShowDeleteConfirm(true)}
+                  onClick={() => onRequestDelete?.(card)}
                   className="p-1 rounded hover:bg-red-100 text-red-500 hover:text-red-700"
                   title="Remove connection"
-                  disabled={isDeleting}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -750,14 +746,14 @@ export function DueDateCard({
           {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
             <div className="text-right">
               <p className="text-xs text-gray-600">Minimum Payment</p>
-              <p className="font-semibold text-sm text-gray-900">
+              <p className="font-bold text-lg text-gray-900">
                 {formatCurrency(card.minimumPaymentAmount)}
               </p>
             </div>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2 mb-4 min-h-[48px] items-center">
+        <div className="grid grid-cols-2 gap-2 mb-4 min-h-[48px] items-center -mt-1">
           <div>
             <p className="text-xs text-gray-600 mb-1">Balance</p>
             <p className={`font-bold ${isPaidOff ? 'text-xl' : 'text-lg'} text-gray-900`}>
@@ -770,7 +766,7 @@ export function DueDateCard({
           {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
             <div className="text-right">
               <p className="text-xs text-gray-600">Minimum Payment</p>
-              <p className="font-semibold text-sm text-gray-900">
+              <p className="font-bold text-lg text-gray-900">
                 {formatCurrency(card.minimumPaymentAmount)}
               </p>
             </div>
@@ -883,65 +879,6 @@ export function DueDateCard({
         )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={showDeleteConfirm}
-        title="Remove Credit Card?"
-        message={`Are you sure you want to remove ${card.name}? This will permanently delete all associated transaction history and cannot be undone.`}
-        confirmText="Yes, Remove Card"
-        cancelText="Cancel"
-        onConfirm={async () => {
-          setShowDeleteConfirm(false);
-          setIsDeleting(true);
-          setDeletionProgress(20);
-          setDeletionStep('Disconnecting from bank...');
-          
-          try {
-            // Start deletion process
-            setDeletionProgress(50);
-            setDeletionStep('Removing card data...');
-            
-            if (onRemove && card.plaidItem) {
-              await onRemove(card.plaidItem.itemId);
-            }
-            
-            setDeletionProgress(100);
-            setDeletionStep('Complete!');
-            
-            // Brief pause to show completion
-            setTimeout(() => {
-              setIsDeleting(false);
-              setDeletionProgress(0);
-              setDeletionStep('');
-              setShowSuccessNotification(true);
-            }, 500);
-          } catch (error) {
-            console.error('Error removing card:', error);
-            setIsDeleting(false);
-            setDeletionProgress(0);
-            setDeletionStep('');
-            alert('Failed to remove card. Please try again.');
-          }
-        }}
-        onCancel={() => setShowDeleteConfirm(false)}
-        type="danger"
-      />
-      
-      {/* Deletion Progress Dialog */}
-      <DeletionProgressDialog
-        isOpen={isDeleting}
-        cardName={card.name}
-        step={deletionStep}
-        progress={deletionProgress}
-      />
-      
-      {/* Success Notification */}
-      <SuccessNotification
-        isOpen={showSuccessNotification}
-        message={`${card.name} has been successfully removed`}
-        duration={3000}
-        onClose={() => setShowSuccessNotification(false)}
-      />
 
     </div>
   );

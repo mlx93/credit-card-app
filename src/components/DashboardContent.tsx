@@ -9,6 +9,9 @@ import { HorizontalCardColumns } from '@/components/HorizontalCardColumns';
 import { PlaidLink } from '@/components/PlaidLink';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { PlaidUpdateLink } from '@/components/PlaidUpdateLink';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
+import { DeletionProgressDialog } from '@/components/DeletionProgressDialog';
+import { SuccessNotification } from '@/components/SuccessNotification';
 
 interface DashboardContentProps {
   isLoggedIn: boolean;
@@ -65,6 +68,14 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     newUtilization: number;
     cardName: string;
   } | null>(null);
+  
+  // Deletion flow state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [cardToDelete, setCardToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletionProgress, setDeletionProgress] = useState(0);
+  const [deletionStep, setDeletionStep] = useState('');
+  const [showDeletionSuccess, setShowDeletionSuccess] = useState(false);
 
   // Create consistent default card ordering based on due dates and card names
   const getDefaultCardOrder = (cards: any[]): string[] => {
@@ -672,6 +683,49 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
     setShowSuccessPopup(true);
   };
 
+  const handleRequestDelete = (card: any) => {
+    setCardToDelete(card);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!cardToDelete) return;
+    
+    setShowDeleteConfirm(false);
+    setIsDeleting(true);
+    setDeletionProgress(20);
+    setDeletionStep('Disconnecting from bank...');
+    
+    try {
+      // Start deletion process
+      setDeletionProgress(50);
+      setDeletionStep('Removing card data...');
+      
+      if (cardToDelete.plaidItem) {
+        await handleCardRemove(cardToDelete.plaidItem.itemId);
+      }
+      
+      setDeletionProgress(100);
+      setDeletionStep('Complete!');
+      
+      // Brief pause to show completion
+      setTimeout(() => {
+        setIsDeleting(false);
+        setDeletionProgress(0);
+        setDeletionStep('');
+        setShowDeletionSuccess(true);
+        setCardToDelete(null);
+      }, 500);
+    } catch (error) {
+      console.error('Error removing card:', error);
+      setIsDeleting(false);
+      setDeletionProgress(0);
+      setDeletionStep('');
+      setCardToDelete(null);
+      alert('Failed to remove card. Please try again.');
+    }
+  };
+
   const handleCardRemove = async (itemId: string) => {
     try {
       // Immediately update UI - optimistic update
@@ -1101,6 +1155,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                 onSync={handleCardSync}
                 onReconnect={handleCardReconnect}
                 onRemove={handleCardRemove}
+                onRequestDelete={handleRequestDelete}
                 onCreditLimitUpdated={handleCreditLimitUpdated}
                 initialCardOrder={sharedCardOrder}
                 onOrderChange={setSharedCardOrder}
@@ -1198,6 +1253,37 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           </div>
         </div>
       )}
+      
+      {/* Page-level Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        title="Remove Credit Card?"
+        message={`Are you sure you want to remove ${cardToDelete?.name}? This will permanently delete all associated transaction history and cannot be undone.`}
+        confirmText="Yes, Remove Card"
+        cancelText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setCardToDelete(null);
+        }}
+        type="danger"
+      />
+      
+      {/* Page-level Deletion Progress Dialog */}
+      <DeletionProgressDialog
+        isOpen={isDeleting}
+        cardName={cardToDelete?.name || ''}
+        step={deletionStep}
+        progress={deletionProgress}
+      />
+      
+      {/* Page-level Deletion Success Notification */}
+      <SuccessNotification
+        isOpen={showDeletionSuccess}
+        message={`${cardToDelete?.name || 'Card'} has been successfully removed`}
+        duration={3000}
+        onClose={() => setShowDeletionSuccess(false)}
+      />
     </div>
   );
 }

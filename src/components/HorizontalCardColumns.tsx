@@ -70,6 +70,7 @@ interface HorizontalCardColumnsProps {
   onSync?: (itemId: string) => void;
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
+  onRequestDelete?: (card: any) => void;
   initialCardOrder?: string[];
   onOrderChange?: (cardOrder: string[]) => void;
   onCreditLimitUpdated?: (data: {
@@ -90,6 +91,7 @@ interface SortableCardColumnProps {
   onSync?: (itemId: string) => void;
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
+  onRequestDelete?: (card: any) => void;
   onCreditLimitUpdated?: (data: {
     newLimit: number;
     previousLimit: number | null;
@@ -110,6 +112,7 @@ function SortableCardColumn({
   onSync, 
   onReconnect, 
   onRemove, 
+  onRequestDelete,
   onCreditLimitUpdated,
   colorIndex,
   billingCycleGradient
@@ -166,6 +169,7 @@ function SortableCardColumn({
               onSync={onSync}
               onReconnect={onReconnect}
               onRemove={onRemove}
+              onRequestDelete={onRequestDelete}
               onCreditLimitUpdated={onCreditLimitUpdated}
             />
 
@@ -232,6 +236,7 @@ export function HorizontalCardColumns({
   onSync, 
   onReconnect, 
   onRemove, 
+  onRequestDelete,
   initialCardOrder, 
   onOrderChange,
   onCreditLimitUpdated 
@@ -387,6 +392,7 @@ export function HorizontalCardColumns({
                     onSync={onSync}
                     onReconnect={onReconnect}
                     onRemove={onRemove}
+                    onRequestDelete={onRequestDelete}
                     onCreditLimitUpdated={onCreditLimitUpdated}
                     colorIndex={colorIndex}
                     billingCycleGradient={getBillingCycleGradient(colorIndex)}

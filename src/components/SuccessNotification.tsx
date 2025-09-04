@@ -26,7 +26,7 @@ export function SuccessNotification({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+    <div className="fixed top-4 right-4 z-[100] animate-slide-in-right" style={{ position: 'fixed' }}>
       <div className="bg-white rounded-lg shadow-lg border border-green-200 p-4 flex items-center gap-3 min-w-[300px] max-w-md">
         <div className="flex-shrink-0">
           <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
