@@ -1207,20 +1207,66 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     )}
                   </button>
                   
-                  <PlaidLink onSuccess={() => {
-                    console.log('🎯 PlaidLink onSuccess: New card ready, waiting briefly then fetching...');
+                  <PlaidLink onSuccess={async () => {
+                    console.log('🎯 PlaidLink onSuccess: New card connected, polling for visibility...');
                     
-                    // Brief delay to ensure PlaidLink's internal sync is 100% complete
-                    setTimeout(() => {
-                      console.log('🔄 PlaidLink: Starting data fetch after sync completion...');
-                      fetchAllUserData('PLAID_SUCCESS: ').then(() => {
-                        console.log('✅ New card data loaded and should be visible now');
-                      }).catch((error) => {
-                        console.error('Error loading new card data:', error);
-                        // If fetch fails, try refreshing the page as fallback
-                        window.location.reload();
-                      });
-                    }, 500); // Small delay to ensure sync completion
+                    const originalCardCount = creditCards.length;
+                    console.log(`📊 Starting card count: ${originalCardCount}`);
+                    
+                    // Poll for new card appearance with smart timeout
+                    const pollForNewCard = async (): Promise<boolean> => {
+                      const maxAttempts = 10; // Up to 10 attempts
+                      const baseDelay = 1000; // Start with 1 second
+                      
+                      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                        console.log(`🔍 Polling attempt ${attempt}/${maxAttempts} for new card...`);
+                        
+                        try {
+                          // Fetch fresh data with cache-busting
+                          const response = await fetch(`/api/user/credit-cards?_t=${Date.now()}`, {
+                            cache: 'no-store',
+                            headers: { 'Cache-Control': 'no-cache' }
+                          });
+                          
+                          if (response.ok) {
+                            const { creditCards: freshCards } = await response.json();
+                            const freshCardCount = Array.isArray(freshCards) ? freshCards.length : 0;
+                            
+                            if (freshCardCount > originalCardCount) {
+                              console.log(`🎉 SUCCESS! New card detected (${freshCardCount} vs ${originalCardCount})`);
+                              
+                              // Now fetch ALL fresh data to update everything
+                              await fetchAllUserData('NEW_CARD_DETECTED: ');
+                              return true;
+                            }
+                            
+                            console.log(`⏳ Card count still ${freshCardCount}, waiting...`);
+                          } else {
+                            console.warn(`⚠️ API error (${response.status}) on attempt ${attempt}`);
+                          }
+                          
+                        } catch (error) {
+                          console.error(`❌ Polling error on attempt ${attempt}:`, error);
+                        }
+                        
+                        // Progressive delay: 1s, 1.5s, 2s, 2.5s, 3s, 3s, 3s...
+                        if (attempt < maxAttempts) {
+                          const delay = Math.min(baseDelay + (attempt * 500), 3000);
+                          await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                      }
+                      
+                      return false;
+                    };
+                    
+                    // Start polling
+                    const detected = await pollForNewCard();
+                    
+                    if (!detected) {
+                      console.error('🚨 New card not detected after polling - forcing refresh');
+                      // Last resort: fetch data anyway and show what we have
+                      await fetchAllUserData('POLLING_TIMEOUT: ');
+                    }
                   }} />
                   
                   {/* Account Settings Button */}

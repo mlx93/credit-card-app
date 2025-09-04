@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 
 // Utility function to intelligently truncate credit card names
 const truncateCardName = (cardName: string): string => {
-  const minLength = 18; // Show more characters to avoid harsh truncation
-  const maxLength = 25; // Shorter max to keep cards consistent
+  const minLength = 20; // Show more characters to avoid harsh truncation - increased for due dates
+  const maxLength = 32; // Longer max for due dates section to show more of the name
   
   if (cardName.length <= maxLength) {
     return cardName;

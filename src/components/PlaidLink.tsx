@@ -60,21 +60,38 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
             
             if (syncResponse.ok) {
               const syncData = await syncResponse.json();
-              console.log('✅ New card sync completed successfully');
+              console.log('✅ New card sync completed successfully:', syncData);
               
-              setLoadingMessage('Card ready!');
-              setLoadingSubMessage('Your new credit card is now available');
+              // Verify sync actually created cards before claiming success
+              const hasSuccessfulResults = syncData.results?.some((result: any) => 
+                result.status === 'success' && result.accountsProcessed > 0
+              );
               
-              // Quick transition to showing the card
-              setTimeout(() => {
-                setLoading(false);
-                setSyncInProgress(false);
+              if (hasSuccessfulResults) {
+                console.log('✅ Verified: Sync created credit card accounts');
+                setLoadingMessage('Card ready!');
+                setLoadingSubMessage('Your new credit card is now available');
                 
-                // Refresh to show the new card
-                console.log('🎯 PlaidLink: About to call onSuccess callback');
-                onSuccess?.();
-                console.log('🎯 PlaidLink: onSuccess callback completed');
-              }, 1000);
+                // Quick transition to showing the card  
+                setTimeout(() => {
+                  setLoading(false);
+                  setSyncInProgress(false);
+                  
+                  // Only call onSuccess if we have verified card creation
+                  console.log('🎯 PlaidLink: Calling onSuccess with verified sync completion');
+                  onSuccess?.();
+                }, 800);
+              } else {
+                console.warn('⚠️ Sync completed but no cards were created, treating as partial success');
+                setLoadingMessage('Connection established');
+                setLoadingSubMessage('Card setup may take a moment to complete...');
+                
+                setTimeout(() => {
+                  setLoading(false);
+                  setSyncInProgress(false);
+                  onSuccess?.();
+                }, 1200);
+              }
               
             } else {
               const syncError = await syncResponse.json();
