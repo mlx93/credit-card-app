@@ -51,7 +51,7 @@ class PlaidServiceImpl implements PlaidService {
       products: ['liabilities', 'transactions'],
       country_codes: ['US'],
       language: 'en',
-      redirect_uri: 'https://cardcycle.app/api/plaid/callback', // API endpoint, not page
+      redirect_uri: 'https://www.cardcycle.app/api/plaid/callback', // Must match Plaid registration exactly
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
       transactions: {
         days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)
@@ -1435,7 +1435,7 @@ class PlaidServiceImpl implements PlaidService {
       products: ['liabilities', 'transactions'],
       country_codes: ['US'],
       language: 'en',
-      redirect_uri: 'https://cardcycle.app/api/plaid/callback',
+      redirect_uri: 'https://www.cardcycle.app/api/plaid/callback', // Must match Plaid registration exactly
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
       transactions: {
         days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)
