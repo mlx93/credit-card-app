@@ -767,41 +767,6 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       }, 500);
     } catch (error) {
       console.error('Error removing card:', error);
-      
-      // Instead of immediately showing error, check if deletion actually succeeded
-      setDeletionStep('Verifying deletion status...');
-      
-      try {
-        // Wait a moment for potential backend completion
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Refresh data to check if card was actually deleted
-        const initialCardCount = creditCards.length;
-        await fetchUserData();
-        
-        // If the card count decreased, deletion was successful despite the error
-        const currentCardCount = creditCards.length;
-        if (currentCardCount < initialCardCount) {
-          console.log('✅ Deletion actually succeeded despite API error');
-          
-          setDeletionProgress(100);
-          setDeletionStep('Complete!');
-          
-          // Show success
-          setTimeout(() => {
-            setIsDeleting(false);
-            setDeletionProgress(0);
-            setDeletionStep('');
-            setShowDeletionSuccess(true);
-            setCardToDelete(null);
-          }, 500);
-          return;
-        }
-      } catch (verificationError) {
-        console.error('Error during deletion verification:', verificationError);
-      }
-      
-      // If we reach here, deletion genuinely failed
       setIsDeleting(false);
       setDeletionProgress(0);
       setDeletionStep('');
@@ -809,11 +774,11 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       // Show specific error message in the deletion dialog instead of browser alert
       setDeletionStep(error instanceof Error ? error.message : 'Failed to remove card');
       
-      // Auto-close error message after 5 seconds
+      // Auto-close error message after 3 seconds (reduced from 5)
       setTimeout(() => {
         setDeletionStep('');
         setCardToDelete(null);
-      }, 5000);
+      }, 3000);
     }
   };
 
@@ -897,20 +862,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         console.error('🚨 Fetch error during deletion:', fetchError);
         
         if (fetchError.name === 'AbortError') {
-          // Before showing timeout error, check if the card was actually deleted
-          console.log('⏰ Request timed out, but checking if deletion actually succeeded...');
-          
-          // Wait a moment for the deletion to potentially complete on the backend
-          setTimeout(async () => {
-            try {
-              await fetchUserData();
-              console.log('🔄 Refreshed data after timeout to check deletion status');
-            } catch (refreshError) {
-              console.error('Failed to refresh after timeout:', refreshError);
-            }
-          }, 1000);
-          
-          throw new Error('Request timed out, but the card may have been deleted. Please refresh the page to check.');
+          throw new Error('Request timed out. Please check your connection and try again.');
         }
         throw fetchError;
       }
@@ -1253,14 +1205,19 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
                   </button>
                   
                   <PlaidLink onSuccess={() => {
-                    // Clear localStorage cache to ensure fresh data
-                    if (typeof window !== 'undefined') {
-                      localStorage.removeItem('cached_credit_cards');
-                      localStorage.removeItem('cached_billing_cycles');
-                    }
+                    console.log('🎯 PlaidLink onSuccess: New card ready, waiting briefly then fetching...');
                     
-                    // Lightweight refresh - only fetch data, no background syncing
-                    refreshDataOnly();
+                    // Brief delay to ensure PlaidLink's internal sync is 100% complete
+                    setTimeout(() => {
+                      console.log('🔄 PlaidLink: Starting data fetch after sync completion...');
+                      fetchAllUserData('PLAID_SUCCESS: ').then(() => {
+                        console.log('✅ New card data loaded and should be visible now');
+                      }).catch((error) => {
+                        console.error('Error loading new card data:', error);
+                        // If fetch fails, try refreshing the page as fallback
+                        window.location.reload();
+                      });
+                    }, 500); // Small delay to ensure sync completion
                   }} />
                 </>
               ) : (
