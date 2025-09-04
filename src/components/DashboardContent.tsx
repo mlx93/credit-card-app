@@ -332,6 +332,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const fetchAllUserData = async (logPrefix: string = '') => {
     if (!isLoggedIn) return;
     
+    // Show brief loading indicator for new card refresh
+    if (logPrefix.includes('PLAID_SUCCESS')) {
+      setLoading(true);
+    }
+    
     // Get current month date range
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -440,6 +445,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       const errorText = await connectionHealthRes.text();
       console.warn(`Failed to fetch connection health data${logPrefix}:`, connectionHealthRes.status, errorText);
       setConnectionHealth(null);
+    }
+    
+    // Clear loading state if this was triggered by PlaidLink success
+    if (logPrefix.includes('PLAID_SUCCESS')) {
+      setLoading(false);
     }
   };
 
@@ -1208,64 +1218,31 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                   </button>
                   
                   <PlaidLink onSuccess={async () => {
-                    console.log('🎯 PlaidLink onSuccess: New card connected, polling for visibility...');
+                    console.log('🎯 PlaidLink onSuccess: New card connected, refreshing dashboard...');
                     
-                    const originalCardCount = creditCards.length;
-                    console.log(`📊 Starting card count: ${originalCardCount}`);
-                    
-                    // Poll for new card appearance with smart timeout
-                    const pollForNewCard = async (): Promise<boolean> => {
-                      const maxAttempts = 10; // Up to 10 attempts
-                      const baseDelay = 1000; // Start with 1 second
+                    // Simple approach: Wait a moment for database commit, then refresh all data
+                    // This is more reliable than polling for count changes
+                    try {
+                      // Wait a bit for database operations to complete
+                      console.log('⏳ Waiting for database commit...');
+                      await new Promise(resolve => setTimeout(resolve, 2000));
                       
-                      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                        console.log(`🔍 Polling attempt ${attempt}/${maxAttempts} for new card...`);
-                        
+                      // Force refresh all data with cache busting
+                      console.log('🔄 Refreshing all dashboard data...');
+                      await fetchAllUserData('PLAID_SUCCESS: ');
+                      
+                      console.log('✅ Dashboard refresh completed after new card addition');
+                    } catch (error) {
+                      console.error('❌ Error refreshing dashboard after new card:', error);
+                      // Fallback: try once more after a longer delay
+                      setTimeout(async () => {
                         try {
-                          // Fetch fresh data with cache-busting
-                          const response = await fetch(`/api/user/credit-cards?_t=${Date.now()}`, {
-                            cache: 'no-store',
-                            headers: { 'Cache-Control': 'no-cache' }
-                          });
-                          
-                          if (response.ok) {
-                            const { creditCards: freshCards } = await response.json();
-                            const freshCardCount = Array.isArray(freshCards) ? freshCards.length : 0;
-                            
-                            if (freshCardCount > originalCardCount) {
-                              console.log(`🎉 SUCCESS! New card detected (${freshCardCount} vs ${originalCardCount})`);
-                              
-                              // Now fetch ALL fresh data to update everything
-                              await fetchAllUserData('NEW_CARD_DETECTED: ');
-                              return true;
-                            }
-                            
-                            console.log(`⏳ Card count still ${freshCardCount}, waiting...`);
-                          } else {
-                            console.warn(`⚠️ API error (${response.status}) on attempt ${attempt}`);
-                          }
-                          
-                        } catch (error) {
-                          console.error(`❌ Polling error on attempt ${attempt}:`, error);
+                          console.log('🔄 Fallback refresh attempt...');
+                          await fetchAllUserData('PLAID_FALLBACK: ');
+                        } catch (fallbackError) {
+                          console.error('❌ Fallback refresh also failed:', fallbackError);
                         }
-                        
-                        // Progressive delay: 1s, 1.5s, 2s, 2.5s, 3s, 3s, 3s...
-                        if (attempt < maxAttempts) {
-                          const delay = Math.min(baseDelay + (attempt * 500), 3000);
-                          await new Promise(resolve => setTimeout(resolve, delay));
-                        }
-                      }
-                      
-                      return false;
-                    };
-                    
-                    // Start polling
-                    const detected = await pollForNewCard();
-                    
-                    if (!detected) {
-                      console.error('🚨 New card not detected after polling - forcing refresh');
-                      // Last resort: fetch data anyway and show what we have
-                      await fetchAllUserData('POLLING_TIMEOUT: ');
+                      }, 3000);
                     }
                   }} />
                   
