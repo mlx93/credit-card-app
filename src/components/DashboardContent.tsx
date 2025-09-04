@@ -1327,28 +1327,23 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                   </button>
                   
                   <PlaidLink onSuccess={async () => {
-                    console.log('🎯 PlaidLink onSuccess: New card connected, using hybrid refresh...');
+                    console.log('🎯 PlaidLink onSuccess: New card connected, refreshing page...');
                     
-                    // Hybrid approach: Wait for database commit, then use cache + new card fetch
+                    // Simple and reliable approach: Wait for database commit, then refresh page
+                    // Since page refresh no longer triggers automatic sync, this is now safe and efficient
                     try {
                       // Wait a bit for database operations to complete
                       console.log('⏳ Waiting for database commit...');
-                      await new Promise(resolve => setTimeout(resolve, 2000));
+                      await new Promise(resolve => setTimeout(resolve, 3000));
                       
-                      // Use hybrid refresh - keeps existing cards from cache, fetches new card data
-                      console.log('🔄 Starting hybrid refresh (cache + new card)...');
-                      await refreshWithNewCard();
+                      // Simple page refresh - loads cached data instantly, no unnecessary syncs
+                      console.log('🔄 Refreshing page to show new card...');
+                      window.location.reload();
                       
-                      console.log('✅ Hybrid refresh completed - new card should be visible');
                     } catch (error) {
-                      console.error('❌ Error in hybrid refresh after new card:', error);
-                      // Fallback to full refresh if hybrid fails
-                      try {
-                        console.log('🔄 Fallback to full refresh...');
-                        await fetchAllUserData('PLAID_FALLBACK: ');
-                      } catch (fallbackError) {
-                        console.error('❌ Fallback refresh also failed:', fallbackError);
-                      }
+                      console.error('❌ Error in post-card flow:', error);
+                      // Even on error, refresh the page to show what we have
+                      window.location.reload();
                     }
                   }} />
                   
