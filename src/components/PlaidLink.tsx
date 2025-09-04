@@ -73,13 +73,14 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
     product: ['liabilities', 'transactions'],
     // Enable account selection so users can pick specific credit cards
     selectAccount: true,
-    // Filter to only show credit card accounts in the selection interface
+    // Filter to only show credit card accounts and enable account selection for Capital One
     accountFilters: {
       credit: {
         account_subtypes: ['credit card']
       }
     },
-    receivedRedirectUri: null, // Keep inline flow as primary, but redirect URI is configured for institutions that require it
+    // Capital One often requires OAuth redirect flow for multiple account selection
+    receivedRedirectUri: 'https://cardcycle.app/plaid/callback',
     onSuccess: async (public_token, metadata) => {
       try {
         console.log('Plaid Link success:', { public_token, metadata });
