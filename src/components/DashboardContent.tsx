@@ -371,15 +371,30 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       const safeCards = Array.isArray(cards) ? cards : [];
       setCreditCards(safeCards);
       
-      // Set default shared card order if it hasn't been set yet
-      if (sharedCardOrder.length === 0 && safeCards.length > 0) {
-        const defaultOrder = getDefaultCardOrder(safeCards);
-        setSharedCardOrder(defaultOrder);
-        console.log(`Setting default card order${logPrefix}:`, {
-          cardCount: safeCards.length,
-          defaultOrder,
-          cardNames: defaultOrder.map(id => safeCards.find(c => c.id === id)?.name)
-        });
+      // Update shared card order to include new cards
+      if (safeCards.length > 0) {
+        const currentCardIds = new Set(sharedCardOrder);
+        const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
+        
+        if (newCards.length > 0) {
+          // New cards detected - add them to the front (far left)
+          const newCardIds = newCards.map(card => card.id);
+          const updatedOrder = [...newCardIds, ...sharedCardOrder];
+          setSharedCardOrder(updatedOrder);
+          console.log(`🆕 Adding ${newCards.length} new cards to front of order${logPrefix}:`, {
+            newCardNames: newCards.map(c => c.name),
+            updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
+          });
+        } else if (sharedCardOrder.length === 0) {
+          // No existing order - set default order
+          const defaultOrder = getDefaultCardOrder(safeCards);
+          setSharedCardOrder(defaultOrder);
+          console.log(`Setting default card order${logPrefix}:`, {
+            cardCount: safeCards.length,
+            defaultOrder,
+            cardNames: defaultOrder.map(id => safeCards.find(c => c.id === id)?.name)
+          });
+        }
       }
     }
 
@@ -752,6 +767,41 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       }, 500);
     } catch (error) {
       console.error('Error removing card:', error);
+      
+      // Instead of immediately showing error, check if deletion actually succeeded
+      setDeletionStep('Verifying deletion status...');
+      
+      try {
+        // Wait a moment for potential backend completion
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Refresh data to check if card was actually deleted
+        const initialCardCount = creditCards.length;
+        await fetchUserData();
+        
+        // If the card count decreased, deletion was successful despite the error
+        const currentCardCount = creditCards.length;
+        if (currentCardCount < initialCardCount) {
+          console.log('✅ Deletion actually succeeded despite API error');
+          
+          setDeletionProgress(100);
+          setDeletionStep('Complete!');
+          
+          // Show success
+          setTimeout(() => {
+            setIsDeleting(false);
+            setDeletionProgress(0);
+            setDeletionStep('');
+            setShowDeletionSuccess(true);
+            setCardToDelete(null);
+          }, 500);
+          return;
+        }
+      } catch (verificationError) {
+        console.error('Error during deletion verification:', verificationError);
+      }
+      
+      // If we reach here, deletion genuinely failed
       setIsDeleting(false);
       setDeletionProgress(0);
       setDeletionStep('');
@@ -792,6 +842,8 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       try {
+        console.log(`🗑️ Starting removal request for itemId: ${itemId}`);
+        
         const response = await fetch('/api/plaid/remove-connection', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -800,6 +852,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         });
         
         clearTimeout(timeoutId);
+        console.log(`✅ Removal request completed with status: ${response.status}`);
       
         // Check if the response is ok before trying to parse JSON
         if (!response.ok) {
@@ -808,6 +861,7 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           try {
             const errorData = await response.json();
             errorMessage = errorData.error || errorMessage;
+            console.error('Error response data:', errorData);
           } catch (parseError) {
             // If JSON parsing fails, use the HTTP status message
             console.warn('Failed to parse error response:', parseError);
@@ -819,7 +873,16 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           throw new Error(errorMessage);
         }
         
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+          console.log('✅ Parsed success response:', data);
+        } catch (jsonError) {
+          console.error('Failed to parse success response JSON:', jsonError);
+          // If we can't parse the response but the status is ok, assume success
+          console.log('⚠️ Assuming success due to OK status despite JSON parse failure');
+          data = { success: true, message: 'Card deleted successfully' };
+        }
         
         if (!data.success) {
           console.error('Failed to remove connection:', data.error);
@@ -827,10 +890,27 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
           await fetchUserData();
           throw new Error(data.error || 'Failed to remove connection');
         }
+        
+        console.log('🎉 Card deletion completed successfully');
       } catch (fetchError) {
         clearTimeout(timeoutId);
+        console.error('🚨 Fetch error during deletion:', fetchError);
+        
         if (fetchError.name === 'AbortError') {
-          throw new Error('Request timed out. Please check your connection and try again.');
+          // Before showing timeout error, check if the card was actually deleted
+          console.log('⏰ Request timed out, but checking if deletion actually succeeded...');
+          
+          // Wait a moment for the deletion to potentially complete on the backend
+          setTimeout(async () => {
+            try {
+              await fetchUserData();
+              console.log('🔄 Refreshed data after timeout to check deletion status');
+            } catch (refreshError) {
+              console.error('Failed to refresh after timeout:', refreshError);
+            }
+          }, 1000);
+          
+          throw new Error('Request timed out, but the card may have been deleted. Please refresh the page to check.');
         }
         throw fetchError;
       }
@@ -899,9 +979,47 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    // Always start background sync immediately without blocking UI
-    // The UI will show cached data (if any) or empty state while sync runs
-    backgroundSync();
+    // First, immediately load any cached data to show instant UI
+    const loadCachedDataFirst = async () => {
+      try {
+        console.log('🚀 Loading cached data for instant UI...');
+        // Force immediate data load from cache without API calls
+        const cachedCards = localStorage.getItem('cached_credit_cards');
+        const cachedCycles = localStorage.getItem('cached_billing_cycles');
+        
+        if (cachedCards) {
+          const cards = JSON.parse(cachedCards);
+          if (Array.isArray(cards) && cards.length > 0) {
+            setCreditCards(cards);
+            console.log(`✅ Loaded ${cards.length} cards from cache instantly`);
+            
+            // Set initial card order for cached cards
+            if (sharedCardOrder.length === 0) {
+              const defaultOrder = getDefaultCardOrder(cards);
+              setSharedCardOrder(defaultOrder);
+            }
+          }
+        }
+        
+        if (cachedCycles) {
+          const cycles = JSON.parse(cachedCycles);
+          if (Array.isArray(cycles) && cycles.length > 0) {
+            setBillingCycles(cycles);
+            console.log(`✅ Loaded ${cycles.length} billing cycles from cache instantly`);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to load cached data:', error);
+      }
+      
+      // After instant cache load, start background sync (truly in background)
+      console.log('🔄 Starting background data sync...');
+      setTimeout(() => {
+        backgroundSync();
+      }, 100); // Small delay to ensure cache load completes first
+    };
+    
+    loadCachedDataFirst();
     setTimeout(checkConnectionHealth, 1000);
   }, [isLoggedIn]);
 
