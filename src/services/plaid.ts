@@ -58,21 +58,10 @@ class PlaidServiceImpl implements PlaidService {
       },
     };
 
-    // For redirect flow, we need to configure OAuth properly
+    // Add oauth_state_id if provided (for resuming OAuth flows)
     if (oauth_state_id) {
-      // This is OAuth resumption - include the state ID
       console.log('🔗 Adding oauth_state_id to link token request:', oauth_state_id);
       (request as any).oauth_state_id = oauth_state_id;
-    } else {
-      // This is initial connection - set up for OAuth redirect flow
-      console.log('🔗 Setting up initial OAuth redirect flow');
-      // Generate a unique state for this OAuth flow
-      const oauthState = `cardcycle_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      (request as any).oauth = {
-        nonce: oauthState,
-        redirect_uri: 'https://www.cardcycle.app/api/plaid/callback'
-      };
-      console.log('🔗 Generated OAuth state:', oauthState);
     }
 
     console.log('Creating link token for environment:', process.env.PLAID_ENV);
@@ -1457,13 +1446,7 @@ class PlaidServiceImpl implements PlaidService {
       access_token: accessToken,
     };
 
-    // Add OAuth configuration for redirect flow
-    const oauthState = `cardcycle_update_${userId}_${itemId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    (request as any).oauth = {
-      nonce: oauthState,
-      redirect_uri: 'https://www.cardcycle.app/api/plaid/callback'
-    };
-    console.log('🔗 Generated OAuth state for update:', oauthState);
+    // OAuth configuration is handled by redirect_uri - no additional setup needed for updates
 
     console.log('Creating update link token for itemId:', itemId);
     
