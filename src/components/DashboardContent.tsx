@@ -936,8 +936,10 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
   // Calculate actual current month spending from transactions
   const totalSpendThisMonth = (() => {
     if (!isLoggedIn) {
-      // For mock data, show sum of all cycle spending
-      return Array.isArray(displayCycles) ? displayCycles.reduce((sum, cycle) => sum + cycle.totalSpend, 0) : 0;
+      // For mock data, only sum OPEN cycles (no dueDate means open/current cycle)
+      return Array.isArray(displayCycles) ? displayCycles
+        .filter(cycle => !cycle.dueDate) // Only open cycles
+        .reduce((sum, cycle) => sum + cycle.totalSpend, 0) : 0;
     }
     
     // For real data, sum all transaction amounts from current month
