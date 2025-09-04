@@ -239,14 +239,23 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
     },
   });
 
-  // Auto-open Plaid Link when token is ready
+  // Auto-open Plaid Link when token is ready (redirect mode)
   useEffect(() => {
     if (linkToken && ready && open) {
-      console.log('Opening Plaid Link with token:', linkToken.substring(0, 20) + '...');
-      // Small delay to ensure loading overlay is visible before Plaid modal opens
-      setTimeout(() => {
-        open();
-      }, 500);
+      console.log('Opening Plaid Link in redirect mode with token:', linkToken.substring(0, 20) + '...');
+      console.log('Redirect URI configured:', 'https://www.cardcycle.app/api/plaid/callback');
+      
+      // In redirect mode, this should redirect the page to Plaid OAuth
+      try {
+        setTimeout(() => {
+          console.log('Triggering Plaid Link redirect...');
+          open();
+        }, 500);
+      } catch (error) {
+        console.error('Error opening Plaid Link in redirect mode:', error);
+        setLoading(false);
+        alert('Failed to start connection flow. Please try again.');
+      }
     }
   }, [linkToken, ready, open]);
 
