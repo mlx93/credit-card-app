@@ -153,11 +153,11 @@ class PlaidServiceImpl implements PlaidService {
     return true;
   }
 
-  // Retry logic with exponential backoff for rate limits
+  // Enhanced retry logic with exponential backoff for rate limits
   private async retryWithBackoff<T>(
     operation: () => Promise<T>,
-    maxRetries: number = 5,
-    baseDelay: number = 1000  // Back to 1000ms base delay
+    maxRetries: number = 8,  // Increased max retries
+    baseDelay: number = 1000  // Keep original 1000ms base delay
   ): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -167,20 +167,28 @@ class PlaidServiceImpl implements PlaidService {
         if (error.response?.status === 429) {
           if (attempt >= maxRetries) {
             console.error(`⚠️ Max retries (${maxRetries}) exceeded for rate-limited request`);
+            console.error(`⚠️ This indicates you may be fetching too much data at once. Consider reducing the date range.`);
             throw error;
           }
           
-          // More aggressive backoff: 2^attempt * baseDelay + jitter
-          const jitter = Math.random() * 1000; // Add 0-1000ms random jitter
-          const delay = (baseDelay * Math.pow(2, attempt)) + jitter;
+          // More aggressive backoff for rate limits: exponential + longer base + jitter
+          const jitter = Math.random() * 2000; // Add 0-2000ms random jitter
+          const delay = (baseDelay * Math.pow(2, attempt - 1)) + jitter;
           console.log(`⏱️ Rate limit hit (429), waiting ${Math.round(delay)}ms before retry ${attempt}/${maxRetries}`);
           console.log(`   Plaid rate limit message: ${error.response?.data?.error_message || 'No message'}`);
+          console.log(`   Error code: ${error.response?.data?.error_code}`);
+          
+          // Check if this is a TRANSACTIONS_LIMIT error and suggest action
+          if (error.response?.data?.error_code === 'TRANSACTIONS_LIMIT') {
+            console.log(`   💡 TRANSACTIONS_LIMIT detected - this usually means too much historical data requested`);
+          }
+          
           await this.delay(delay);
           continue;
         }
         
         // For other errors, still retry but with less aggressive backoff
-        if (attempt < maxRetries && error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+        if (attempt < maxRetries && (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT')) {
           const delay = baseDelay * attempt;
           console.log(`🔄 Connection error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
           await this.delay(delay);
@@ -212,9 +220,9 @@ class PlaidServiceImpl implements PlaidService {
         }
       }
       
-      // Use optimized chunking strategy
+      // Use optimized chunking strategy with progressive fetching
       const allTransactions: any[] = [];
-      const chunkSize = isCapitalOne ? 90 : 30; // Use 90-day chunks for Capital One, 30-day for others
+      const chunkSize = isCapitalOne ? 60 : 90; // Use 60-day chunks for Capital One, 90-day for others to reduce API calls
       
       let currentStart = new Date(startDate);
       
@@ -1046,13 +1054,13 @@ class PlaidServiceImpl implements PlaidService {
       const startDate = new Date();
       
       if (isCapitalOneItem) {
-        // Capital One: Only 90 days of history available due to API limitation
-        startDate.setDate(startDate.getDate() - 90);
-        console.log('📍 Capital One detected: Using 90-day transaction window');
+        // Capital One: Request 4 months knowing they'll limit to ~90 days
+        startDate.setMonth(startDate.getMonth() - 4);
+        console.log('📍 Capital One detected: Requesting 4 months (will be limited to ~90 days)');
       } else {
-        // All other institutions: 24 months to match Link configuration
-        startDate.setMonth(startDate.getMonth() - 24);
-        console.log('📍 Standard institution: Using 24-month transaction window');
+        // Standard institutions: Request 12 months of transaction history
+        startDate.setMonth(startDate.getMonth() - 12);
+        console.log('📍 Standard institution: Requesting 12 months of transaction history');
       }
 
       console.log(`=== TRANSACTION DATE RANGE DEBUG ===`);
@@ -1062,17 +1070,17 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`Calculated start date: ${startDate.toISOString()}`);  
       console.log(`Calculated end date: ${endDate.toISOString()}`);
       console.log(`Requesting range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
-      console.log(`Expected ${isCapitalOneItem ? 'days' : 'months'} back: ${isCapitalOneItem ? 90 : Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))}`);
+      console.log(`Expected ${isCapitalOneItem ? 'days' : 'months'} back: ${isCapitalOneItem ? 90 : 12}`);
       
       // Validate date range
       const now = new Date();
       const maxPastDate = new Date();
-      maxPastDate.setFullYear(maxPastDate.getFullYear() - 2); // 2 years max
+      maxPastDate.setFullYear(maxPastDate.getFullYear() - 1); // 12 months max
       
       if (startDate < maxPastDate) {
-        console.warn(`⚠️ Start date ${startDate.toISOString().split('T')[0]} is more than 2 years ago, adjusting to 2 years max`);
-        startDate.setTime(maxPastDate.getTime()); // Cap at 2 years ago
-        console.log(`🔧 Adjusted start date to 2 years ago: ${startDate.toISOString().split('T')[0]}`);
+        console.warn(`⚠️ Start date ${startDate.toISOString().split('T')[0]} is more than 12 months ago, adjusting to 12 months max`);
+        startDate.setTime(maxPastDate.getTime()); // Cap at 12 months ago
+        console.log(`🔧 Adjusted start date to 12 months ago: ${startDate.toISOString().split('T')[0]}`);
       }
       
       if (endDate > now) {
