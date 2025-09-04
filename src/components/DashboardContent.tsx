@@ -755,8 +755,15 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
       setIsDeleting(false);
       setDeletionProgress(0);
       setDeletionStep('');
-      setCardToDelete(null);
-      alert('Failed to remove card. Please try again.');
+      
+      // Show specific error message in the deletion dialog instead of browser alert
+      setDeletionStep(error instanceof Error ? error.message : 'Failed to remove card');
+      
+      // Auto-close error message after 5 seconds
+      setTimeout(() => {
+        setDeletionStep('');
+        setCardToDelete(null);
+      }, 5000);
     }
   };
 
@@ -780,20 +787,52 @@ export function DashboardContent({ isLoggedIn }: DashboardContentProps) {
         setSharedCardOrder(prevOrder => prevOrder.filter(id => id !== removedCard.id));
       }
       
-      // Make API call to remove from backend
-      const response = await fetch('/api/plaid/remove-connection', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId })
-      });
+      // Make API call to remove from backend with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const data = await response.json();
+      try {
+        const response = await fetch('/api/plaid/remove-connection', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
       
-      if (!data.success) {
-        console.error('Failed to remove connection:', data.error);
-        // Revert the optimistic update on failure
-        await fetchUserData();
-        throw new Error(data.error || 'Failed to remove connection');
+        // Check if the response is ok before trying to parse JSON
+        if (!response.ok) {
+          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            // If JSON parsing fails, use the HTTP status message
+            console.warn('Failed to parse error response:', parseError);
+          }
+          
+          console.error('API request failed:', errorMessage);
+          // Revert the optimistic update on failure
+          await fetchUserData();
+          throw new Error(errorMessage);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          console.error('Failed to remove connection:', data.error);
+          // Revert the optimistic update on failure  
+          await fetchUserData();
+          throw new Error(data.error || 'Failed to remove connection');
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timed out. Please check your connection and try again.');
+        }
+        throw fetchError;
       }
       
       // Clear from localStorage cache as well
