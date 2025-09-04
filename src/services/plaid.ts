@@ -58,9 +58,10 @@ class PlaidServiceImpl implements PlaidService {
       },
     };
 
-    // Add oauth_state_id if provided (for resuming OAuth flows)
+    // For OAuth resumption, oauth_state_id should be passed when creating the link token
+    // but ONLY when resuming an existing OAuth flow, not for new connections
     if (oauth_state_id) {
-      console.log('🔗 Adding oauth_state_id to link token request:', oauth_state_id);
+      console.log('🔗 Creating link token for OAuth resumption with oauth_state_id:', oauth_state_id);
       (request as any).oauth_state_id = oauth_state_id;
     }
 

@@ -79,8 +79,8 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         account_subtypes: ['credit card']
       }
     },
-    // Use redirect flow for all institutions - points to API callback endpoint
-    receivedRedirectUri: 'https://www.cardcycle.app/api/plaid/callback',
+    // Try embedded mode to avoid OAuth configuration issues
+    // receivedRedirectUri: 'https://www.cardcycle.app/api/plaid/callback',
     onSuccess: async (public_token, metadata) => {
       try {
         console.log('Plaid Link success:', { public_token, metadata });
@@ -239,20 +239,19 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
     },
   });
 
-  // Auto-open Plaid Link when token is ready (redirect mode)
+  // Auto-open Plaid Link when token is ready (embedded mode)
   useEffect(() => {
     if (linkToken && ready && open) {
-      console.log('Opening Plaid Link in redirect mode with token:', linkToken.substring(0, 20) + '...');
-      console.log('Redirect URI configured:', 'https://www.cardcycle.app/api/plaid/callback');
+      console.log('Opening Plaid Link in embedded mode with token:', linkToken.substring(0, 20) + '...');
       
-      // In redirect mode, this should redirect the page to Plaid OAuth
+      // In embedded mode, this opens the Plaid modal/popup
       try {
         setTimeout(() => {
-          console.log('Triggering Plaid Link redirect...');
+          console.log('Triggering Plaid Link embedded flow...');
           open();
         }, 500);
       } catch (error) {
-        console.error('Error opening Plaid Link in redirect mode:', error);
+        console.error('Error opening Plaid Link in embedded mode:', error);
         setLoading(false);
         alert('Failed to start connection flow. Please try again.');
       }
