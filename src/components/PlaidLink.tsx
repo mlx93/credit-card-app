@@ -195,6 +195,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                 pollForNewCard();
               } else {
                 console.warn('⚠️ No credit cards found at connected institution');
+                console.warn('⚠️ Instant setup response:', syncData);
                 setLoadingMessage('No credit cards found');
                 setLoadingSubMessage('This institution may not have credit card accounts available');
                 

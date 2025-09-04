@@ -40,14 +40,30 @@ export async function POST(request: NextRequest) {
     // Phase 1: ONLY create credit card records (ultra fast)
     console.log('⚡ Phase 1: Creating credit card records only...');
     
-    const accountSyncResult = await plaidService.syncAccounts(accessToken, itemId);
-    console.log('✅ Credit card records created');
+    let accountSyncResult;
+    try {
+      accountSyncResult = await plaidService.syncAccounts(accessToken, itemId);
+      console.log('✅ Credit card records created:', accountSyncResult);
+    } catch (syncAccountsError) {
+      console.error('❌ Failed to sync accounts:', syncAccountsError);
+      throw new Error(`Account sync failed: ${syncAccountsError.message}`);
+    }
 
     // Get the newly created credit cards
-    const { data: creditCards } = await supabaseAdmin
+    const { data: creditCards, error: cardFetchError } = await supabaseAdmin
       .from('credit_cards')
       .select('*')
       .eq('plaidItemId', plaidItem.id);
+      
+    console.log(`📊 Credit cards found: ${creditCards?.length || 0} for plaidItemId: ${plaidItem.id}`);
+    if (cardFetchError) {
+      console.error('❌ Error fetching credit cards:', cardFetchError);
+    }
+    if (creditCards?.length) {
+      creditCards.forEach(card => {
+        console.log(`📋 Found card: ${card.name} (${card.accountId})`);
+      });
+    }
 
     // Phase 1.5: Get recent transactions for current cycle estimation
     console.log('⚡ Phase 1.5: Fetching recent transactions for current cycle...');
@@ -113,6 +129,8 @@ export async function POST(request: NextRequest) {
       }
     }, 2000); // Start comprehensive sync 2 seconds after instant setup completes
 
+    console.log(`✅ Instant card setup completed: ${creditCards?.length || 0} credit cards found`);
+    
     return NextResponse.json({
       success: true,
       message: 'Instant card setup completed',
