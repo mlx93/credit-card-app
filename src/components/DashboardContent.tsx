@@ -1026,14 +1026,19 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       setDeletionProgress(100);
       setDeletionStep('Complete!');
       
-      // Brief pause to show completion
-      setTimeout(() => {
-        setIsDeleting(false);
-        setDeletionProgress(0);
-        setDeletionStep('');
-        setShowDeletionSuccess(true);
-        setCardToDelete(null);
-      }, 500);
+      // Verify deletion by fetching fresh data before closing dialog
+      try {
+        await fetchDatabaseDataOnly(' Post delete verify: ');
+      } finally {
+        // Brief pause to show completion
+        setTimeout(() => {
+          setIsDeleting(false);
+          setDeletionProgress(0);
+          setDeletionStep('');
+          setShowDeletionSuccess(true);
+          setCardToDelete(null);
+        }, 500);
+      }
     } catch (error) {
       console.error('Error removing card:', error);
       setIsDeleting(false);

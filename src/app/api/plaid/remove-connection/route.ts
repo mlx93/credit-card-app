@@ -62,68 +62,104 @@ export async function DELETE(request: NextRequest) {
     const creditCardIds = (creditCards || []).map(card => card.id);
     console.log(`Found ${creditCardIds.length} credit cards to delete:`, creditCardIds);
 
-    // Step 1: Delete related data explicitly to ensure complete cleanup
-    if (creditCardIds.length > 0) {
-      // Delete APRs
-      const { error: aprsDeleteError } = await supabaseAdmin
-        .from('aprs')
-        .delete()
-        .in('creditCardId', creditCardIds);
-      
-      if (aprsDeleteError) {
-        console.error('Error deleting APRs:', aprsDeleteError);
-        return NextResponse.json({ error: 'Failed to delete APR data' }, { status: 500 });
+    // Prefer transactional deletion via RPC if available
+    let didUseRPC = false;
+    try {
+      const { data: rpcResult, error: rpcError } = await supabaseAdmin
+        .rpc('delete_plaid_item_and_data', { p_plaid_item_id: plaidItem.id });
+      if (!rpcError) {
+        console.log('RPC delete_plaid_item_and_data executed successfully:', rpcResult);
+        didUseRPC = true;
+      } else {
+        console.log('RPC delete_plaid_item_and_data unavailable or failed, falling back to manual deletion:', rpcError.message);
       }
-      console.log(`Deleted APR data for ${creditCardIds.length} cards`);
-
-      // Delete billing cycles
-      const { error: billingCyclesDeleteError } = await supabaseAdmin
-        .from('billing_cycles')
-        .delete()
-        .in('creditCardId', creditCardIds);
-      
-      if (billingCyclesDeleteError) {
-        console.error('Error deleting billing cycles:', billingCyclesDeleteError);
-        return NextResponse.json({ error: 'Failed to delete billing cycle data' }, { status: 500 });
-      }
-      console.log(`Deleted billing cycles for ${creditCardIds.length} cards`);
-
-      // Delete transactions
-      const { error: transactionsDeleteError } = await supabaseAdmin
-        .from('transactions')
-        .delete()
-        .in('creditCardId', creditCardIds);
-      
-      if (transactionsDeleteError) {
-        console.error('Error deleting transactions:', transactionsDeleteError);
-        return NextResponse.json({ error: 'Failed to delete transaction data' }, { status: 500 });
-      }
-      console.log(`Deleted transactions for ${creditCardIds.length} cards`);
+    } catch (rpcErr: any) {
+      console.warn('RPC deletion attempt threw an exception, falling back to manual deletion:', rpcErr?.message);
     }
 
-    // Step 2: Delete credit cards
-    const { error: creditCardsDeleteError } = await supabaseAdmin
+    if (!didUseRPC) {
+      // Step 1: Delete related data explicitly to ensure complete cleanup
+      if (creditCardIds.length > 0) {
+        // Delete APRs
+        const { error: aprsDeleteError } = await supabaseAdmin
+          .from('aprs')
+          .delete()
+          .in('creditCardId', creditCardIds);
+        
+        if (aprsDeleteError) {
+          console.error('Error deleting APRs:', aprsDeleteError);
+          return NextResponse.json({ error: 'Failed to delete APR data' }, { status: 500 });
+        }
+        console.log(`Deleted APR data for ${creditCardIds.length} cards`);
+
+        // Delete billing cycles
+        const { error: billingCyclesDeleteError } = await supabaseAdmin
+          .from('billing_cycles')
+          .delete()
+          .in('creditCardId', creditCardIds);
+        
+        if (billingCyclesDeleteError) {
+          console.error('Error deleting billing cycles:', billingCyclesDeleteError);
+          return NextResponse.json({ error: 'Failed to delete billing cycle data' }, { status: 500 });
+        }
+        console.log(`Deleted billing cycles for ${creditCardIds.length} cards`);
+
+        // Delete transactions
+        const { error: transactionsDeleteError } = await supabaseAdmin
+          .from('transactions')
+          .delete()
+          .in('creditCardId', creditCardIds);
+        
+        if (transactionsDeleteError) {
+          console.error('Error deleting transactions:', transactionsDeleteError);
+          return NextResponse.json({ error: 'Failed to delete transaction data' }, { status: 500 });
+        }
+        console.log(`Deleted transactions for ${creditCardIds.length} cards`);
+      }
+
+      // Step 2: Delete credit cards
+      const { error: creditCardsDeleteError } = await supabaseAdmin
+        .from('credit_cards')
+        .delete()
+        .eq('plaidItemId', plaidItem.id);
+      
+      if (creditCardsDeleteError) {
+        console.error('Error deleting credit cards:', creditCardsDeleteError);
+        return NextResponse.json({ error: 'Failed to delete credit card data' }, { status: 500 });
+      }
+      console.log(`Deleted ${creditCardIds.length} credit cards`);
+
+      // Step 3: Finally delete the plaid item
+      const { error: deleteError } = await supabaseAdmin
+        .from('plaid_items')
+        .delete()
+        .eq('id', plaidItem.id);
+      
+      if (deleteError) {
+        console.error('Error deleting plaid item:', deleteError);
+        return NextResponse.json({ error: 'Failed to remove connection' }, { status: 500 });
+      }
+      console.log(`Deleted plaid item: ${plaidItem.institutionName}`);
+    }
+
+    // Post-delete verification to avoid partial cleanup issues
+    const { data: remainingCards } = await supabaseAdmin
       .from('credit_cards')
-      .delete()
+      .select('id')
       .eq('plaidItemId', plaidItem.id);
-    
-    if (creditCardsDeleteError) {
-      console.error('Error deleting credit cards:', creditCardsDeleteError);
-      return NextResponse.json({ error: 'Failed to delete credit card data' }, { status: 500 });
-    }
-    console.log(`Deleted ${creditCardIds.length} credit cards`);
-
-    // Step 3: Finally delete the plaid item
-    const { error: deleteError } = await supabaseAdmin
+    const { data: remainingItem } = await supabaseAdmin
       .from('plaid_items')
-      .delete()
-      .eq('id', plaidItem.id);
-    
-    if (deleteError) {
-      console.error('Error deleting plaid item:', deleteError);
-      return NextResponse.json({ error: 'Failed to remove connection' }, { status: 500 });
+      .select('id')
+      .eq('id', plaidItem.id)
+      .maybeSingle();
+
+    if ((remainingCards && remainingCards.length > 0) || remainingItem) {
+      console.error('Post-delete verification failed:', {
+        remainingCardCount: remainingCards?.length || 0,
+        remainingItem: !!remainingItem,
+      });
+      return NextResponse.json({ error: 'Partial deletion detected. Please try again.' }, { status: 500 });
     }
-    console.log(`Deleted plaid item: ${plaidItem.institutionName}`);
 
     console.log(`Successfully removed connection for ${plaidItem.institutionName}`);
 
