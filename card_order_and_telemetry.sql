@@ -9,14 +9,17 @@ create table if not exists public.user_card_orders (
 
 alter table public.user_card_orders enable row level security;
 
--- RLS: Users can manage only their own order
-create policy if not exists "select own order" on public.user_card_orders
+-- RLS: Users can manage only their own order (idempotent via drop/create)
+drop policy if exists "select own order" on public.user_card_orders;
+create policy "select own order" on public.user_card_orders
   for select using (next_auth.uid() = user_id);
 
-create policy if not exists "upsert own order" on public.user_card_orders
+drop policy if exists "upsert own order" on public.user_card_orders;
+create policy "upsert own order" on public.user_card_orders
   for insert with check (next_auth.uid() = user_id);
 
-create policy if not exists "update own order" on public.user_card_orders
+drop policy if exists "update own order" on public.user_card_orders;
+create policy "update own order" on public.user_card_orders
   for update using (next_auth.uid() = user_id);
 
 -- Getter RPC
@@ -57,9 +60,10 @@ create table if not exists public.user_sync_telemetry (
 
 alter table public.user_sync_telemetry enable row level security;
 
-create policy if not exists "insert own telemetry" on public.user_sync_telemetry
+drop policy if exists "insert own telemetry" on public.user_sync_telemetry;
+create policy "insert own telemetry" on public.user_sync_telemetry
   for insert with check (next_auth.uid() = user_id);
 
-create policy if not exists "select own telemetry" on public.user_sync_telemetry
+drop policy if exists "select own telemetry" on public.user_sync_telemetry;
+create policy "select own telemetry" on public.user_sync_telemetry
   for select using (next_auth.uid() = user_id);
-

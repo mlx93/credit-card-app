@@ -59,6 +59,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const [recentCardAddition, setRecentCardAddition] = useState(false);
   const [cardDeletionInProgress, setCardDeletionInProgress] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
+  // Prevent saving order before we've loaded an initial preferred order (DB or default)
+  const orderInitializedRef = typeof window === 'undefined' ? { current: false } as any : (window as any).__orderInitRef || { current: false };
+  if (typeof window !== 'undefined') { (window as any).__orderInitRef = orderInitializedRef; }
   const [visualRefreshingIds, setVisualRefreshingIds] = useState<string[]>([]);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
@@ -1278,7 +1281,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   };
 
   // Database-only data fetch for initial load (no API calls)
-  const fetchDatabaseDataOnly = async (logPrefix: string = '') => {
+  const fetchDatabaseDataOnly = async (logPrefix: string = '', preferredOrder?: string[]) => {
     if (!isLoggedIn) return;
     
     console.log(`📀 ${logPrefix}Loading data from database only (no API calls)`);
@@ -1320,12 +1323,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         
         // Update shared card order to include new cards
         if (safeCards.length > 0) {
-          const currentCardIds = new Set(sharedCardOrder);
+          const baseOrder = (preferredOrder && preferredOrder.length > 0) ? preferredOrder : sharedCardOrder;
+          const currentCardIds = new Set(baseOrder);
           const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
           
           if (newCards.length > 0) {
             const newCardIds = newCards.map(card => card.id);
-            const updatedOrder = [...newCardIds, ...sharedCardOrder];
+            const updatedOrder = [...newCardIds, ...baseOrder];
             setSharedCardOrder(updatedOrder);
             console.log(`🆕 Adding ${newCards.length} new cards to front of order${logPrefix}:`, {
               newCardNames: newCards.map(c => c.name),
@@ -1334,9 +1338,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             
             // New cards will sync during next daily sync (once per day only)
             console.log('📝 New cards detected in fetchAllUserData, will sync during next daily sync');
-          } else if (sharedCardOrder.length === 0) {
+          } else if (baseOrder.length === 0) {
             const defaultOrder = getDefaultCardOrder(safeCards);
             setSharedCardOrder(defaultOrder);
+            orderInitializedRef.current = true; // default has been chosen
             console.log(`Setting default card order${logPrefix}:`, {
               cardCount: safeCards.length,
               defaultOrder,
