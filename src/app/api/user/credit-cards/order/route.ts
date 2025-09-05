@@ -10,7 +10,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabaseAdmin.rpc('get_card_order', { p_user_id: session.user.id });
+    const { data, error } = await supabaseAdmin.rpc('get_card_order');
     if (error) {
       console.warn('get_card_order RPC failed:', error.message);
       return NextResponse.json({ order: [] });
@@ -33,7 +33,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid order payload' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin.rpc('set_card_order', { p_user_id: session.user.id, p_order: order });
+    const { data, error } = await supabaseAdmin.rpc('set_card_order', { p_order: order });
     if (error || data !== true) {
       console.warn('set_card_order RPC failed:', error?.message);
       return NextResponse.json({ success: false }, { status: 500 });

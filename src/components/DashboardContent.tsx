@@ -1421,12 +1421,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             console.log(`✅ Loaded ${cards.length} cards from cache instantly`);
             hasCachedData = true;
             
-            // Set initial card order for cached cards
-            if (sharedCardOrder.length === 0) {
-              const defaultOrder = getDefaultCardOrder(cards);
-              setSharedCardOrder(defaultOrder);
-              orderInitializedRef.current = true;
-            }
+            // Don't set order here - wait for DB order to load first
+            // Only set default order if DB doesn't have one
           }
         }
         
