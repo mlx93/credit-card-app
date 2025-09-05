@@ -36,7 +36,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
-    console.log(`Removing Plaid connection for ${plaidItem.institution_name} (${itemId})`);
+    console.log(`Removing Plaid connection for ${plaidItem.institutionName} (${itemId})`);
 
     try {
       // Try to remove the item from Plaid (best effort, with timeout)

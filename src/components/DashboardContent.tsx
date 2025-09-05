@@ -1132,23 +1132,25 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         return filtered;
       });
       
-      // Also update billing cycles to remove cycles for this card
+      // Also update billing cycles to remove cycles for ALL deleted cards
       setBillingCycles(prevCycles => {
-        const removedCard = creditCards.find(card => card.plaidItem?.itemId === itemId);
-        if (removedCard) {
-          const filtered = prevCycles.filter(cycle => cycle.creditCardId !== removedCard.id);
+        const removedCards = creditCards.filter(card => card.plaidItem?.itemId === itemId);
+        if (removedCards.length > 0) {
+          const removedCardIds = removedCards.map(c => c.id);
+          const filtered = prevCycles.filter(cycle => !removedCardIds.includes(cycle.creditCardId));
           console.log(`🗑️ Optimistic UI update: Removed ${prevCycles.length - filtered.length} billing cycles from UI`);
           return filtered;
         }
         return prevCycles;
       });
       
-      // Update card order to remove the deleted card
-      const removedCard = creditCards.find(card => card.plaidItem?.itemId === itemId);
-      if (removedCard) {
+      // Update card order to remove ALL deleted cards for this itemId
+      const removedCards = creditCards.filter(card => card.plaidItem?.itemId === itemId);
+      if (removedCards.length > 0) {
+        const removedCardIds = removedCards.map(c => c.id);
         setSharedCardOrder(prevOrder => {
-          const filtered = prevOrder.filter(id => id !== removedCard.id);
-          console.log(`🗑️ Updated card order: Removed card ${removedCard.id} from order`);
+          const filtered = prevOrder.filter(id => !removedCardIds.includes(id));
+          console.log(`🗑️ Updated card order: Removed ${removedCards.length} cards from order`);
           return filtered;
         });
       }
