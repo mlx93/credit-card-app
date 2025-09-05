@@ -328,6 +328,57 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
   };
 
+  // Background sync for new cards to load Recent Billing Cycles
+  const startBackgroundSyncForNewCards = async (newCards: any[]) => {
+    if (!isLoggedIn) return;
+    
+    console.log('🔄 Starting background sync for new cards:', newCards.map(c => c.name));
+    
+    for (const card of newCards) {
+      try {
+        const plaidItem = card.plaidItem;
+        if (!plaidItem?.itemId) {
+          console.warn(`⚠️ No plaid item found for card: ${card.name}`);
+          continue;
+        }
+        
+        console.log(`⚡ Starting comprehensive sync for ${card.name} (itemId: ${plaidItem.itemId})`);
+        
+        // Use comprehensive-sync to load full data for the new card
+        const response = await fetch('/api/plaid/comprehensive-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: plaidItem.itemId })
+        });
+        
+        if (response.ok) {
+          const syncData = await response.json();
+          console.log(`✅ Background sync completed for ${card.name}:`, syncData);
+          
+          // Refresh billing cycles to show the newly calculated cycles
+          console.log('🔄 Refreshing billing cycles after background sync');
+          const cyclesResponse = await fetch('/api/user/billing-cycles', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          });
+          
+          if (cyclesResponse.ok) {
+            const { billingCycles: freshCycles } = await cyclesResponse.json();
+            const safeCycles = Array.isArray(freshCycles) ? freshCycles : [];
+            setBillingCycles(safeCycles);
+            console.log(`✅ Billing cycles refreshed: ${safeCycles.length} total cycles`);
+          }
+        } else {
+          console.warn(`⚠️ Background sync failed for ${card.name}:`, response.status);
+        }
+      } catch (error) {
+        console.error(`❌ Background sync error for ${card.name}:`, error);
+      }
+    }
+    
+    console.log('✅ Background sync completed for all new cards');
+  };
+
   // Shared data fetching logic used by all sync functions
   const fetchAllUserData = async (logPrefix: string = '') => {
     if (!isLoggedIn) return;
@@ -1061,6 +1112,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
               newCardNames: newCards.map(c => c.name),
               updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
             });
+            
+            // Start background sync for new cards to load Recent Billing Cycles
+            console.log('🔄 Triggering background sync for new cards to load Recent Billing Cycles');
+            setTimeout(() => {
+              startBackgroundSyncForNewCards(newCards);
+            }, 2000); // Wait 2 seconds for card to be fully visible
           } else if (sharedCardOrder.length === 0) {
             const defaultOrder = getDefaultCardOrder(safeCards);
             setSharedCardOrder(defaultOrder);
@@ -1430,15 +1487,38 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                       // Wait a moment for database commits to complete
                       await new Promise(resolve => setTimeout(resolve, 1000));
                       
+                      // Capture current cards before refresh to detect new ones
+                      const currentCardIds = new Set(creditCards.map(c => c.id));
+                      
                       // Refresh data with the new card
                       await fetchDatabaseDataOnly('New card added: ');
                       
                       console.log('✅ Dashboard data refreshed with new card');
                       
-                      // Clear the recent addition flag after a delay
-                      setTimeout(() => {
-                        setRecentCardAddition(false);
-                      }, 5000);
+                      // Wait a moment, then detect and sync new cards
+                      setTimeout(async () => {
+                        try {
+                          // Get the updated card list to identify new cards
+                          const cardResponse = await fetch('/api/user/credit-cards', {
+                            cache: 'no-store',
+                            headers: { 'Cache-Control': 'no-cache' }
+                          });
+                          
+                          if (cardResponse.ok) {
+                            const { creditCards: updatedCards } = await cardResponse.json();
+                            const newCards = updatedCards.filter(card => !currentCardIds.has(card.id));
+                            
+                            if (newCards.length > 0) {
+                              console.log('🔄 PlaidLink: Starting background sync for new cards:', newCards.map(c => c.name));
+                              await startBackgroundSyncForNewCards(newCards);
+                            }
+                          }
+                        } catch (syncError) {
+                          console.warn('⚠️ Background sync after card addition failed:', syncError);
+                        } finally {
+                          setRecentCardAddition(false);
+                        }
+                      }, 3000); // Wait 3 seconds for card to appear, then start background sync
                       
                     } catch (error) {
                       console.error('❌ Failed to refresh Dashboard data:', error);
