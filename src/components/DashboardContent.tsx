@@ -339,6 +339,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
 
   // Perform daily sync check on first login of the day
   const performDailySyncCheck = async () => {
+    // Skip daily sync check if card was recently added or if deletion is in progress
+    if (recentCardAddition) {
+      console.log('⏭️ Skipping daily sync check - recent card addition in progress');
+      return;
+    }
+    
+    if (cardDeletionInProgress) {
+      console.log('⏭️ Skipping daily sync check - card deletion in progress');
+      return;
+    }
+    
     try {
       console.log('🌅 Checking if daily sync needed...');
       
@@ -372,6 +383,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
 
   // Perform daily sync in background without blocking UI
   const performBackgroundDailySync = async () => {
+    // Skip daily sync if card was recently added or if deletion is in progress
+    if (recentCardAddition) {
+      console.log('⏭️ Skipping background daily sync - recent card addition in progress');
+      return;
+    }
+    
+    if (cardDeletionInProgress) {
+      console.log('⏭️ Skipping background daily sync - card deletion in progress');
+      return;
+    }
+    
     try {
       console.log('🌅 Starting background daily sync...');
       
@@ -401,6 +423,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   // Lightweight data fetch for new card additions (skips connection health to avoid rate limits)
   const fetchUserDataForNewCard = async (logPrefix: string = '') => {
     if (!isLoggedIn) return;
+    console.log(`🚀 fetchUserDataForNewCard STARTED${logPrefix}`);
     
     // Get current month date range
     const now = new Date();
@@ -436,7 +459,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       const { creditCards: cards } = await creditCardsRes.json();
       const safeCards = Array.isArray(cards) ? cards : [];
       console.log(`🔄${logPrefix}Fetched ${safeCards.length} cards from API:`, safeCards.map(c => ({ id: c.id, name: c.name })));
+      console.log(`🔄${logPrefix}About to setCreditCards - BEFORE state update, current cards:`, creditCards.length);
       setCreditCards(safeCards);
+      console.log(`🔄${logPrefix}setCreditCards completed - AFTER setState called (may not be immediately visible)`);
       
       // Update shared card order to include new cards
       if (safeCards.length > 0) {
@@ -1652,18 +1677,21 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                   </button>
                   
                   <PlaidLink onSuccess={async () => {
-                    console.log('🎯 DashboardContent: PlaidLink onSuccess - refreshing data without page reload');
+                    console.log('🎯🎯🎯 DashboardContent: PlaidLink onSuccess CALLBACK TRIGGERED 🎯🎯🎯');
                     console.log('📊 Current state before refresh:', {
                       creditCardCount: creditCards.length,
                       billingCycleCount: billingCycles.length,
-                      sharedCardOrderLength: sharedCardOrder.length
+                      sharedCardOrderLength: sharedCardOrder.length,
+                      cardNames: creditCards.map(c => c.name)
                     });
                     
                     // Directly refresh the Dashboard data instead of page reload
                     try {
-                      setRecentCardAddition(true); // Prevent background sync interference
+                      console.log('🔧 Setting recentCardAddition flag to prevent background sync interference');
+                      setRecentCardAddition(true);
                       
                       // Wait a moment for database commits to complete
+                      console.log('⏳ Waiting 1 second for database commits to complete...');
                       await new Promise(resolve => setTimeout(resolve, 1000));
                       
                       // Capture current cards before refresh to detect new ones
@@ -1671,18 +1699,44 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                       console.log('📊 Current card IDs before refresh:', Array.from(currentCardIds));
                       
                       // Refresh data with the new card (lightweight version to avoid rate limits)
+                      console.log('🔄 Starting fetchUserDataForNewCard...');
                       await fetchUserDataForNewCard('New card added: ');
+                      console.log('✅ fetchUserDataForNewCard completed');
                       
-                      console.log('✅ Dashboard data refreshed with new card');
-                      console.log('📊 Final state after refresh:', {
+                      console.log('📊 Final state after fetchUserDataForNewCard:', {
                         creditCardCount: creditCards.length,
                         billingCycleCount: billingCycles.length,
-                        sharedCardOrderLength: sharedCardOrder.length
+                        sharedCardOrderLength: sharedCardOrder.length,
+                        cardNames: creditCards.map(c => c.name)
                       });
                       
                       // Force a re-render by updating a dummy state
-                      console.log('🔄 Forcing Dashboard re-render...');
+                      console.log('🔄 Forcing Dashboard re-render with state update...');
                       setRefreshProgress(0); // This will trigger a re-render
+                      
+                      // Additional force refresh - trigger multiple state updates to ensure re-render
+                      setTimeout(() => {
+                        console.log('🔄 Additional state update to ensure re-render...');
+                        setRefreshProgress(prev => prev + 1);
+                        setLoading(false); // Make sure loading is off
+                      }, 100);
+                      
+                      // Final fallback: If still not showing after 3 seconds, do a page refresh
+                      setTimeout(() => {
+                        console.log('📊 Final check - are new cards visible?', {
+                          creditCardCount: creditCards.length,
+                          cardNames: creditCards.map(c => c.name)
+                        });
+                        
+                        // If we still don't see the expected cards, do a page refresh as fallback
+                        const currentCardCount = creditCards.length;
+                        if (currentCardCount === 0) {
+                          console.log('⚠️ No cards visible after 3 seconds - doing page refresh as fallback');
+                          window.location.reload();
+                        } else {
+                          console.log('✅ Cards are visible - no page refresh needed');
+                        }
+                      }, 3000);
                       
                       // Clear the recent addition flag after a delay (background sync is handled by fetchUserDataForNewCard)
                       setTimeout(() => {
