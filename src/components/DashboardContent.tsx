@@ -1396,6 +1396,19 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         
         // Step 1: Load cached data immediately for instant UI
         console.log('📦 Step 1: Loading cached data for instant UI...');
+        // Load cached card order first to avoid visual reordering on first paint
+        try {
+          const cachedOrder = localStorage.getItem('cached_card_order');
+          if (cachedOrder) {
+            const order = JSON.parse(cachedOrder);
+            if (Array.isArray(order) && order.length > 0) {
+              setSharedCardOrder(order);
+              console.log('✅ Loaded card order from local cache');
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to read cached card order:', e);
+        }
         const cachedCards = localStorage.getItem('cached_credit_cards');
         const cachedCycles = localStorage.getItem('cached_billing_cycles');
         
@@ -1436,6 +1449,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
               setSharedCardOrder(order);
               orderInitializedRef.current = true;
               console.log('✅ Loaded saved card order from DB:', order);
+              // Mirror to cache for faster next paint
+              try { localStorage.setItem('cached_card_order', JSON.stringify(order)); } catch {}
             }
           }
         } catch (e) {
@@ -1488,6 +1503,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           body: JSON.stringify({ order: sharedCardOrder })
         });
         console.log('💾 Saved card order to DB:', sharedCardOrder);
+        try { localStorage.setItem('cached_card_order', JSON.stringify(sharedCardOrder)); } catch {}
       } catch (e) {
         console.warn('Failed to save card order:', e);
       }

@@ -39,13 +39,14 @@ export async function DELETE(request: NextRequest) {
     console.log(`Removing Plaid connection for ${plaidItem.institution_name} (${itemId})`);
 
     try {
-      // Try to remove the item from Plaid (best effort)
+      // Try to remove the item from Plaid (best effort, with timeout)
       const decryptedAccessToken = decrypt(plaidItem.accessToken);
-      await plaidService.removeItem(decryptedAccessToken);
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Plaid removeItem timeout')), 5000));
+      await Promise.race([plaidService.removeItem(decryptedAccessToken), timeout]);
       console.log('Successfully removed item from Plaid');
-    } catch (plaidError) {
-      console.warn('Failed to remove item from Plaid (continuing with local cleanup):', plaidError.message);
-      // Continue with local cleanup even if Plaid removal fails
+    } catch (plaidError: any) {
+      console.warn('Failed or timed out removing item from Plaid (continuing with local cleanup):', plaidError?.message || plaidError);
+      // Continue with local cleanup even if Plaid removal fails or times out
     }
 
     // Get all credit cards associated with this plaid item before deletion

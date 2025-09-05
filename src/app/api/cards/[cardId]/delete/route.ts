@@ -41,7 +41,8 @@ export async function DELETE(
       if (!otherCards || otherCards.length === 0) {
         // Last card — try to remove item from Plaid backend to revoke access
         const decryptedAccessToken = decrypt((card as any).plaid_items.accessToken);
-        await plaidService.removeItem(decryptedAccessToken);
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Plaid removeItem timeout')), 5000));
+        await Promise.race([plaidService.removeItem(decryptedAccessToken), timeout]);
       }
     } catch (plaidErr) {
       // Continue with local cleanup even if Plaid removal fails
@@ -94,4 +95,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete card', details: error.message }, { status: 500 });
   }
 }
-
