@@ -106,21 +106,69 @@ export async function POST(request: NextRequest) {
       console.log(`📋 Found card: ${card.name} (${card.accountId})`);
     });
 
-    // Skip transaction sync in instant setup to avoid rate limits and OAuth errors
-    // Card will appear immediately with basic data from syncAccounts (balance, due date, etc.)
-    // Dashboard will handle transaction sync and billing cycle calculation in background
-    console.log('⚡ Instant setup complete - returning card with basic data only');
+    // Phase 1.5: Sync recent transactions (3 months) and calculate Recent Billing Cycles for instant visibility
+    console.log('⚡ Phase 1.5: Syncing recent transactions and calculating Recent Billing Cycles...');
+    
+    let recentCyclesCalculated = 0;
+    
+    try {
+      // Brief delay to let database commit from syncAccounts
+      console.log('⏳ Brief delay for database commit before transaction sync...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Sync recent transactions (3 months only for speed)
+      console.log('🔄 Starting recent transaction sync (3 months for instant setup)...');
+      await plaidService.syncRecentTransactions(plaidItem, accessToken);
+      console.log('✅ Recent transactions synced for instant setup');
+      
+      // Brief pause to ensure transactions are stored
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Calculate Recent Billing Cycles (current + most recently closed) for immediate visibility
+      const { calculateCurrentBillingCycle, calculateRecentClosedCycle } = await import('@/utils/billingCycles');
+      for (const card of creditCards || []) {
+        try {
+          console.log(`🔄 Calculating Recent Billing Cycles for ${card.name}...`);
+          
+          // Calculate current open cycle
+          const currentCycle = await calculateCurrentBillingCycle(card.id);
+          if (currentCycle) {
+            recentCyclesCalculated += 1;
+            console.log(`✅ Card ${card.name}: Current billing cycle calculated (${currentCycle.startDate} to ${currentCycle.endDate})`);
+          }
+          
+          // Calculate most recent closed cycle 
+          const recentClosedCycle = await calculateRecentClosedCycle(card.id);
+          if (recentClosedCycle) {
+            recentCyclesCalculated += 1;
+            console.log(`✅ Card ${card.name}: Recent closed billing cycle calculated (${recentClosedCycle.startDate} to ${recentClosedCycle.endDate})`);
+          }
+        } catch (cycleError) {
+          console.error(`❌ Failed to calculate Recent Billing Cycles for ${card.name}:`, cycleError);
+          // Continue - missing cycle data shouldn't block card visibility
+        }
+      }
+      
+      console.log(`⚡ Recent Billing Cycles calculated: ${recentCyclesCalculated} cycles (current + recent closed for each card)`);
+    } catch (recentSyncError) {
+      console.warn('⚠️ Recent transaction sync failed, card will appear without Recent Billing Cycles:', recentSyncError);
+      // Continue - card should still be visible with basic data
+    }
 
-    // No background sync in instant setup - Dashboard will handle all data loading
-    console.log('⚡ Background sync will be handled by Dashboard after card appears');
+    // Phase 2: Schedule comprehensive background sync for full transaction history
+    console.log('⚡ Scheduling comprehensive background sync for full history...');
+    
+    // Note: Comprehensive sync will be handled by Dashboard after card appears
+    // This ensures the card appears immediately with Recent Billing Cycles, then full history loads in background
 
     console.log(`✅ Instant card setup completed: ${creditCards?.length || 0} credit cards found`);
     
     return NextResponse.json({
       success: true,
-      message: 'Instant card setup completed',
-      phase: 'cards_ready',
+      message: 'Instant card setup with Recent Billing Cycles completed',
+      phase: 'cards_with_recent_cycles_ready',
       creditCardsFound: creditCards?.length || 0,
+      recentCyclesCalculated: recentCyclesCalculated || 0,
       backgroundSyncScheduled: true,
       readyForDisplay: true
     });

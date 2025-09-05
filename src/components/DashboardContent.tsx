@@ -379,6 +379,91 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     console.log('✅ Background sync completed for all new cards');
   };
 
+  // Lightweight data fetch for new card additions (skips connection health to avoid rate limits)
+  const fetchUserDataForNewCard = async (logPrefix: string = '') => {
+    if (!isLoggedIn) return;
+    
+    // Get current month date range
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    
+    // Skip connection health check during new card addition to avoid rate limits
+    const [creditCardsRes, billingCyclesRes, transactionsRes] = await Promise.all([
+      fetch('/api/user/credit-cards', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      }),
+      fetch('/api/user/billing-cycles', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      }),
+      fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+    ]);
+
+    if (creditCardsRes.ok) {
+      const { creditCards: cards } = await creditCardsRes.json();
+      const safeCards = Array.isArray(cards) ? cards : [];
+      setCreditCards(safeCards);
+      
+      // Update shared card order to include new cards
+      if (safeCards.length > 0) {
+        const currentCardIds = new Set(sharedCardOrder);
+        const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
+        
+        if (newCards.length > 0) {
+          const newCardIds = newCards.map(card => card.id);
+          const updatedOrder = [...newCardIds, ...sharedCardOrder];
+          setSharedCardOrder(updatedOrder);
+          console.log(`🆕 Adding ${newCards.length} new cards to front of order${logPrefix}:`, {
+            newCardNames: newCards.map(c => c.name),
+            updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
+          });
+          
+          // Start background sync for new cards to load Recent Billing Cycles
+          console.log('🔄 Triggering background sync for new cards to load Recent Billing Cycles');
+          setTimeout(() => {
+            startBackgroundSyncForNewCards(newCards);
+          }, 2000); // Wait 2 seconds for card to be fully visible
+        } else if (sharedCardOrder.length === 0) {
+          const defaultOrder = getDefaultCardOrder(safeCards);
+          setSharedCardOrder(defaultOrder);
+          console.log(`Setting default card order${logPrefix}:`, {
+            cardCount: safeCards.length,
+            defaultOrder,
+            cardNames: defaultOrder.map(id => safeCards.find(c => c.id === id)?.name)
+          });
+        }
+      }
+    }
+
+    if (billingCyclesRes.ok) {
+      const { billingCycles: cycles } = await billingCyclesRes.json();
+      const safeCycles = Array.isArray(cycles) ? cycles : [];
+      setBillingCycles(safeCycles);
+    }
+
+    if (transactionsRes.ok) {
+      const { transactions } = await transactionsRes.json();
+      const safeTransactions = Array.isArray(transactions) ? transactions : [];
+      setCurrentMonthTransactions(safeTransactions);
+    }
+    
+    console.log(`✅ ${logPrefix}Lightweight data loaded successfully (skipped connection health to avoid rate limits)`);
+  };
+
   // Shared data fetching logic used by all sync functions
   const fetchAllUserData = async (logPrefix: string = '') => {
     if (!isLoggedIn) return;
@@ -867,6 +952,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     setCardToDelete(card);
     setShowDeleteConfirm(true);
   };
+  
+  // Helper function to get all cards that share the same plaidItemId
+  const getCardsToBeDeleted = (card: any): any[] => {
+    if (!card?.plaidItem?.itemId) return [card];
+    
+    return creditCards.filter(c => c.plaidItem?.itemId === card.plaidItem.itemId);
+  };
 
   const handleConfirmDelete = async () => {
     if (!cardToDelete) return;
@@ -874,12 +966,24 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     setShowDeleteConfirm(false);
     setIsDeleting(true);
     setDeletionProgress(20);
-    setDeletionStep('Disconnecting from bank...');
+    
+    const cardsToDelete = getCardsToBeDeleted(cardToDelete);
+    const bankName = cardToDelete.plaidItem?.institutionName || 'bank';
+    
+    if (cardsToDelete.length > 1) {
+      setDeletionStep(`Disconnecting from ${bankName}...`);
+    } else {
+      setDeletionStep('Disconnecting from bank...');
+    }
     
     try {
       // Start deletion process
       setDeletionProgress(50);
-      setDeletionStep('Removing card data...');
+      if (cardsToDelete.length > 1) {
+        setDeletionStep(`Removing ${cardsToDelete.length} cards from ${bankName}...`);
+      } else {
+        setDeletionStep('Removing card data...');
+      }
       
       if (cardToDelete.plaidItem) {
         await handleCardRemove(cardToDelete.plaidItem.itemId);
@@ -1490,35 +1594,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                       // Capture current cards before refresh to detect new ones
                       const currentCardIds = new Set(creditCards.map(c => c.id));
                       
-                      // Refresh data with the new card
-                      await fetchDatabaseDataOnly('New card added: ');
+                      // Refresh data with the new card (lightweight version to avoid rate limits)
+                      await fetchUserDataForNewCard('New card added: ');
                       
                       console.log('✅ Dashboard data refreshed with new card');
                       
-                      // Wait a moment, then detect and sync new cards
-                      setTimeout(async () => {
-                        try {
-                          // Get the updated card list to identify new cards
-                          const cardResponse = await fetch('/api/user/credit-cards', {
-                            cache: 'no-store',
-                            headers: { 'Cache-Control': 'no-cache' }
-                          });
-                          
-                          if (cardResponse.ok) {
-                            const { creditCards: updatedCards } = await cardResponse.json();
-                            const newCards = updatedCards.filter(card => !currentCardIds.has(card.id));
-                            
-                            if (newCards.length > 0) {
-                              console.log('🔄 PlaidLink: Starting background sync for new cards:', newCards.map(c => c.name));
-                              await startBackgroundSyncForNewCards(newCards);
-                            }
-                          }
-                        } catch (syncError) {
-                          console.warn('⚠️ Background sync after card addition failed:', syncError);
-                        } finally {
-                          setRecentCardAddition(false);
-                        }
-                      }, 3000); // Wait 3 seconds for card to appear, then start background sync
+                      // Clear the recent addition flag after a delay (background sync is handled by fetchUserDataForNewCard)
+                      setTimeout(() => {
+                        setRecentCardAddition(false);
+                      }, 5000);
                       
                     } catch (error) {
                       console.error('❌ Failed to refresh Dashboard data:', error);
@@ -1727,9 +1811,28 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       {/* Page-level Delete Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showDeleteConfirm}
-        title="Remove Credit Card?"
-        message={`Are you sure you want to remove ${cardToDelete?.name}? This will permanently delete all associated transaction history and cannot be undone.`}
-        confirmText="Yes, Remove Card"
+        title="Remove Credit Card Connection?"
+        message={(() => {
+          if (!cardToDelete) return '';
+          
+          const cardsToDelete = getCardsToBeDeleted(cardToDelete);
+          const bankName = cardToDelete.plaidItem?.institutionName || 'bank';
+          
+          if (cardsToDelete.length > 1) {
+            const cardNames = cardsToDelete.map(c => c.name).join(', ');
+            return `This will remove your entire ${bankName} connection and delete ALL ${cardsToDelete.length} cards: ${cardNames}. All transaction history will be permanently deleted and cannot be undone.`;
+          } else {
+            return `Are you sure you want to remove ${cardToDelete.name}? This will permanently delete all associated transaction history and cannot be undone.`;
+          }
+        })()}
+        confirmText={(() => {
+          if (!cardToDelete) return 'Yes, Remove';
+          
+          const cardsToDelete = getCardsToBeDeleted(cardToDelete);
+          return cardsToDelete.length > 1 
+            ? `Yes, Remove All ${cardsToDelete.length} Cards` 
+            : 'Yes, Remove Card';
+        })()}
         cancelText="Cancel"
         onConfirm={handleConfirmDelete}
         onCancel={() => {
@@ -1750,7 +1853,18 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       {/* Page-level Deletion Success Notification */}
       <SuccessNotification
         isOpen={showDeletionSuccess}
-        message={`${cardToDelete?.name || 'Card'} has been successfully removed`}
+        message={(() => {
+          if (!cardToDelete) return 'Card has been successfully removed';
+          
+          const cardsToDelete = getCardsToBeDeleted(cardToDelete);
+          const bankName = cardToDelete.plaidItem?.institutionName || 'bank';
+          
+          if (cardsToDelete.length > 1) {
+            return `All ${cardsToDelete.length} cards from ${bankName} have been successfully removed`;
+          } else {
+            return `${cardToDelete.name} has been successfully removed`;
+          }
+        })()}
         duration={3000}
         onClose={() => setShowDeletionSuccess(false)}
       />

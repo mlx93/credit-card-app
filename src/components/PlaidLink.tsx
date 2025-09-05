@@ -104,7 +104,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           // Use instant card setup for immediate visibility
           console.log('⚡ Starting instant card setup for itemId:', data.itemId);
           setLoadingMessage('Setting up your card');
-          setLoadingSubMessage('Creating card with essential data...');
+          setLoadingSubMessage('Creating card with Recent Billing Cycles...');
           
           try {
             // Add timeout to instant-card-setup request (60 seconds)
@@ -126,36 +126,72 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               
               // Check if instant setup found credit cards
               if (syncData.success && syncData.creditCardsFound > 0 && syncData.readyForDisplay) {
-                console.log('✅ Verified: Cards are ready for immediate display with essential cycles');
-                setLoadingMessage('Card ready!');
-                setLoadingSubMessage('Your credit card is now available with recent billing cycles! Full history loading in background.');
+                console.log('✅ Verified: Cards are ready for immediate display with Recent Billing Cycles');
                 
-                // Poll the database until the new card is actually available  
-                const pollForNewCard = async () => {
+                if (syncData.recentCyclesCalculated > 0) {
+                  setLoadingMessage('Card ready with Recent Billing Cycles!');
+                } else {
+                  setLoadingMessage('Card ready!');
+                }
+                if (syncData.recentCyclesCalculated > 0) {
+                  setLoadingSubMessage('Your credit card is now available with Recent Billing Cycles! Full history loading in background.');
+                } else {
+                  setLoadingSubMessage('Your credit card is now available! Recent Billing Cycles will load shortly.');
+                }
+                
+                // Poll the database until the new card AND Recent Billing Cycles are available  
+                const pollForNewCardWithCycles = async () => {
                   let attempts = 0;
-                  const maxAttempts = 15; // 15 seconds should be enough with optimized transaction sync
+                  const maxAttempts = 30; // Extended to 30 seconds to wait for Recent Billing Cycles
                   
                   while (attempts < maxAttempts) {
                     try {
-                      console.log(`🔍 Polling attempt ${attempts + 1} for new card data...`);
+                      console.log(`🔍 Polling attempt ${attempts + 1} for new card with Recent Billing Cycles...`);
                       
-                      const response = await fetch('/api/user/credit-cards', {
-                        cache: 'no-store',
-                        headers: {
-                          'Cache-Control': 'no-cache',
-                          'Pragma': 'no-cache'
-                        }
-                      });
+                      const [cardResponse, cyclesResponse] = await Promise.all([
+                        fetch('/api/user/credit-cards', {
+                          cache: 'no-store',
+                          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                        }),
+                        fetch('/api/user/billing-cycles', {
+                          cache: 'no-store',
+                          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                        })
+                      ]);
                       
-                      if (response.ok) {
-                        const { creditCards } = await response.json();
+                      if (cardResponse.ok && cyclesResponse.ok) {
+                        const { creditCards } = await cardResponse.json();
+                        const { billingCycles } = await cyclesResponse.json();
                         const currentCardCount = creditCards?.length || 0;
                         
-                        console.log(`📊 Card count check: initial=${initialCardCount}, current=${currentCardCount}`);
+                        console.log(`📊 Polling check: initial=${initialCardCount}, current=${currentCardCount}, cycles=${billingCycles?.length || 0}`);
                         
-                        // Only proceed if we have MORE cards than we started with
+                        // Check if we have MORE cards than we started with
                         if (currentCardCount > initialCardCount) {
-                          console.log('✅ New card data confirmed in database!');
+                          // Find the new cards
+                          const newCards = creditCards.filter(card => 
+                            !creditCards.slice(0, initialCardCount).some(existingCard => 
+                              existingCard.id === card.id
+                            )
+                          );
+                          
+                          // Check if the new cards have Recent Billing Cycles
+                          const newCardIds = newCards.map(c => c.id);
+                          const cyclesForNewCards = (billingCycles || []).filter(cycle => 
+                            newCardIds.includes(cycle.creditCardId)
+                          );
+                          
+                          if (cyclesForNewCards.length > 0) {
+                            console.log(`✅ New card with Recent Billing Cycles confirmed! ${newCards.length} cards, ${cyclesForNewCards.length} cycles`);
+                          } else if (syncData.recentCyclesCalculated === 0) {
+                            // If instant setup didn't calculate cycles, proceed anyway
+                            console.log('✅ New card confirmed (no Recent Billing Cycles expected from instant setup)');
+                          } else {
+                            console.log(`⏳ New card found but waiting for Recent Billing Cycles... (expected ${syncData.recentCyclesCalculated}, found ${cyclesForNewCards.length})`);
+                            attempts++;
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            continue;
+                          }
                           setLoadingMessage('Card ready!');
                           setLoadingSubMessage('Your new credit card is available! Full transaction history will load in background.');
                           
@@ -195,7 +231,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   }
                 };
                 
-                pollForNewCard();
+                pollForNewCardWithCycles();
               } else if (syncData.error === 'OAUTH_INVALID_TOKEN' || syncData.requiresReauth) {
                 console.warn('⚠️ OAuth authentication required');
                 console.warn('⚠️ Instant setup response:', syncData);
