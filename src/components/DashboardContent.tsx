@@ -1363,7 +1363,21 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           }
         }
         
-        // Step 2: Load fresh database data (no API calls)
+        // Step 2a: Load saved card order from DB
+        try {
+          const orderRes = await fetch('/api/user/credit-cards/order', { cache: 'no-store' });
+          if (orderRes.ok) {
+            const { order } = await orderRes.json();
+            if (Array.isArray(order) && order.length > 0) {
+              setSharedCardOrder(order);
+              console.log('✅ Loaded saved card order from DB:', order);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to load saved card order (will use default):', e);
+        }
+
+        // Step 2b: Load fresh database data (no API calls)
         console.log('📀 Step 2: Loading fresh data from database (no API calls)...');
         await fetchDatabaseDataOnly('Initial load: ');
         
@@ -1396,6 +1410,23 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     
     loadInitialData();
   }, [isLoggedIn]);
+
+  // Persist card order to DB when it changes
+  useEffect(() => {
+    if (!isLoggedIn || !Array.isArray(sharedCardOrder) || sharedCardOrder.length === 0) return;
+    (async () => {
+      try {
+        await fetch('/api/user/credit-cards/order', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order: sharedCardOrder })
+        });
+        console.log('💾 Saved card order to DB:', sharedCardOrder);
+      } catch (e) {
+        console.warn('Failed to save card order:', e);
+      }
+    })();
+  }, [JSON.stringify(sharedCardOrder), isLoggedIn]);
 
   // Auto-close success popup after 5 seconds
   useEffect(() => {

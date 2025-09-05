@@ -30,6 +30,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!plaidItems || plaidItems.length === 0) {
+      // Telemetry: no items
+      await supabaseAdmin.from('user_sync_telemetry').insert({
+        user_id: session.user.id,
+        event: 'daily_sync_check',
+        details: { totalItems: 0, itemsNeedingSync: 0 }
+      }).catch(() => {});
       console.log('🕐 No plaid items found for user');
       return NextResponse.json({
         needsSync: false,
@@ -75,12 +81,29 @@ export async function POST(request: NextRequest) {
     });
 
     if (itemsNeedingSync.length === 0) {
+      // Telemetry: gated (skip)
+      await supabaseAdmin.from('user_sync_telemetry').insert({
+        user_id: session.user.id,
+        event: 'daily_sync_check',
+        details: { totalItems: plaidItems.length, itemsNeedingSync: 0, gated: true }
+      }).catch(() => {});
       return NextResponse.json({
         needsSync: false,
         message: 'All items synced within the past 12 hours',
         totalItems: plaidItems.length
       });
     }
+
+    // Telemetry: needs sync
+    await supabaseAdmin.from('user_sync_telemetry').insert({
+      user_id: session.user.id,
+      event: 'daily_sync_check',
+      details: {
+        totalItems: plaidItems.length,
+        itemsNeedingSync: itemsNeedingSync.length,
+        items: itemsNeedingSync.map(i => ({ itemId: i.itemId, lastSyncAt: i.lastSyncAt }))
+      }
+    }).catch(() => {});
 
     return NextResponse.json({
       needsSync: true,

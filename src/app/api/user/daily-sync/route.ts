@@ -46,6 +46,12 @@ export async function POST(request: NextRequest) {
     console.log(`🌅 Daily sync: ${itemsNeedingSync.length}/${plaidItems.length} items need sync`);
 
     if (itemsNeedingSync.length === 0) {
+      // Telemetry: no-op run
+      await supabaseAdmin.from('user_sync_telemetry').insert({
+        user_id: session.user.id,
+        event: 'daily_sync_run',
+        details: { itemsProcessed: 0 }
+      }).catch(() => {});
       return NextResponse.json({
         success: true,
         message: 'All items already synced today',
@@ -113,6 +119,13 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`🌅 Daily sync completed: ${successCount}/${itemsNeedingSync.length} items synced successfully`);
+
+    // Telemetry: run summary
+    await supabaseAdmin.from('user_sync_telemetry').insert({
+      user_id: session.user.id,
+      event: 'daily_sync_run',
+      details: { totalItems: plaidItems.length, itemsProcessed: itemsNeedingSync.length, itemsSynced: successCount }
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,
