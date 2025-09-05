@@ -480,7 +480,8 @@ function SortableCard({
   isExpanded, 
   onToggleExpand,
   allCycles,
-  compactMode = false
+  compactMode = false,
+  olderLoading = false
 }: {
   cardName: string;
   cardCycles: BillingCycle[];
@@ -490,6 +491,7 @@ function SortableCard({
   onToggleExpand: () => void;
   allCycles: BillingCycle[];
   compactMode?: boolean;
+  olderLoading?: boolean;
 }) {
   const {
     attributes,
@@ -518,6 +520,7 @@ function SortableCard({
         allCycles={allCycles}
         dragHandleProps={{ ...attributes, ...listeners }}
         compactMode={compactMode}
+        olderLoading={olderLoading}
       />
     </div>
   );
@@ -660,6 +663,7 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
             const card = cards.find(c => c.name === cardName);
             const colorIndex = getCardColorIndex(cardName, card?.id);
             const isExpanded = expandedCards.has(cardName);
+            const olderLoading = card ? olderCyclesLoadingIds.includes(card.id) : false;
 
             return (
               <SortableCard
@@ -672,6 +676,7 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
                 onToggleExpand={() => toggleCardExpansion(cardName)}
                 allCycles={cycles}
                 compactMode={compactMode}
+                olderLoading={olderLoading}
               />
             );
           })}
@@ -691,7 +696,8 @@ function CardContent({
   onToggleExpand,
   allCycles,
   dragHandleProps,
-  compactMode = false
+  compactMode = false,
+  olderLoading = false
 }: {
   cardName: string;
   cardCycles: BillingCycle[];
@@ -702,6 +708,7 @@ function CardContent({
   allCycles: BillingCycle[];
   dragHandleProps?: any;
   compactMode?: boolean;
+  olderLoading?: boolean;
 }) {
   // Sort cycles by end date (newest first) to properly identify recent cycles
   const sortedCycles = [...cardCycles].sort((a, b) => 
@@ -884,30 +891,28 @@ function CardContent({
                   onToggleExpand: typeof onToggleExpand
                 });
                 // Disable expand while historical data is still loading for this card
-                const cardId = card?.id;
-                const loading = cardId ? olderCyclesLoadingIds.includes(cardId) : false;
-                if (!loading) onToggleExpand();
+                if (!olderLoading) onToggleExpand();
               }}
-              disabled={(() => { const id = card?.id; return id ? olderCyclesLoadingIds.includes(id) : false; })()}
+              disabled={olderLoading}
               className={`group relative inline-flex items-center text-sm px-3 py-2 rounded-lg border transition-all duration-300 mb-3 ml-6 mr-4 shadow-sm backdrop-blur-sm ${
-                card && olderCyclesLoadingIds.includes(card.id)
+                olderLoading
                   ? 'text-gray-600 bg-gradient-to-r from-gray-200/80 to-gray-300/80 border-gray-300 cursor-not-allowed'
                   : 'text-gray-500 hover:text-gray-700 bg-gradient-to-r from-gray-50/80 to-white/90 hover:from-gray-100/90 hover:to-gray-50/80 border-gray-100 hover:border-gray-200 hover:shadow-md'
               }`}
             >
               <div className={`flex items-center justify-center w-5 h-5 rounded-full mr-2 transition-all duration-300 ${
-                card && olderCyclesLoadingIds.includes(card.id)
+                olderLoading
                   ? 'bg-gradient-to-br from-gray-300 to-gray-400'
                   : 'bg-gradient-to-br from-gray-200 to-gray-300 group-hover:from-gray-300 group-hover:to-gray-400'
               } ${isExpanded ? 'rotate-90' : ''}`}>
-                {card && olderCyclesLoadingIds.includes(card.id) ? (
+                {olderLoading ? (
                   <History className="h-3 w-3 text-gray-700 animate-spin" />
                 ) : (
                   <ChevronRight className="h-3 w-3 text-gray-600 group-hover:text-gray-700" />
                 )}
               </div>
               <span className="font-medium">
-                {card && olderCyclesLoadingIds.includes(card.id)
+                {olderLoading
                   ? `${historical.length} older cycles (loading history...)`
                   : `${historical.length} older cycle${historical.length !== 1 ? 's' : ''}`}
               </span>
