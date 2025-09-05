@@ -1425,12 +1425,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         }
         
         // Step 2a: Load saved card order from DB
+        let loadedOrder: string[] | undefined = undefined;
         try {
           const orderRes = await fetch('/api/user/credit-cards/order', { cache: 'no-store' });
           if (orderRes.ok) {
             const { order } = await orderRes.json();
             if (Array.isArray(order) && order.length > 0) {
+              loadedOrder = order;
               setSharedCardOrder(order);
+              orderInitializedRef.current = true;
               console.log('✅ Loaded saved card order from DB:', order);
             }
           }
@@ -1440,7 +1443,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
 
         // Step 2b: Load fresh database data (no API calls)
         console.log('📀 Step 2: Loading fresh data from database (no API calls)...');
-        await fetchDatabaseDataOnly('Initial load: ');
+        await fetchDatabaseDataOnly('Initial load: ', loadedOrder);
         
         // Step 3: Check if daily sync needed (12-hour window, for active users only)
         // Delay the sync check to avoid immediate API calls on page load
@@ -1475,6 +1478,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   // Persist card order to DB when it changes
   useEffect(() => {
     if (!isLoggedIn || !Array.isArray(sharedCardOrder) || sharedCardOrder.length === 0) return;
+    if (!orderInitializedRef.current) return; // don't save until initial order decided
     (async () => {
       try {
         await fetch('/api/user/credit-cards/order', {
