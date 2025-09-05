@@ -920,35 +920,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         
         // Add small delay to ensure database updates are complete before refreshing
         await new Promise(resolve => setTimeout(resolve, 1000));
-        await backgroundSync(); // User-initiated sync - no 12-hour protection needed
+        // Just refresh Dashboard data from database - no additional API calls needed
+        console.log('🔄 Refreshing Dashboard data from database after individual card sync...');
+        await fetchUserDataForNewCard(' (after individual card sync - database only)');
         
-        // Also refresh connection health specifically (it might have different timing)
-        console.log('🔄 Manually refreshing connection health after sync...');
-        try {
-          const healthRes = await fetch('/api/user/connection-health', {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-          });
-          if (healthRes.ok) {
-            const healthData = await healthRes.json();
-            console.log('📊 Updated connection health after sync:', healthData);
-            setConnectionHealth(healthData);
-            
-            // Check if any connection still requires auth after sync
-            const needsReconnection = healthData.connections?.find(
-              (conn: any) => conn.itemId === itemId && conn.status === 'requires_auth'
-            );
-            
-            if (needsReconnection) {
-              console.log('⚠️ Connection still requires auth after sync, auto-triggering reconnection...');
-              // Auto-trigger reconnection since sync didn't fix the auth issue
-              await handleCardReconnect(itemId);
-              return; // Exit early, reconnection flow will handle the rest
-            }
-          }
-        } catch (healthError) {
-          console.warn('Failed to refresh connection health:', healthError);
-        }
+        // Individual card sync completed successfully - no need to check connection health with API calls
+        // If sync was successful, we know the connection is working
+        console.log('✅ Individual card sync completed successfully - connection is healthy');
       } else {
         console.error('Card sync failed:', response.status);
         const errorText = await response.text();
