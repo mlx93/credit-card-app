@@ -127,17 +127,9 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               // Check if instant setup found credit cards
               if (syncData.success && syncData.creditCardsFound > 0 && syncData.readyForDisplay) {
                 console.log('✅ Verified: Cards are ready for immediate display with Recent Billing Cycles');
-                
-                if (syncData.recentCyclesCalculated > 0) {
-                  setLoadingMessage('Card ready with Recent Billing Cycles!');
-                } else {
-                  setLoadingMessage('Card ready!');
-                }
-                if (syncData.recentCyclesCalculated > 0) {
-                  setLoadingSubMessage('Your credit card is now available with Recent Billing Cycles! Full history loading in background.');
-                } else {
-                  setLoadingSubMessage('Your credit card is now available! Recent Billing Cycles will load shortly.');
-                }
+                // Show more accurate status while we confirm recent cycles are persisted
+                setLoadingMessage('Getting recent billing cycles');
+                setLoadingSubMessage('Your card is almost ready. Loading older history in the background…');
                 
                 // Poll the database until the new card AND Recent Billing Cycles are available  
                 const pollForNewCardWithCycles = async () => {
@@ -181,7 +173,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                           
                           console.log(`✅ New card confirmed! Cycles: ${billingCycles?.length || 0}`);
                           setLoadingMessage('Card ready!');
-                          setLoadingSubMessage('Your new credit card is available! Full transaction history will load in background.');
+                          setLoadingSubMessage('Full transaction history will continue loading in the background.');
                           
                           // Defer hiding the overlay until parent onSuccess finishes updating the dashboard
                           console.log('🎯 PlaidLink: Database confirmed new card - awaiting parent onSuccess to finish refresh');

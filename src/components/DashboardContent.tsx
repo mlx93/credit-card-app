@@ -63,6 +63,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const orderInitializedRef = typeof window === 'undefined' ? { current: false } as any : (window as any).__orderInitRef || { current: false };
   if (typeof window !== 'undefined') { (window as any).__orderInitRef = orderInitializedRef; }
   const [visualRefreshingIds, setVisualRefreshingIds] = useState<string[]>([]);
+  const [historyRefreshingIds, setHistoryRefreshingIds] = useState<string[]>([]);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
     institutionName: string;
@@ -1821,6 +1822,31 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                               setTimeout(() => {
                                 setVisualRefreshingIds(prev => prev.filter(id => !newCardsForItem.includes(id)));
                               }, 30000);
+
+                              // Also mark older cycles as loading; poll DB-only for completion
+                              setHistoryRefreshingIds(prev => Array.from(new Set([...prev, ...newCardsForItem])));
+                              // Start lightweight polling to see when more than 2 cycles are present
+                              const start = Date.now();
+                              const poll = async () => {
+                                try {
+                                  const cyclesRes = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
+                                  if (cyclesRes.ok) {
+                                    const { billingCycles } = await cyclesRes.json();
+                                    const doneIds: string[] = [];
+                                    for (const cardId of newCardsForItem) {
+                                      const count = (billingCycles || []).filter((bc: any) => bc.creditCardId === cardId).length;
+                                      if (count > 2) doneIds.push(cardId);
+                                    }
+                                    if (doneIds.length > 0) {
+                                      setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
+                                    }
+                                    if (Date.now() - start < 120000 && doneIds.length < newCardsForItem.length) {
+                                      setTimeout(poll, 5000);
+                                    }
+                                  }
+                                } catch {}
+                              };
+                              setTimeout(poll, 5000);
                             }
                           }
                         }
@@ -1971,6 +1997,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                 initialCardOrder={sharedCardOrder}
                 onOrderChange={setSharedCardOrder}
                 visualRefreshingIds={visualRefreshingIds}
+                olderCyclesLoadingIds={historyRefreshingIds}
               />
             </div>
           ) : isLoggedIn ? (
