@@ -1228,7 +1228,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     
     try {
-      const [creditCardsRes, billingCyclesRes, transactionsRes, connectionHealthRes] = await Promise.all([
+      const [creditCardsRes, billingCyclesRes, transactionsRes] = await Promise.all([
         fetch('/api/user/credit-cards', {
           cache: 'no-store',
           headers: {
@@ -1244,13 +1244,6 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           }
         }),
         fetch(`/api/user/transactions?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=1000`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }),
-        fetch('/api/user/connection-health', {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
@@ -1304,11 +1297,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         setCurrentMonthTransactions(safeTransactions);
       }
 
-      if (connectionHealthRes.ok) {
-        const healthData = await connectionHealthRes.json();
-        console.log(`📊 Connection health data loaded from database${logPrefix}:`, healthData);
-        setConnectionHealth(healthData);
-      }
+      // Intentionally skip live Plaid connection-health checks on initial load to avoid unnecessary API calls
+      // We'll only fetch connection health during explicit user actions (e.g., Refresh All) to control costs.
       
       console.log(`✅ ${logPrefix}Database data loaded successfully`);
     } catch (error) {
