@@ -244,6 +244,7 @@ export function HorizontalCardColumns({
   onCreditLimitUpdated 
 }: HorizontalCardColumnsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
+  const [userReordered, setUserReordered] = useState(false);
   // Initialize with all cards expanded by default
   const [expandedCards, setExpandedCards] = useState<Set<string>>(() => {
     // On initial render, expand all cards
@@ -328,9 +329,23 @@ export function HorizontalCardColumns({
       
       const newOrder = arrayMove(cardOrder, oldIndex, newIndex);
       setCardOrder(newOrder);
+      setUserReordered(true);
       onOrderChange?.(newOrder);
     }
   };
+
+  // If parent provides a new authoritative order (e.g., loaded from DB at init),
+  // and the user hasn't manually reordered yet in this session, adopt it.
+  useEffect(() => {
+    if (!initialCardOrder || initialCardOrder.length === 0) return;
+    const sameLength = initialCardOrder.length === cardOrder.length;
+    const sameOrder = sameLength && initialCardOrder.every((id, i) => id === cardOrder[i]);
+    const sameSet = initialCardOrder.every(id => cardOrder.includes(id)) && cardOrder.every(id => initialCardOrder.includes(id));
+    if (!userReordered && (!sameOrder || !sameLength) && sameSet) {
+      setCardOrder(initialCardOrder);
+      onOrderChange?.(initialCardOrder);
+    }
+  }, [JSON.stringify(initialCardOrder)]);
 
   const toggleCardExpansion = (cardId: string) => {
     setExpandedCards(prev => {

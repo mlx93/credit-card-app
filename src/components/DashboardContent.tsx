@@ -1412,6 +1412,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             if (sharedCardOrder.length === 0) {
               const defaultOrder = getDefaultCardOrder(cards);
               setSharedCardOrder(defaultOrder);
+              orderInitializedRef.current = true;
             }
           }
         }
