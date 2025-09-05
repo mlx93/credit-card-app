@@ -351,9 +351,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
     
     try {
-      console.log('🌅 Checking if daily sync needed...');
+      console.log('🌅 Checking if daily sync needed for active user...');
+      console.log('🌅 User activity validation: Currently logged in and has been on Dashboard for 2+ seconds');
       
-      // Check if daily sync is needed
+      // Check if daily sync is needed (12-hour window, active users only)
       const syncCheckResponse = await fetch('/api/user/daily-sync-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
@@ -364,13 +365,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         console.log('🌅 Daily sync check result:', syncCheck);
         
         if (syncCheck.needsSync) {
-          console.log(`🌅 Daily sync needed for ${syncCheck.itemsNeedingSyncCount} items`);
-          console.log('🌅 Starting background daily sync...');
+          console.log(`🌅 Sync needed for ${syncCheck.itemsNeedingSyncCount} items (not updated in 12+ hours)`);
+          console.log('🌅 Starting background sync for active user...');
           
-          // Perform daily sync in background (don't await - let it run async)
+          // Perform sync in background (don't await - let it run async) 
           performBackgroundDailySync();
         } else {
-          console.log('🌅 No daily sync needed - all items current');
+          console.log('🌅 No sync needed - all items synced within past 12 hours');
         }
       } else {
         console.warn('⚠️ Daily sync check failed, skipping automatic sync');
@@ -919,7 +920,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         
         // Add small delay to ensure database updates are complete before refreshing
         await new Promise(resolve => setTimeout(resolve, 1000));
-        await backgroundSync(); // Refresh data after sync
+        await backgroundSync(); // User-initiated sync - no 12-hour protection needed
         
         // Also refresh connection health specifically (it might have different timing)
         console.log('🔄 Manually refreshing connection health after sync...');
@@ -1342,17 +1343,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     if (!isLoggedIn) return;
 
     try {
-      // First check if it's time for scheduled sync
-      if (isScheduledSyncTime()) {
-        console.log('🕘 Starting scheduled sync...');
-        
-        // Mark that we've performed the scheduled sync
-        localStorage.setItem('lastScheduledSync', new Date().toISOString());
-        
-        // Perform background sync
-        await backgroundSync();
-        return; // Exit early after scheduled sync
-      }
+      // Note: Scheduled sync is now handled by performDailySyncCheck() with 12-hour protection
+      // This old time-based sync logic has been removed to prevent duplicate syncs
 
       // For initial load, just load from database - no health checking that might trigger syncs
       console.log('✅ Initial load complete - database data available. Use "Refresh All" for latest API data.');
@@ -1402,11 +1394,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         console.log('📀 Step 2: Loading fresh data from database (no API calls)...');
         await fetchDatabaseDataOnly('Initial load: ');
         
-        // Step 3: Check if daily sync needed (once per day, first login only)
-        console.log('🌅 Step 3: Checking if daily sync needed...');
+        // Step 3: Check if daily sync needed (12-hour window, for active users only)
+        // Delay the sync check to avoid immediate API calls on page load
+        console.log('🌅 Step 3: Checking if daily sync needed (12-hour window for active users)...');
         setTimeout(() => {
           performDailySyncCheck();
-        }, 100);
+        }, 2000); // Increased delay to 2 seconds to ensure user is actively using the app
         
         console.log('✅ Initial data load complete - showing most recent database data');
         

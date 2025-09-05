@@ -13,6 +13,10 @@ export async function POST(request: NextRequest) {
 
     console.log('🕐 Daily sync check for user:', session.user.id);
 
+    // User activity check: Since they're logged in and making this request, they're active
+    // This API is only called when the user loads the Dashboard, so we know they're actively using the app
+    console.log('🕐 User activity: Active (currently logged in and using the Dashboard)');
+
     // Get all user's plaid items and their last sync dates
     const { data: plaidItems, error } = await supabaseAdmin
       .from('plaid_items')
@@ -33,19 +37,35 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check if any items need daily sync (haven't been synced today)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
+    // Check if any items need sync (haven't been synced in the past 12 hours)
+    // Only sync for active users who have logged in, and only if cards need updating
+    const now = new Date();
+    const twelveHoursAgo = new Date(now.getTime() - (12 * 60 * 60 * 1000)); // 12 hours ago
+    
+    console.log('🕐 Sync timing check:', {
+      currentTime: now.toISOString(),
+      twelveHoursAgo: twelveHoursAgo.toISOString(),
+      message: 'Only syncing cards that havent been updated in the past 12 hours'
+    });
 
     const itemsNeedingSync = plaidItems.filter(item => {
       if (!item.lastSyncAt) {
+        console.log(`🕐 Item ${item.institutionName}: Never synced - needs sync`);
         return true; // Never synced
       }
       
       const lastSync = new Date(item.lastSyncAt);
-      lastSync.setHours(0, 0, 0, 0); // Start of last sync day
+      const needsSync = lastSync < twelveHoursAgo; // Last sync was more than 12 hours ago
       
-      return lastSync < today; // Last sync was before today
+      if (needsSync) {
+        const hoursSinceSync = Math.round((now.getTime() - lastSync.getTime()) / (1000 * 60 * 60));
+        console.log(`🕐 Item ${item.institutionName}: Last synced ${hoursSinceSync}h ago - needs sync`);
+      } else {
+        const hoursSinceSync = Math.round((now.getTime() - lastSync.getTime()) / (1000 * 60 * 60));
+        console.log(`🕐 Item ${item.institutionName}: Last synced ${hoursSinceSync}h ago - recent enough, skipping`);
+      }
+      
+      return needsSync;
     });
 
     console.log(`🕐 Daily sync check results:`, {
@@ -57,14 +77,14 @@ export async function POST(request: NextRequest) {
     if (itemsNeedingSync.length === 0) {
       return NextResponse.json({
         needsSync: false,
-        message: 'All items synced today',
+        message: 'All items synced within the past 12 hours',
         totalItems: plaidItems.length
       });
     }
 
     return NextResponse.json({
       needsSync: true,
-      message: `${itemsNeedingSync.length} items need daily sync`,
+      message: `${itemsNeedingSync.length} items need sync (not updated in 12+ hours)`,
       itemsToSync: itemsNeedingSync.map(item => ({
         itemId: item.itemId,
         institutionName: item.institutionName,

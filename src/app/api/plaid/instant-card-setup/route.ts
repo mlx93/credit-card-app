@@ -161,7 +161,19 @@ export async function POST(request: NextRequest) {
     // Note: Comprehensive sync will be handled by Dashboard after card appears
     // This ensures the card appears immediately with Recent Billing Cycles, then full history loads in background
 
+    // Update plaid item to mark it as synced (so it doesn't show as "never synced")
+    await supabaseAdmin
+      .from('plaid_items')
+      .update({
+        status: 'active',
+        lastSyncAt: new Date().toISOString(),
+        errorCode: null,
+        errorMessage: null
+      })
+      .eq('itemId', itemId);
+
     console.log(`✅ Instant card setup completed: ${creditCards?.length || 0} credit cards found`);
+    console.log('✅ Marked plaid item as synced to prevent "never synced" status');
     
     return NextResponse.json({
       success: true,
