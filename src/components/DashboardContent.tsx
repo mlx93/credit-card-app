@@ -987,6 +987,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   };
 
   const handleRequestDelete = (card: any) => {
+    console.log('🗑️ handleRequestDelete called with card:', {
+      cardId: card.id,
+      cardName: card.name,
+      plaidItem: card.plaidItem,
+      plaidItemId: card.plaidItemId
+    });
     setCardToDelete(card);
     setShowDeleteConfirm(true);
   };
@@ -1023,8 +1029,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         setDeletionStep('Removing card data...');
       }
       
-      if (cardToDelete.plaidItem) {
+      if (cardToDelete.plaidItem?.itemId) {
+        console.log('🗑️ Calling handleCardRemove with itemId:', cardToDelete.plaidItem.itemId);
         await handleCardRemove(cardToDelete.plaidItem.itemId);
+      } else {
+        console.error('🗑️ ERROR: cardToDelete.plaidItem is missing!', {
+          cardToDelete,
+          plaidItem: cardToDelete.plaidItem
+        });
+        throw new Error('Cannot delete card: Missing Plaid connection information');
       }
       
       setDeletionProgress(100);
@@ -1492,7 +1505,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   // Persist card order to DB when it changes
   useEffect(() => {
     if (!isLoggedIn || !Array.isArray(sharedCardOrder) || sharedCardOrder.length === 0) return;
-    if (!orderInitializedRef.current) return; // don't save until initial order decided
+    if (!orderInitializedRef.current) {
+      // If we have cards and an order, mark as initialized
+      if (creditCards.length > 0 && sharedCardOrder.length > 0) {
+        orderInitializedRef.current = true;
+        console.log('📝 Order initialized due to manual change');
+      } else {
+        return; // don't save until initial order decided
+      }
+    }
     (async () => {
       try {
         await fetch('/api/user/credit-cards/order', {

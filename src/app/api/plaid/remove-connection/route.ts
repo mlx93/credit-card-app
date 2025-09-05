@@ -6,20 +6,26 @@ import { plaidService } from '@/services/plaid';
 import { decrypt } from '@/lib/encryption';
 
 export async function DELETE(request: NextRequest) {
+  console.log('🗑️ DELETE /api/plaid/remove-connection called');
+  
   try {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id) {
+      console.error('🗑️ Unauthorized - no session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { itemId } = await request.json();
+    console.log('🗑️ Received itemId:', itemId);
 
     if (!itemId) {
+      console.error('🗑️ No itemId provided');
       return NextResponse.json({ error: 'Item ID is required' }, { status: 400 });
     }
 
     // Find the Plaid item and verify ownership
+    console.log('🗑️ Looking up plaid item for user:', session.user.id);
     const { data: plaidItem, error } = await supabaseAdmin
       .from('plaid_items')
       .select('*')
@@ -28,11 +34,12 @@ export async function DELETE(request: NextRequest) {
       .single();
     
     if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching plaid item:', error);
-      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+      console.error('🗑️ Error fetching plaid item:', error);
+      return NextResponse.json({ error: 'Database error', details: error.message }, { status: 500 });
     }
 
     if (!plaidItem) {
+      console.error('🗑️ Plaid item not found for itemId:', itemId);
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
@@ -63,21 +70,9 @@ export async function DELETE(request: NextRequest) {
     const creditCardIds = (creditCards || []).map(card => card.id);
     console.log(`Found ${creditCardIds.length} credit cards to delete:`, creditCardIds);
 
-    // Prefer transactional deletion via RPC if available
-    let didUseRPC = false;
-    try {
-      const { data: rpcResult, error: rpcError } = await supabaseAdmin
-        .rpc('delete_plaid_item_and_data', { p_plaid_item_id: plaidItem.id });
-      if (!rpcError) {
-        console.log('RPC delete_plaid_item_and_data executed successfully:', rpcResult);
-        didUseRPC = true;
-      } else {
-        console.log('RPC delete_plaid_item_and_data unavailable or failed, falling back to manual deletion:', rpcError.message);
-      }
-    } catch (rpcErr: any) {
-      console.warn('RPC deletion attempt threw an exception, falling back to manual deletion:', rpcErr?.message);
-    }
-
+    // Skip RPC functions for now - use direct deletion which is more reliable
+    const didUseRPC = false;
+    
     if (!didUseRPC) {
       // Step 1: Delete related data explicitly to ensure complete cleanup
       if (creditCardIds.length > 0) {
