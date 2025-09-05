@@ -8,8 +8,10 @@ interface ConfirmationDialogProps {
   title: string;
   message: string;
   confirmText?: string;
+  secondConfirmText?: string;
   cancelText?: string;
   onConfirm: () => void;
+  onSecondConfirm?: () => void;
   onCancel: () => void;
   type?: 'danger' | 'warning' | 'info';
 }
@@ -19,8 +21,10 @@ export function ConfirmationDialog({
   title,
   message,
   confirmText = 'Confirm',
+  secondConfirmText,
   cancelText = 'Cancel',
   onConfirm,
+  onSecondConfirm,
   onCancel,
   type = 'danger'
 }: ConfirmationDialogProps) {
@@ -66,16 +70,24 @@ export function ConfirmationDialog({
         </div>
         
         {/* Actions */}
-        <div className="flex gap-3 mt-6">
+        <div className={`grid gap-3 mt-6 ${secondConfirmText ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <button
             onClick={onCancel}
-            className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            className="py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             {cancelText}
           </button>
+          {secondConfirmText && onSecondConfirm && (
+            <button
+              onClick={onSecondConfirm}
+              className="py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-medium rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+            >
+              {secondConfirmText}
+            </button>
+          )}
           <button
             onClick={onConfirm}
-            className={`flex-1 py-3 px-4 text-white font-medium rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${style.confirmButton}`}
+            className={`py-3 px-4 text-white font-medium rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${style.confirmButton}`}
           >
             {confirmText}
           </button>

@@ -123,6 +123,7 @@ interface DueDateCardProps {
   onRemove?: (itemId: string) => void;
   onRequestDelete?: (card: CreditCardInfo) => void;
   onSync?: (itemId: string) => void;
+  forceRefreshing?: boolean; // visual spinner without triggering sync
   onCreditLimitUpdated?: (data: {
     newLimit: number;
     previousLimit: number | null;
@@ -163,6 +164,7 @@ function SortableDueDateCard({
   onReconnect,
   onRemove,
   onSync,
+  forceRefreshing,
   onCreditLimitUpdated
 }: DueDateCardProps) {
   const {
@@ -189,6 +191,7 @@ function SortableDueDateCard({
         onRemove={onRemove}
         onRequestDelete={onRequestDelete}
         onSync={onSync}
+        forceRefreshing={forceRefreshing}
         onCreditLimitUpdated={onCreditLimitUpdated}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
@@ -333,6 +336,7 @@ export function DueDateCard({
   onRemove, 
   onRequestDelete,
   onSync,
+  forceRefreshing,
   onCreditLimitUpdated,
   dragHandleProps 
 }: DueDateCardProps & { dragHandleProps?: any }) {
@@ -700,11 +704,12 @@ export function DueDateCard({
                 title={
                   syncing ? "Syncing data..." :
                   reconnecting ? "Opening reconnection..." :
+                  forceRefreshing ? "Loading full history..." :
                   hasConnectionIssue ? "Reconnect account" :
                   "Refresh data"
                 }
               >
-                {syncing || reconnecting ? (
+                {syncing || reconnecting || forceRefreshing ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
                 ) : hasConnectionIssue ? (
                   <ExternalLink className="h-4 w-4" />

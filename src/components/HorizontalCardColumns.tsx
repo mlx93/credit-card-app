@@ -73,6 +73,7 @@ interface HorizontalCardColumnsProps {
   onRequestDelete?: (card: any) => void;
   initialCardOrder?: string[];
   onOrderChange?: (cardOrder: string[]) => void;
+  visualRefreshingIds?: string[];
   onCreditLimitUpdated?: (data: {
     newLimit: number;
     previousLimit: number | null;
@@ -239,6 +240,7 @@ export function HorizontalCardColumns({
   onRequestDelete,
   initialCardOrder, 
   onOrderChange,
+  visualRefreshingIds,
   onCreditLimitUpdated 
 }: HorizontalCardColumnsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
@@ -468,6 +470,8 @@ export function HorizontalCardColumns({
                       onRemove={onRemove}
                       onRequestDelete={onRequestDelete}
                       onCreditLimitUpdated={onCreditLimitUpdated}
+                      // Visual spinner for background historical load
+                      forceRefreshing={visualRefreshingIds?.includes(card.id)}
                       colorIndex={colorIndex}
                       billingCycleGradient={getBillingCycleGradient(colorIndex)}
                     />

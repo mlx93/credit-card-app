@@ -7,7 +7,7 @@ import { CreditCard, Loader2 } from 'lucide-react';
 import { LoadingOverlay } from './LoadingOverlay';
 
 interface PlaidLinkProps {
-  onSuccess?: () => void;
+  onSuccess?: (ctx?: { itemId?: string }) => Promise<void> | void;
 }
 
 export function PlaidLink({ onSuccess }: PlaidLinkProps) {
@@ -187,7 +187,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                           console.log('🎯 PlaidLink: Database confirmed new card - awaiting parent onSuccess to finish refresh');
                           if (onSuccess) {
                             try {
-                              await onSuccess();
+                              await onSuccess({ itemId: data.itemId });
                             } catch (cbErr) {
                               console.warn('onSuccess callback error:', cbErr);
                             }
@@ -216,7 +216,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   setLoadingSubMessage('Loading your dashboard');
                   if (onSuccess) {
                     try {
-                      await onSuccess();
+                      await onSuccess({ itemId: data.itemId });
                     } catch (cbErr) {
                       console.warn('onSuccess callback error:', cbErr);
                     }
@@ -262,7 +262,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               console.log('🎯 PlaidLink: Instant setup had issues, awaiting onSuccess to show what we have...');
               if (onSuccess) {
                 try {
-                  await onSuccess();
+                  await onSuccess({ itemId: data.itemId });
                 } catch (cbErr) {
                   console.warn('onSuccess callback error:', cbErr);
                 }
@@ -287,7 +287,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
             console.log('🎯 PlaidLink: Card connected (sync failed), awaiting onSuccess...');
             if (onSuccess) {
               try {
-                await onSuccess();
+                await onSuccess({ itemId: data.itemId });
               } catch (cbErr) {
                 console.warn('onSuccess callback error:', cbErr);
               }

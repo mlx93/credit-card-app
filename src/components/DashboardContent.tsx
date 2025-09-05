@@ -59,6 +59,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const [recentCardAddition, setRecentCardAddition] = useState(false);
   const [cardDeletionInProgress, setCardDeletionInProgress] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
+  const [visualRefreshingIds, setVisualRefreshingIds] = useState<string[]>([]);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
     institutionName: string;
@@ -1056,6 +1057,61 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
   };
 
+  // Delete only the selected card (not the whole connection)
+  const handleConfirmDeleteSingle = async () => {
+    if (!cardToDelete) return;
+
+    setShowDeleteConfirm(false);
+    setIsDeleting(true);
+    setDeletionProgress(20);
+    setDeletionStep('Removing this card...');
+
+    try {
+      // Optimistic UI updates for a single card
+      const removedCardId = cardToDelete.id;
+      setCreditCards(prev => prev.filter(c => c.id !== removedCardId));
+      setBillingCycles(prev => prev.filter(cycle => cycle.creditCardId !== removedCardId));
+      setSharedCardOrder(prev => prev.filter(id => id !== removedCardId));
+
+      setDeletionProgress(50);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const response = await fetch(`/api/cards/${removedCardId}/delete`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.error('Single-card delete failed with status', response.status);
+        await fetchUserData(); // revert optimistic
+        throw new Error('Failed to delete card');
+      }
+
+      setDeletionProgress(100);
+      setDeletionStep('Complete!');
+
+      await fetchDatabaseDataOnly(' Post single delete verify: ');
+      setTimeout(() => {
+        setIsDeleting(false);
+        setDeletionProgress(0);
+        setDeletionStep('');
+        setShowDeletionSuccess(true);
+        setCardToDelete(null);
+      }, 500);
+    } catch (error) {
+      console.error('Error removing single card:', error);
+      setIsDeleting(false);
+      setDeletionProgress(0);
+      setDeletionStep('');
+      setTimeout(() => {
+        setCardToDelete(null);
+      }, 3000);
+    }
+  };
+
   const handleCardRemove = async (itemId: string) => {
     try {
       const cardToRemove = creditCards.find(card => card.plaidItem?.itemId === itemId);
@@ -1673,7 +1729,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     )}
                   </button>
                   
-                  <PlaidLink onSuccess={async () => {
+                  <PlaidLink onSuccess={async (ctx) => {
                     console.log('🎯🎯🎯 DashboardContent: PlaidLink onSuccess CALLBACK TRIGGERED 🎯🎯🎯');
                     console.log('📊 Current state before refresh:', {
                       creditCardCount: creditCards.length,
@@ -1707,6 +1763,26 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                         cardNames: creditCards.map(c => c.name)
                       });
                       
+                      // Mark newly added cards (by itemId) as visually refreshing
+                      try {
+                        if (ctx?.itemId) {
+                          const res = await fetch('/api/user/credit-cards', { cache: 'no-store' });
+                          if (res.ok) {
+                            const { creditCards: latest } = await res.json();
+                            const newCardsForItem = (latest || []).filter((c: any) => c.plaidItem?.itemId === ctx.itemId).map((c: any) => c.id);
+                            if (newCardsForItem.length > 0) {
+                              setVisualRefreshingIds(prev => Array.from(new Set([...prev, ...newCardsForItem])));
+                              // Clear indicator after 30 seconds (visual only)
+                              setTimeout(() => {
+                                setVisualRefreshingIds(prev => prev.filter(id => !newCardsForItem.includes(id)));
+                              }, 30000);
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        console.warn('Unable to set visual refreshing indicator:', e);
+                      }
+
                       // Force a re-render by updating a dummy state
                       console.log('🔄 Forcing Dashboard re-render with state update...');
                       setRefreshProgress(0); // This will trigger a re-render
@@ -1849,6 +1925,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                 onCreditLimitUpdated={handleCreditLimitUpdated}
                 initialCardOrder={sharedCardOrder}
                 onOrderChange={setSharedCardOrder}
+                visualRefreshingIds={visualRefreshingIds}
               />
             </div>
           ) : isLoggedIn ? (
@@ -1969,8 +2046,14 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             ? `Yes, Remove All ${cardsToDelete.length} Cards` 
             : 'Yes, Remove Card';
         })()}
+        secondConfirmText={(() => {
+          if (!cardToDelete) return undefined;
+          const cardsToDelete = getCardsToBeDeleted(cardToDelete);
+          return cardsToDelete.length > 1 ? 'Delete Only This Card' : undefined;
+        })()}
         cancelText="Cancel"
         onConfirm={handleConfirmDelete}
+        onSecondConfirm={handleConfirmDeleteSingle}
         onCancel={() => {
           setShowDeleteConfirm(false);
           setCardToDelete(null);
