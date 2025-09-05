@@ -416,12 +416,19 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     if (creditCardsRes.ok) {
       const { creditCards: cards } = await creditCardsRes.json();
       const safeCards = Array.isArray(cards) ? cards : [];
+      console.log(`🔄${logPrefix}Fetched ${safeCards.length} cards from API:`, safeCards.map(c => ({ id: c.id, name: c.name })));
       setCreditCards(safeCards);
       
       // Update shared card order to include new cards
       if (safeCards.length > 0) {
         const currentCardIds = new Set(sharedCardOrder);
         const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
+        console.log(`🔍${logPrefix}New card detection:`, {
+          totalCards: safeCards.length,
+          currentOrderIds: Array.from(currentCardIds),
+          newCardsFound: newCards.length,
+          newCardNames: newCards.map(c => c.name)
+        });
         
         if (newCards.length > 0) {
           const newCardIds = newCards.map(card => card.id);
@@ -432,11 +439,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
           });
           
-          // Start background sync for new cards to load Recent Billing Cycles
-          console.log('🔄 Triggering background sync for new cards to load Recent Billing Cycles');
-          setTimeout(() => {
-            startBackgroundSyncForNewCards(newCards);
-          }, 2000); // Wait 2 seconds for card to be fully visible
+          // Background sync will be handled by PlaidLink onSuccess callback
+          // Removing duplicate sync to avoid excessive API calls
+          console.log('📝 New cards detected, background sync will be handled by PlaidLink callback');
         } else if (sharedCardOrder.length === 0) {
           const defaultOrder = getDefaultCardOrder(safeCards);
           setSharedCardOrder(defaultOrder);
@@ -1217,11 +1222,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
               updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
             });
             
-            // Start background sync for new cards to load Recent Billing Cycles
-            console.log('🔄 Triggering background sync for new cards to load Recent Billing Cycles');
-            setTimeout(() => {
-              startBackgroundSyncForNewCards(newCards);
-            }, 2000); // Wait 2 seconds for card to be fully visible
+            // Background sync is handled by PlaidLink onSuccess to avoid duplicate syncs
+            console.log('📝 New cards detected in fetchAllUserData, but background sync handled elsewhere');
           } else if (sharedCardOrder.length === 0) {
             const defaultOrder = getDefaultCardOrder(safeCards);
             setSharedCardOrder(defaultOrder);
@@ -1363,6 +1365,22 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       return () => clearTimeout(timer);
     }
   }, [showSuccessPopup]);
+
+  // Debug: Monitor credit card state changes
+  useEffect(() => {
+    console.log('🔍 DASHBOARD STATE CHANGE - Credit Cards:', {
+      count: creditCards.length,
+      cardNames: creditCards.map(c => c.name),
+      cardIds: creditCards.map(c => c.id)
+    });
+  }, [creditCards]);
+
+  useEffect(() => {
+    console.log('🔍 DASHBOARD STATE CHANGE - Shared Card Order:', {
+      orderLength: sharedCardOrder.length,
+      orderIds: sharedCardOrder
+    });
+  }, [sharedCardOrder]);
 
   // Listen for credit limit updates
   useEffect(() => {
@@ -1583,6 +1601,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                   
                   <PlaidLink onSuccess={async () => {
                     console.log('🎯 DashboardContent: PlaidLink onSuccess - refreshing data without page reload');
+                    console.log('📊 Current state before refresh:', {
+                      creditCardCount: creditCards.length,
+                      billingCycleCount: billingCycles.length,
+                      sharedCardOrderLength: sharedCardOrder.length
+                    });
                     
                     // Directly refresh the Dashboard data instead of page reload
                     try {
@@ -1593,11 +1616,21 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                       
                       // Capture current cards before refresh to detect new ones
                       const currentCardIds = new Set(creditCards.map(c => c.id));
+                      console.log('📊 Current card IDs before refresh:', Array.from(currentCardIds));
                       
                       // Refresh data with the new card (lightweight version to avoid rate limits)
                       await fetchUserDataForNewCard('New card added: ');
                       
                       console.log('✅ Dashboard data refreshed with new card');
+                      console.log('📊 Final state after refresh:', {
+                        creditCardCount: creditCards.length,
+                        billingCycleCount: billingCycles.length,
+                        sharedCardOrderLength: sharedCardOrder.length
+                      });
+                      
+                      // Force a re-render by updating a dummy state
+                      console.log('🔄 Forcing Dashboard re-render...');
+                      setRefreshProgress(0); // This will trigger a re-render
                       
                       // Clear the recent addition flag after a delay (background sync is handled by fetchUserDataForNewCard)
                       setTimeout(() => {

@@ -26,6 +26,7 @@ export interface PlaidService {
   getStatements(accessToken: string, accountId: string): Promise<any[]>;
   syncAccounts(accessToken: string, itemId: string): Promise<void>;
   syncTransactions(plaidItemRecord: any, accessToken: string): Promise<void>;
+  syncHistoricalTransactions(plaidItemRecord: any, accessToken: string, cutoffDate: Date): Promise<void>;
   forceReconnectionSync(accessToken: string, itemId: string, userId: string): Promise<{success: boolean, details: any}>;
 }
 
@@ -1206,6 +1207,108 @@ class PlaidServiceImpl implements PlaidService {
       
     } catch (error: any) {
       console.error('❌ Recent transaction sync failed:', error);
+      throw error;
+    }
+  }
+
+  async syncHistoricalTransactions(plaidItemRecord: any, accessToken: string, cutoffDate: Date): Promise<void> {
+    console.log('📜 HISTORICAL TRANSACTION SYNC (avoiding recent duplicates)', { 
+      itemId: plaidItemRecord.itemId, 
+      cutoffDate: cutoffDate.toISOString().split('T')[0] 
+    });
+    
+    // Validate access token format
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) {
+      throw new Error(`Invalid access token: ${accessToken ? 'too short' : 'missing'}`);
+    }
+    
+    try {
+      console.log(`📜 Starting HISTORICAL transaction sync for itemId: ${plaidItemRecord.itemId}`);
+      console.log(`📜 Only fetching transactions OLDER than: ${cutoffDate.toISOString().split('T')[0]}`);
+      
+      // Add delay to respect rate limits
+      await this.delay(500);
+      
+      const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
+      
+      // Set end date to cutoff date (don't fetch recent data that already exists)
+      const endDate = new Date(cutoffDate);
+      endDate.setDate(endDate.getDate() - 1); // Go back one day before cutoff to avoid overlap
+      
+      const startDate = new Date();
+      
+      if (isCapitalOneItem) {
+        // Capital One: 4 months back (will be limited by their 90-day rule anyway)
+        startDate.setMonth(startDate.getMonth() - 4);
+        console.log('📜 Capital One: Requesting historical data (up to 90-day limit)');
+      } else {
+        // Standard institutions: 12 months of historical data
+        startDate.setMonth(startDate.getMonth() - 12);
+        console.log('📜 Standard institution: Requesting 12 months of historical data');
+      }
+      
+      // Only proceed if there's actually historical data to fetch
+      if (endDate <= startDate) {
+        console.log('📜 No historical data to fetch (cutoff date is older than our max range)');
+        return;
+      }
+      
+      console.log(`📜 HISTORICAL SYNC DATE RANGE: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+      
+      // Get transactions for historical period only
+      const transactions = await this.getTransactions(
+        accessToken,
+        startDate,
+        endDate,
+        isCapitalOneItem
+      );
+
+      console.log(`📜 Got ${transactions.length} historical transactions (avoiding recent duplicates)`);
+      
+      if (transactions.length === 0) {
+        console.log('📜 No historical transactions found');
+        return;
+      }
+      
+      // Store the transactions using same logic as other sync methods
+      const { data: creditCards } = await supabaseAdmin
+        .from('credit_cards')
+        .select('id, accountId')
+        .eq('plaidItemId', plaidItemRecord.id);
+
+      const accountToCardMap = new Map(
+        (creditCards || []).map(card => [card.accountId, card.id])
+      );
+
+      const transactionRecords = transactions.map(transaction => ({
+        transactionId: transaction.transaction_id,
+        creditCardId: accountToCardMap.get(transaction.account_id),
+        amount: transaction.amount,
+        date: transaction.date,
+        name: transaction.name,
+        merchantName: transaction.merchant_name,
+        category: transaction.personal_finance_category?.primary || 'OTHER',
+        pending: transaction.pending || false
+      })).filter(t => t.creditCardId);
+
+      console.log(`📜 Storing ${transactionRecords.length} historical transactions`);
+
+      const { error: insertError } = await supabaseAdmin
+        .from('transactions')
+        .upsert(transactionRecords, {
+          onConflict: 'transactionId',
+          ignoreDuplicates: false
+        });
+
+      if (insertError) {
+        console.error('❌ Error storing historical transactions:', insertError);
+        throw insertError;
+      }
+      
+      console.log('✅ Historical transaction sync completed (no duplicates)');
+      
+    } catch (error: any) {
+      console.error('❌ Historical transaction sync failed:', error);
       throw error;
     }
   }

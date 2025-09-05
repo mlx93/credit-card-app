@@ -37,10 +37,52 @@ export async function POST(request: NextRequest) {
 
     const accessToken = decrypt(plaidItem.accessToken);
 
-    // Phase 1: Sync ALL historical transactions (this can be slow)
-    console.log('🔄 Phase 1: Syncing full transaction history...');
-    await plaidService.syncTransactions(plaidItem, accessToken);
-    console.log('✅ Full transaction history synced');
+    // Check if we've synced this item recently (within 12 hours) to avoid unnecessary API calls
+    const lastSyncDate = plaidItem.lastSyncAt ? new Date(plaidItem.lastSyncAt) : null;
+    const twelveHoursAgo = new Date();
+    twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
+    
+    if (lastSyncDate && lastSyncDate > twelveHoursAgo) {
+      const hoursAgo = Math.round((Date.now() - lastSyncDate.getTime()) / (1000 * 60 * 60));
+      console.log(`⏭️ Skipping comprehensive sync - item was synced ${hoursAgo}h ago (less than 12h)`);
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Comprehensive sync skipped - recent sync found',
+        lastSyncAt: lastSyncDate.toISOString(),
+        hoursAgo
+      });
+    }
+
+    // Phase 1: Sync HISTORICAL transactions (avoiding recent duplicates)
+    console.log('🔄 Phase 1: Syncing historical transaction data...');
+    
+    // Check if recent transactions already exist to avoid duplicate syncing
+    const { data: recentTransactions } = await supabaseAdmin
+      .from('transactions')
+      .select('date')
+      .in('creditCardId', (await supabaseAdmin
+        .from('credit_cards')
+        .select('id')
+        .eq('plaidItemId', plaidItem.id)).data?.map(c => c.id) || [])
+      .order('date', { ascending: false })
+      .limit(1);
+      
+    const hasRecentData = recentTransactions && recentTransactions.length > 0;
+    const latestTransactionDate = hasRecentData ? new Date(recentTransactions[0].date) : null;
+    
+    if (hasRecentData) {
+      console.log(`📊 Found recent transactions up to ${latestTransactionDate?.toISOString().split('T')[0]}`);
+      console.log('⚡ Syncing only historical data older than recent transactions to avoid duplicates');
+      
+      // Sync only historical data (older than what instant-setup already fetched)
+      await plaidService.syncHistoricalTransactions(plaidItem, accessToken, latestTransactionDate);
+    } else {
+      console.log('📊 No recent transactions found, syncing full historical data');
+      await plaidService.syncTransactions(plaidItem, accessToken);
+    }
+    
+    console.log('✅ Historical transaction sync completed');
 
     // Phase 2: Calculate ALL historical billing cycles
     console.log('🔄 Phase 2: Calculating complete billing cycle history...');

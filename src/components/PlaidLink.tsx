@@ -168,30 +168,18 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                         
                         // Check if we have MORE cards than we started with
                         if (currentCardCount > initialCardCount) {
-                          // Find the new cards
-                          const newCards = creditCards.filter(card => 
-                            !creditCards.slice(0, initialCardCount).some(existingCard => 
-                              existingCard.id === card.id
-                            )
-                          );
+                          console.log(`✅ New card data confirmed in database! Found ${currentCardCount} cards (started with ${initialCardCount})`);
                           
-                          // Check if the new cards have Recent Billing Cycles
-                          const newCardIds = newCards.map(c => c.id);
-                          const cyclesForNewCards = (billingCycles || []).filter(cycle => 
-                            newCardIds.includes(cycle.creditCardId)
-                          );
-                          
-                          if (cyclesForNewCards.length > 0) {
-                            console.log(`✅ New card with Recent Billing Cycles confirmed! ${newCards.length} cards, ${cyclesForNewCards.length} cycles`);
-                          } else if (syncData.recentCyclesCalculated === 0) {
-                            // If instant setup didn't calculate cycles, proceed anyway
-                            console.log('✅ New card confirmed (no Recent Billing Cycles expected from instant setup)');
-                          } else {
-                            console.log(`⏳ New card found but waiting for Recent Billing Cycles... (expected ${syncData.recentCyclesCalculated}, found ${cyclesForNewCards.length})`);
+                          // For now, proceed if we have more cards (billing cycle check can be added later)
+                          // The instant setup should have already calculated Recent Billing Cycles
+                          if (syncData.recentCyclesCalculated > 0 && billingCycles?.length === 0) {
+                            console.log(`⏳ Still waiting for Recent Billing Cycles... (expected ${syncData.recentCyclesCalculated}, found ${billingCycles?.length || 0})`);
                             attempts++;
                             await new Promise(resolve => setTimeout(resolve, 1000));
                             continue;
                           }
+                          
+                          console.log(`✅ New card confirmed! Cycles: ${billingCycles?.length || 0}`);
                           setLoadingMessage('Card ready!');
                           setLoadingSubMessage('Your new credit card is available! Full transaction history will load in background.');
                           
