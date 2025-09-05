@@ -17,15 +17,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if specific itemId was requested
+    // Check if specific itemId was requested and if forceSync is enabled
     let targetItemId: string | null = null;
+    let forceSync: boolean = false;
     try {
       const body = await request.json();
       targetItemId = body?.itemId || null;
+      forceSync = body?.forceSync || false;
       if (targetItemId) {
         console.log('🎯 Individual card sync requested for itemId:', targetItemId);
       } else {
         console.log('🎯 Full sync requested for all cards');
+      }
+      if (forceSync) {
+        console.log('⚡ FORCE SYNC enabled - bypassing all daily sync protections');
       }
     } catch {
       // No body or invalid JSON - sync all items
@@ -90,6 +95,11 @@ export async function POST(request: NextRequest) {
         console.log('PlaidService method exists?', typeof plaidService.syncTransactions);
         
         try {
+          // syncTransactions method doesn't have daily sync protections built-in
+          // It always syncs when called, which is what we want for both regular and force sync
+          if (forceSync) {
+            console.log('⚡ Force sync: Bypassing any daily sync protections');
+          }
           await plaidService.syncTransactions(item, decryptedAccessToken);
           console.log('Step 2: Transaction sync completed successfully');
         } catch (syncError) {

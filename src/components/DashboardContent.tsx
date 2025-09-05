@@ -57,6 +57,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const [backgroundSyncing, setBackgroundSyncing] = useState(false);
   const [lastBackgroundSync, setLastBackgroundSync] = useState<Date | null>(null);
   const [recentCardAddition, setRecentCardAddition] = useState(false);
+  const [cardDeletionInProgress, setCardDeletionInProgress] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
@@ -314,9 +315,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   ];
 
   // Shared Plaid API sync function
-  const syncWithPlaidAPI = async (logPrefix: string = '') => {
+  const syncWithPlaidAPI = async (logPrefix: string = '', forceSync: boolean = false) => {
     console.log(`🔄${logPrefix}: Starting Plaid API sync...`);
-    const syncResponse = await fetch('/api/sync', { method: 'POST' });
+    const syncResponse = await fetch('/api/sync', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ forceSync })
+    });
     
     if (syncResponse.ok) {
       const syncResult = await syncResponse.json();
@@ -485,6 +490,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   // Shared data fetching logic used by all sync functions
   const fetchAllUserData = async (logPrefix: string = '') => {
     if (!isLoggedIn) return;
+    console.log(`🔄 fetchAllUserData called${logPrefix}`);
     
     // Get current month date range
     const now = new Date();
@@ -526,6 +532,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       const { creditCards: cards } = await creditCardsRes.json();
       // Ensure cards is always an array to prevent filter errors
       const safeCards = Array.isArray(cards) ? cards : [];
+      console.log(`📊${logPrefix} fetchAllUserData - Setting ${safeCards.length} cards:`, safeCards.map(c => ({id: c.id, name: c.name, itemId: c.plaidItem?.itemId})));
       setCreditCards(safeCards);
       
       // Update shared card order to include new cards
@@ -718,9 +725,14 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const backgroundSync = async () => {
     if (!isLoggedIn) return;
     
-    // Skip background sync if card was recently added to avoid interfering with targeted sync
+    // Skip background sync if card was recently added or if deletion is in progress
     if (recentCardAddition) {
       console.log('⏭️ Skipping background sync - recent card addition in progress');
+      return;
+    }
+    
+    if (cardDeletionInProgress) {
+      console.log('⏭️ Skipping background sync - card deletion in progress');
       return;
     }
     
@@ -770,7 +782,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       setRefreshStep('Syncing account data...');
       setRefreshProgress(50);
       
-      const syncResult = await syncWithPlaidAPI(' Refresh All');
+      const syncResult = await syncWithPlaidAPI(' Refresh All', true); // Force sync regardless of recent sync
       console.log('Sync API success result:', syncResult);
       
       setRefreshStep('Processing connections...');
@@ -1037,14 +1049,28 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
 
   const handleCardRemove = async (itemId: string) => {
     try {
+      const cardToRemove = creditCards.find(card => card.plaidItem?.itemId === itemId);
+      console.log(`🗑️ Starting card removal for itemId: ${itemId}`, cardToRemove?.name);
+      console.log(`🗑️ Current cards before removal:`, creditCards.map(c => ({id: c.id, name: c.name, itemId: c.plaidItem?.itemId})));
+      
+      // Set flag to prevent background syncs during deletion
+      setCardDeletionInProgress(true);
+      console.log(`🗑️ Set cardDeletionInProgress = true to prevent background syncs`);
+      
       // Immediately update UI - optimistic update
-      setCreditCards(prevCards => prevCards.filter(card => card.plaidItem?.itemId !== itemId));
+      setCreditCards(prevCards => {
+        const filtered = prevCards.filter(card => card.plaidItem?.itemId !== itemId);
+        console.log(`🗑️ Optimistic UI update: Removed ${prevCards.length - filtered.length} cards from UI`);
+        return filtered;
+      });
       
       // Also update billing cycles to remove cycles for this card
       setBillingCycles(prevCycles => {
         const removedCard = creditCards.find(card => card.plaidItem?.itemId === itemId);
         if (removedCard) {
-          return prevCycles.filter(cycle => cycle.creditCardId !== removedCard.id);
+          const filtered = prevCycles.filter(cycle => cycle.creditCardId !== removedCard.id);
+          console.log(`🗑️ Optimistic UI update: Removed ${prevCycles.length - filtered.length} billing cycles from UI`);
+          return filtered;
         }
         return prevCycles;
       });
@@ -1052,7 +1078,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       // Update card order to remove the deleted card
       const removedCard = creditCards.find(card => card.plaidItem?.itemId === itemId);
       if (removedCard) {
-        setSharedCardOrder(prevOrder => prevOrder.filter(id => id !== removedCard.id));
+        setSharedCardOrder(prevOrder => {
+          const filtered = prevOrder.filter(id => id !== removedCard.id);
+          console.log(`🗑️ Updated card order: Removed card ${removedCard.id} from order`);
+          return filtered;
+        });
       }
       
       // Make API call to remove from backend with timeout
@@ -1087,6 +1117,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           
           console.error('API request failed:', errorMessage);
           // Revert the optimistic update on failure
+          console.log('🗑️ Deletion failed - reverting optimistic UI updates...');
           await fetchUserData();
           throw new Error(errorMessage);
         }
@@ -1105,11 +1136,16 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         if (!data.success) {
           console.error('Failed to remove connection:', data.error);
           // Revert the optimistic update on failure  
+          console.log('🗑️ Deletion not successful - reverting optimistic UI updates...');
           await fetchUserData();
           throw new Error(data.error || 'Failed to remove connection');
         }
         
-        console.log('🎉 Card deletion completed successfully');
+        console.log('🎉 Card deletion completed successfully - no need to revert optimistic updates');
+        
+        // Clear the deletion in progress flag
+        setCardDeletionInProgress(false);
+        console.log(`🗑️ Set cardDeletionInProgress = false - deletion complete`);
         
         // Clear from localStorage cache as well
         if (typeof window !== 'undefined') {
@@ -1133,6 +1169,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       }
     } catch (error) {
       console.error('Error removing connection:', error);
+      // Clear the deletion in progress flag on error
+      setCardDeletionInProgress(false);
+      console.log(`🗑️ Set cardDeletionInProgress = false - deletion API call failed`);
       // The error will be handled by the calling component
       throw error;
     }
