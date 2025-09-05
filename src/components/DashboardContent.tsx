@@ -1827,7 +1827,6 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                               setHistoryRefreshingIds(prev => Array.from(new Set([...prev, ...newCardsForItem])));
                               // Start lightweight polling to see when more than 2 cycles are present
                               const start = Date.now();
-                              const minHoldMs = 15000; // keep visual loading at least 15s
                               const poll = async () => {
                                 try {
                                   const cyclesRes = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
@@ -1835,11 +1834,21 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                     const { billingCycles } = await cyclesRes.json();
                                     const doneIds: string[] = [];
                                     for (const cardId of newCardsForItem) {
-                                      const count = (billingCycles || []).filter((bc: any) => bc.creditCardId === cardId).length;
-                                      if (count > 2) doneIds.push(cardId);
+                                      const cardCycles = (billingCycles || [])
+                                        .filter((bc: any) => bc.creditCardId === cardId)
+                                        .sort((a: any, b: any) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                                      // Consider "ready" when at least one historical cycle (beyond current + recent closed)
+                                      // has evidence of data (transactions counted or a statement balance present)
+                                      const historical = cardCycles.slice(2);
+                                      const hasHistoricalWithData = historical.some((c: any) =>
+                                        (typeof c.transactionCount === 'number' && c.transactionCount > 0) ||
+                                        (typeof c.statementBalance === 'number' && c.statementBalance > 0)
+                                      );
+                                      if (historical.length > 0 && hasHistoricalWithData) {
+                                        doneIds.push(cardId);
+                                      }
                                     }
-                                    // Respect minimum visual hold time before clearing
-                                    if (doneIds.length > 0 && Date.now() - start >= minHoldMs) {
+                                    if (doneIds.length > 0) {
                                       setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
                                     }
                                     if (Date.now() - start < 120000 && doneIds.length < newCardsForItem.length) {
