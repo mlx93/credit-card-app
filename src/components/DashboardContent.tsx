@@ -328,55 +328,69 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
   };
 
-  // Background sync for new cards to load Recent Billing Cycles
-  const startBackgroundSyncForNewCards = async (newCards: any[]) => {
-    if (!isLoggedIn) return;
-    
-    console.log('🔄 Starting background sync for new cards:', newCards.map(c => c.name));
-    
-    for (const card of newCards) {
-      try {
-        const plaidItem = card.plaidItem;
-        if (!plaidItem?.itemId) {
-          console.warn(`⚠️ No plaid item found for card: ${card.name}`);
-          continue;
-        }
+  // NOTE: Removed automatic background sync for new cards
+  // New cards will get their full data during the next daily sync (once per day)
+  // This prevents excessive API calls and follows the "once per day" sync strategy
+
+  // Perform daily sync check on first login of the day
+  const performDailySyncCheck = async () => {
+    try {
+      console.log('🌅 Checking if daily sync needed...');
+      
+      // Check if daily sync is needed
+      const syncCheckResponse = await fetch('/api/user/daily-sync-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (syncCheckResponse.ok) {
+        const syncCheck = await syncCheckResponse.json();
+        console.log('🌅 Daily sync check result:', syncCheck);
         
-        console.log(`⚡ Starting comprehensive sync for ${card.name} (itemId: ${plaidItem.itemId})`);
-        
-        // Use comprehensive-sync to load full data for the new card
-        const response = await fetch('/api/plaid/comprehensive-sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ itemId: plaidItem.itemId })
-        });
-        
-        if (response.ok) {
-          const syncData = await response.json();
-          console.log(`✅ Background sync completed for ${card.name}:`, syncData);
+        if (syncCheck.needsSync) {
+          console.log(`🌅 Daily sync needed for ${syncCheck.itemsNeedingSyncCount} items`);
+          console.log('🌅 Starting background daily sync...');
           
-          // Refresh billing cycles to show the newly calculated cycles
-          console.log('🔄 Refreshing billing cycles after background sync');
-          const cyclesResponse = await fetch('/api/user/billing-cycles', {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache' }
-          });
-          
-          if (cyclesResponse.ok) {
-            const { billingCycles: freshCycles } = await cyclesResponse.json();
-            const safeCycles = Array.isArray(freshCycles) ? freshCycles : [];
-            setBillingCycles(safeCycles);
-            console.log(`✅ Billing cycles refreshed: ${safeCycles.length} total cycles`);
-          }
+          // Perform daily sync in background (don't await - let it run async)
+          performBackgroundDailySync();
         } else {
-          console.warn(`⚠️ Background sync failed for ${card.name}:`, response.status);
+          console.log('🌅 No daily sync needed - all items current');
         }
-      } catch (error) {
-        console.error(`❌ Background sync error for ${card.name}:`, error);
+      } else {
+        console.warn('⚠️ Daily sync check failed, skipping automatic sync');
       }
+      
+    } catch (error) {
+      console.error('❌ Daily sync check error:', error);
     }
-    
-    console.log('✅ Background sync completed for all new cards');
+  };
+
+  // Perform daily sync in background without blocking UI
+  const performBackgroundDailySync = async () => {
+    try {
+      console.log('🌅 Starting background daily sync...');
+      
+      const dailySyncResponse = await fetch('/api/user/daily-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (dailySyncResponse.ok) {
+        const result = await dailySyncResponse.json();
+        console.log('🌅 Background daily sync completed:', result);
+        
+        // Refresh data after sync completes
+        if (result.itemsSynced > 0) {
+          console.log('🌅 Refreshing data after daily sync...');
+          await fetchDatabaseDataOnly('Post daily sync: ');
+        }
+      } else {
+        console.warn('⚠️ Background daily sync failed');
+      }
+      
+    } catch (error) {
+      console.error('❌ Background daily sync error:', error);
+    }
   };
 
   // Lightweight data fetch for new card additions (skips connection health to avoid rate limits)
@@ -439,9 +453,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
           });
           
-          // Background sync will be handled by PlaidLink onSuccess callback
-          // Removing duplicate sync to avoid excessive API calls
-          console.log('📝 New cards detected, background sync will be handled by PlaidLink callback');
+          // New cards will sync during next daily sync (once per day only)
+          console.log('📝 New cards detected, will sync during next daily sync');
         } else if (sharedCardOrder.length === 0) {
           const defaultOrder = getDefaultCardOrder(safeCards);
           setSharedCardOrder(defaultOrder);
@@ -1222,8 +1235,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
               updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
             });
             
-            // Background sync is handled by PlaidLink onSuccess to avoid duplicate syncs
-            console.log('📝 New cards detected in fetchAllUserData, but background sync handled elsewhere');
+            // New cards will sync during next daily sync (once per day only)
+            console.log('📝 New cards detected in fetchAllUserData, will sync during next daily sync');
           } else if (sharedCardOrder.length === 0) {
             const defaultOrder = getDefaultCardOrder(safeCards);
             setSharedCardOrder(defaultOrder);
@@ -1325,10 +1338,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         console.log('📀 Step 2: Loading fresh data from database (no API calls)...');
         await fetchDatabaseDataOnly('Initial load: ');
         
-        // Step 3: Check for scheduled sync only
-        console.log('🕘 Step 3: Checking for scheduled sync requirements...');
+        // Step 3: Check if daily sync needed (once per day, first login only)
+        console.log('🌅 Step 3: Checking if daily sync needed...');
         setTimeout(() => {
-          checkConnectionHealthAndScheduledSync();
+          performDailySyncCheck();
         }, 100);
         
         console.log('✅ Initial data load complete - showing most recent database data');
