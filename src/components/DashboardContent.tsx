@@ -1827,6 +1827,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                               setHistoryRefreshingIds(prev => Array.from(new Set([...prev, ...newCardsForItem])));
                               // Start lightweight polling to see when more than 2 cycles are present
                               const start = Date.now();
+                              const minHoldMs = 15000; // keep visual loading at least 15s
                               const poll = async () => {
                                 try {
                                   const cyclesRes = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
@@ -1837,7 +1838,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                       const count = (billingCycles || []).filter((bc: any) => bc.creditCardId === cardId).length;
                                       if (count > 2) doneIds.push(cardId);
                                     }
-                                    if (doneIds.length > 0) {
+                                    // Respect minimum visual hold time before clearing
+                                    if (doneIds.length > 0 && Date.now() - start >= minHoldMs) {
                                       setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
                                     }
                                     if (Date.now() - start < 120000 && doneIds.length < newCardsForItem.length) {

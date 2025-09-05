@@ -85,8 +85,8 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
     onSuccess: async (public_token, metadata) => {
       try {
         console.log('Plaid Link success:', { public_token, metadata });
-        setLoadingMessage('Securing your connection');
-        setLoadingSubMessage('Exchanging tokens...');
+        setLoadingMessage('Exchanging tokens');
+        setLoadingSubMessage('Securing your connection...');
         
         const response = await fetch('/api/plaid/exchange-token', {
           method: 'POST',
@@ -103,8 +103,8 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           
           // Use instant card setup for immediate visibility
           console.log('⚡ Starting instant card setup for itemId:', data.itemId);
-          setLoadingMessage('Setting up your card');
-          setLoadingSubMessage('Creating card with Recent Billing Cycles...');
+          setLoadingMessage('Loading balance info');
+          setLoadingSubMessage('Preparing recent billing cycles...');
           
           try {
             // Add timeout to instant-card-setup request (60 seconds)
@@ -128,8 +128,8 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               if (syncData.success && syncData.creditCardsFound > 0 && syncData.readyForDisplay) {
                 console.log('✅ Verified: Cards are ready for immediate display with Recent Billing Cycles');
                 // Show more accurate status while we confirm recent cycles are persisted
-                setLoadingMessage('Getting recent billing cycles');
-                setLoadingSubMessage('Your card is almost ready. Loading older history in the background…');
+                setLoadingMessage('Loading recent cycles');
+                setLoadingSubMessage('Your card is almost ready. Historical cycles will load in the background.');
                 
                 // Poll the database until the new card AND Recent Billing Cycles are available  
                 const pollForNewCardWithCycles = async () => {
