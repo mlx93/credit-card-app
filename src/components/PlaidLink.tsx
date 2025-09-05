@@ -183,15 +183,17 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                           setLoadingMessage('Card ready!');
                           setLoadingSubMessage('Your new credit card is available! Full transaction history will load in background.');
                           
-                          // Immediately hide loading and call onSuccess - no artificial delay
-                          console.log('🎯 PlaidLink: Database confirmed new card - calling onSuccess callback immediately');
+                          // Defer hiding the overlay until parent onSuccess finishes updating the dashboard
+                          console.log('🎯 PlaidLink: Database confirmed new card - awaiting parent onSuccess to finish refresh');
+                          if (onSuccess) {
+                            try {
+                              await onSuccess();
+                            } catch (cbErr) {
+                              console.warn('onSuccess callback error:', cbErr);
+                            }
+                          }
                           setLoading(false);
                           setSyncInProgress(false);
-                          
-                          // Call the Dashboard's refresh function immediately
-                          if (onSuccess) {
-                            onSuccess();
-                          }
                           return;
                         } else {
                           console.log(`⏳ Still waiting... need ${initialCardCount + 1} cards, have ${currentCardCount}`);
@@ -212,11 +214,15 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   console.warn('⚠️ Polling timeout - calling onSuccess immediately');
                   setLoadingMessage('Card should be ready...');
                   setLoadingSubMessage('Loading your dashboard');
+                  if (onSuccess) {
+                    try {
+                      await onSuccess();
+                    } catch (cbErr) {
+                      console.warn('onSuccess callback error:', cbErr);
+                    }
+                  }
                   setLoading(false);
                   setSyncInProgress(false);
-                  if (onSuccess) {
-                    onSuccess();
-                  }
                 };
                 
                 pollForNewCardWithCycles();
@@ -252,15 +258,17 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               setLoadingMessage('Connection established');
               setLoadingSubMessage('Card will appear shortly...');
               
-              // Proceed immediately even if instant setup had issues
+              // Proceed, but keep overlay until dashboard refresh completes
+              console.log('🎯 PlaidLink: Instant setup had issues, awaiting onSuccess to show what we have...');
+              if (onSuccess) {
+                try {
+                  await onSuccess();
+                } catch (cbErr) {
+                  console.warn('onSuccess callback error:', cbErr);
+                }
+              }
               setLoading(false);
               setSyncInProgress(false);
-              
-              // Call onSuccess to show what we have
-              console.log('🎯 PlaidLink: Instant setup had issues, calling onSuccess to check results...');
-              if (onSuccess) {
-                onSuccess();
-              }
             }
             
           } catch (syncError) {
@@ -275,15 +283,17 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
               setLoadingSubMessage('Basic card info available, full sync will retry');
             }
             
-            // Proceed immediately even if sync failed
+            // Proceed, but keep overlay until dashboard refresh completes
+            console.log('🎯 PlaidLink: Card connected (sync failed), awaiting onSuccess...');
+            if (onSuccess) {
+              try {
+                await onSuccess();
+              } catch (cbErr) {
+                console.warn('onSuccess callback error:', cbErr);
+              }
+            }
             setLoading(false);
             setSyncInProgress(false);
-            
-            // Call onSuccess to show new card
-            console.log('🎯 PlaidLink: Card connected (sync failed), calling onSuccess...');
-            if (onSuccess) {
-              onSuccess();
-            }
           }
         } else {
           console.error('Token exchange failed:', data.error);

@@ -270,7 +270,7 @@ export function HorizontalCardColumns({
     const cardIds = cards.map(card => card.id);
 
     if (cardOrder.length === 0 && cardIds.length > 0) {
-      // First-time initialize
+      // First-time initialize: use parent's preferred order, then append any missing
       if (initialCardOrder && initialCardOrder.length > 0) {
         const validOrder = initialCardOrder.filter(id => cardIds.includes(id));
         const newCards = cardIds.filter(id => !validOrder.includes(id));
@@ -284,34 +284,38 @@ export function HorizontalCardColumns({
       return;
     }
 
-    // Merge newly added cards and drop removed cards while preserving user order
+    // Merge newly added cards (prepend) and drop removed cards, but do NOT reorder existing
     if (cardOrder.length > 0) {
       const missing = cardIds.filter(id => !cardOrder.includes(id));
-      const removed = cardOrder.filter(id => !cardIds.includes(id));
+      const kept = cardOrder.filter(id => cardIds.includes(id));
 
-      // If parent provides an updated preferred order (e.g., put new cards first), respect it
-      let baseOrder = cardOrder.filter(id => cardIds.includes(id));
-      if (initialCardOrder && initialCardOrder.length > 0) {
-        const desired = initialCardOrder.filter(id => cardIds.includes(id));
-        const differs = desired.length === baseOrder.length
-          ? desired.some((id, i) => id !== baseOrder[i])
-          : true;
-        if (differs) {
-          baseOrder = desired;
-        }
-      }
-
-      if (missing.length > 0 || removed.length > 0 || baseOrder !== cardOrder) {
-        // Place new cards according to parent's order if available, else append to end
+      if (missing.length > 0 || kept.length !== cardOrder.length) {
+        // Respect parent's order for the new cards only; keep existing order as-is
         const missingOrdered = initialCardOrder
           ? missing.sort((a, b) => initialCardOrder.indexOf(a) - initialCardOrder.indexOf(b))
           : missing;
-        const updated = [...missingOrdered, ...baseOrder];
+        const updated = [...missingOrdered, ...kept];
         setCardOrder(updated);
         onOrderChange?.(updated);
       }
     }
   }, [cards, initialCardOrder]);
+
+  // Auto-expand any newly added cards so that recent and current cycles are visible immediately
+  useEffect(() => {
+    const currentIds = new Set(cards.map(c => c.id));
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const id of currentIds) {
+        if (!next.has(id)) {
+          next.add(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [cards]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
