@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import { CreditCard, Loader2 } from 'lucide-react';
 import { LoadingOverlay } from './LoadingOverlay';
+import { InstitutionSelectModal } from './InstitutionSelectModal';
 
 interface PlaidLinkProps {
   onSuccess?: (ctx?: { itemId?: string; newCardIds?: string[] }) => Promise<void> | void;
@@ -18,6 +19,8 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
   const [loadingSubMessage, setLoadingSubMessage] = useState('This may take a few moments...');
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [initialCardCount, setInitialCardCount] = useState<number>(0);
+  const [showInstitutionModal, setShowInstitutionModal] = useState(false);
+  const [selectedInstitutionType, setSelectedInstitutionType] = useState<'standard' | 'investment' | null>(null);
 
   // Check for OAuth resumption parameters on mount
   useEffect(() => {
@@ -349,17 +352,25 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
     }
   }, [linkToken, ready, open]);
 
-  const handleClick = async () => {
+  const handleClick = () => {
     if (!session?.user?.id) {
       console.error('User not authenticated');
       alert('Please sign in to connect your credit card.');
       return;
     }
-
+    
+    // Show the institution selection modal
+    setShowInstitutionModal(true);
+  };
+  
+  const handleInstitutionTypeSelect = async (type: 'standard' | 'investment') => {
+    setShowInstitutionModal(false);
+    setSelectedInstitutionType(type);
+    
     try {
       setLoading(true);
       setLoadingMessage('Initializing secure connection');
-      setLoadingSubMessage('Preparing Plaid Link...');
+      setLoadingSubMessage(type === 'investment' ? 'Preparing Robinhood connection...' : 'Preparing Plaid Link...');
       
       // Capture initial card count before starting
       console.log('📊 Capturing initial card count...');
@@ -375,19 +386,25 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         setInitialCardCount(0);
       }
       
-      console.log('Fetching link token...');
+      console.log(`Fetching link token for ${type} institution...`);
+      
+      // For investment type (Robinhood), pass the institution ID
+      const requestBody = type === 'investment' 
+        ? { institutionId: 'ins_54' }
+        : {};
       
       const response = await fetch('/api/plaid/link-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
       console.log('Link token response:', data);
       
       if (data.link_token) {
-        console.log('Link token received, setting state...');
-        setLoadingMessage('Opening Plaid');
+        console.log(`Link token received for ${type} institution`);
+        setLoadingMessage(type === 'investment' ? 'Opening Robinhood' : 'Opening Plaid');
         setLoadingSubMessage('Redirecting to secure banking portal...');
         // Brief delay to show the loading animation before opening
         setTimeout(() => {
@@ -396,7 +413,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
         // The useEffect will handle opening the link
       } else {
         console.error('Failed to get link token:', data.error);
-        alert('Failed to initialize Plaid connection. Please try again.');
+        alert('Failed to initialize connection. Please try again.');
         setLoading(false);
       }
     } catch (error) {
@@ -408,11 +425,18 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
 
   return (
     <>
+      <InstitutionSelectModal
+        isOpen={showInstitutionModal}
+        onClose={() => setShowInstitutionModal(false)}
+        onSelectType={handleInstitutionTypeSelect}
+      />
+      
       <LoadingOverlay 
         isVisible={loading} 
         message={loadingMessage}
         subMessage={loadingSubMessage}
       />
+      
       <button
         onClick={handleClick}
         disabled={loading || !session}
