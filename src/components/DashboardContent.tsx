@@ -2048,6 +2048,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ order })
                     });
+                    localStorage.setItem('card_order_user_set', '1');
+                    setHasUserOrdered(true);
                   } catch {}
                 }}
                 visualRefreshingIds={visualRefreshingIds}
