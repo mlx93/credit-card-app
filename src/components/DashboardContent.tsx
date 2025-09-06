@@ -59,6 +59,16 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const [recentCardAddition, setRecentCardAddition] = useState(false);
   const [cardDeletionInProgress, setCardDeletionInProgress] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
+  // Track which cards have been explicitly positioned by the user at least once
+  const [positionedCardIds, setPositionedCardIds] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('positioned_card_ids');
+        if (raw) return new Set(JSON.parse(raw));
+      } catch {}
+    }
+    return new Set<string>();
+  });
   // Prevent saving order before we've loaded an initial preferred order (DB or default)
   const orderInitializedRef = typeof window === 'undefined' ? { current: false } as any : (window as any).__orderInitRef || { current: false };
   if (typeof window !== 'undefined') { (window as any).__orderInitRef = orderInitializedRef; }
@@ -572,14 +582,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
         
         if (newCards.length > 0) {
-          // New cards detected - add them to the front (far left)
-          const newCardIds = newCards.map(card => card.id);
-          const updatedOrder = [...newCardIds, ...sharedCardOrder];
-          setSharedCardOrder(updatedOrder);
-          console.log(`🆕 Adding ${newCards.length} new cards to front of order${logPrefix}:`, {
-            newCardNames: newCards.map(c => c.name),
-            updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
-          });
+          // Only prepend cards that have never been explicitly positioned by the user
+          const unpositionedNew = newCards
+            .map(c => c.id)
+            .filter(id => !positionedCardIds.has(id));
+          if (unpositionedNew.length > 0) {
+            const updatedOrder = [...unpositionedNew, ...sharedCardOrder];
+            setSharedCardOrder(updatedOrder);
+            console.log(`🆕 Prepending ${unpositionedNew.length} truly-new cards${logPrefix}:`, {
+              unpositionedNew
+            });
+          }
         } else if (sharedCardOrder.length === 0) {
           // No existing order - set default order
           const defaultOrder = getDefaultCardOrder(safeCards);
@@ -1345,16 +1358,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
           
           if (newCards.length > 0) {
-            const newCardIds = newCards.map(card => card.id);
-            const updatedOrder = [...newCardIds, ...baseOrder];
-            setSharedCardOrder(updatedOrder);
-            console.log(`🆕 Adding ${newCards.length} new cards to front of order${logPrefix}:`, {
-              newCardNames: newCards.map(c => c.name),
-              updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
-            });
-            
-            // New cards will sync during next daily sync (once per day only)
-            console.log('📝 New cards detected in fetchAllUserData, will sync during next daily sync');
+            const unpositionedNew = newCards
+              .map(c => c.id)
+              .filter(id => !positionedCardIds.has(id));
+            if (unpositionedNew.length > 0) {
+              const updatedOrder = [...unpositionedNew, ...baseOrder];
+              setSharedCardOrder(updatedOrder);
+              console.log(`🆕 Adding ${unpositionedNew.length} new cards to front of order${logPrefix}:`, {
+                unpositionedNew,
+                updatedOrder: updatedOrder.map(id => safeCards.find(c => c.id === id)?.name)
+              });
+            }
           } else if (baseOrder.length === 0) {
             const defaultOrder = getDefaultCardOrder(safeCards);
             setSharedCardOrder(defaultOrder);
@@ -2011,7 +2025,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                 onRequestDelete={handleRequestDelete}
                 onCreditLimitUpdated={handleCreditLimitUpdated}
                 initialCardOrder={sharedCardOrder}
-                onOrderChange={setSharedCardOrder}
+                onOrderChange={(order) => {
+                  setSharedCardOrder(order);
+                  try {
+                    localStorage.setItem('cached_card_order', JSON.stringify(order));
+                    // Mark all cards we know about as positioned so they won't be treated as new again
+                    const next = new Set(positionedCardIds);
+                    order.forEach(id => next.add(id));
+                    setPositionedCardIds(next);
+                    localStorage.setItem('positioned_card_ids', JSON.stringify(Array.from(next)));
+                  } catch {}
+                }}
                 visualRefreshingIds={visualRefreshingIds}
                 olderCyclesLoadingIds={historyRefreshingIds}
               />
