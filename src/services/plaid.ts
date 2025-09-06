@@ -44,18 +44,15 @@ class PlaidServiceImpl implements PlaidService {
   async createLinkToken(userId: string, oauth_state_id?: string, institutionId?: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
     
-    // Use a universal product set that works for most institutions
-    // Balance + Transactions works universally, then we try to get liability data separately
-    const products = ['transactions', 'balance'];
-    
-    // Only add liabilities if NOT Robinhood (since Robinhood doesn't support it)
-    if (institutionId !== 'ins_54') {
-      products.unshift('liabilities'); // Add liabilities as first product for non-Robinhood
-    }
+    // For Robinhood, we can't use liabilities product
+    // For other institutions, liabilities already includes balance data
+    const products = institutionId === 'ins_54'
+      ? ['transactions', 'balance'] // Robinhood: no liabilities support
+      : ['liabilities', 'transactions']; // Standard: liabilities includes balance
     
     console.log(`Creating link token with products:`, products);
     if (institutionId === 'ins_54') {
-      console.log('🎯 Robinhood institution detected - excluding liabilities product');
+      console.log('🎯 Robinhood institution detected - using balance instead of liabilities');
     }
     
     const request: LinkTokenCreateRequest = {
