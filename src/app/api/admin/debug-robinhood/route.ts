@@ -4,22 +4,27 @@ import { isPaymentTransaction } from '@/utils/billingCycles';
 
 export async function GET() {
   try {
-    // First, let's see all cards and check for negative balance cards (likely Robinhood)
-    const { data: allCards } = await supabaseAdmin
-      .from('credit_cards')
-      .select('id, name, mask, institutionId, institutionName, balanceCurrent, officialName');
+    // Get plaid items to find Robinhood by institutionName
+    const { data: plaidItems } = await supabaseAdmin
+      .from('plaid_items')
+      .select('id, institutionName')
+      .ilike('institutionName', '%robinhood%');
     
-    // Known Robinhood card from the debug data
+    const robinhoodPlaidItemIds = plaidItems?.map(item => item.id) || [];
+    
+    // Get cards linked to Robinhood plaid items OR known Robinhood card
     const knownRobinhoodCardId = 'a4668ff3-2e74-46b7-93f5-e6ca3d3256ad';
     
-    // Find cards that are likely Robinhood
+    const { data: allCards } = await supabaseAdmin
+      .from('credit_cards')
+      .select('id, name, mask, plaidItemId, institutionId, balanceCurrent, officialName');
+    
     const possibleRobinhoodCards = allCards?.filter(c => 
       c.id === knownRobinhoodCardId || // Known Robinhood card
+      robinhoodPlaidItemIds.includes(c.plaidItemId) || // Cards from Robinhood plaid items
       c.institutionId === 'ins_54' || 
-      c.institutionName?.toLowerCase().includes('robinhood') ||
-      c.officialName?.toLowerCase().includes('robinhood') ||
       c.name?.toLowerCase().includes('robinhood') ||
-      c.name?.toLowerCase().includes('gold') // Robinhood Gold Card
+      c.officialName?.toLowerCase().includes('robinhood')
     );
 
     if (!possibleRobinhoodCards || possibleRobinhoodCards.length === 0) {
