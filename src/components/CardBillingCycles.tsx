@@ -277,36 +277,24 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
             </p>
           </div>
           <div className="text-right ml-2">
-            {cycle.statementBalance ? (
-              <div className="flex items-center gap-1">
-                <p className="text-sm font-semibold text-gray-900">
-                  {formatCurrency(cycle.statementBalance)}
-                </p>
-                {paymentStatus === 'paid' && (
-                  <div className="w-3 h-3 rounded-full bg-green-100 flex items-center justify-center">
-                    <svg className="w-2 h-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
-                {paymentStatus === 'outstanding' && (
-                  <div className="w-3 h-3 rounded-full bg-red-100 flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-1">
-                <p className="text-sm text-gray-600">{formatCurrency(cycle.totalSpend)}</p>
-                {paymentStatus === 'paid' && (
-                  <div className="w-3 h-3 rounded-full bg-green-100 flex items-center justify-center">
-                    <svg className="w-2 h-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Always show totalSpend in Recent Billing Cycles (compact mode) */}
+            <div className="flex items-center gap-1">
+              <p className="text-sm font-semibold text-gray-900">
+                {formatCurrency(cycle.totalSpend)}
+              </p>
+              {paymentStatus === 'paid' && (
+                <div className="w-3 h-3 rounded-full bg-green-100 flex items-center justify-center">
+                  <svg className="w-2 h-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+              {paymentStatus === 'outstanding' && (
+                <div className="w-3 h-3 rounded-full bg-red-100 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
