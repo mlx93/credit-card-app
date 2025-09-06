@@ -834,12 +834,18 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
         endDate: closedCycleEnd,
         statementBalance: updatedCycle.statementBalance || undefined,
         minimumPayment: updatedCycle.minimumPayment || undefined,
-        dueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate) : undefined,
+        // nextPaymentDueDate may already be a string; normalize safely
+        dueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate as any) : undefined,
         totalSpend,
         transactionCount: cycleTransactions.length,
       };
     } else {
       // Create new closed cycle
+      // Normalize due date to YYYY-MM-DD string if provided (accepts Date or string)
+      const dueDateVal = creditCard.nextPaymentDueDate
+        ? new Date(creditCard.nextPaymentDueDate as any).toISOString().split('T')[0]
+        : null;
+
       const { data: newCycle, error: insertError } = await supabaseAdmin
         .from('billing_cycles')
         .insert({
@@ -850,7 +856,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
           totalSpend,
           transactionCount: cycleTransactions.length,
           statementBalance: creditCard.lastStatementBalance || totalSpend,
-          dueDate: creditCard.nextPaymentDueDate ? creditCard.nextPaymentDueDate.toISOString().split('T')[0] : null,
+          dueDate: dueDateVal,
           paymentStatus: 'due', // Closed cycles are typically due
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -872,7 +878,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
         endDate: closedCycleEnd,
         statementBalance: newCycle.statementBalance || undefined,
         minimumPayment: newCycle.minimumPayment || undefined,
-        dueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate) : undefined,
+        dueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate as any) : undefined,
         totalSpend,
         transactionCount: cycleTransactions.length,
       };

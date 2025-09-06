@@ -155,11 +155,20 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                         const { creditCards } = await cardResponse.json();
                         const { billingCycles } = await cyclesResponse.json();
                         const currentCardCount = creditCards?.length || 0;
-                        
+
                         console.log(`📊 Polling check: initial=${initialCardCount}, current=${currentCardCount}, cycles=${billingCycles?.length || 0}`);
-                        
-                        // Check if we have MORE cards than we started with
-                        if (currentCardCount > initialCardCount) {
+
+                        // Identify newly added card IDs for this item
+                        const newCardIdsForItem = (creditCards || [])
+                          .filter((c: any) => c.plaidItem?.itemId === data.itemId)
+                          .map((c: any) => c.id);
+
+                        // Check if all new cards have at least 2 cycles (current + most recent closed)
+                        const cyclesByCard = (id: string) => (billingCycles || []).filter((bc: any) => bc.creditCardId === id);
+                        const allHaveRecentCycles = newCardIdsForItem.length > 0 && newCardIdsForItem.every(id => cyclesByCard(id).length >= 2);
+
+                        // Proceed when the new card(s) exist and have the two recent cycles ready
+                        if (currentCardCount > initialCardCount && allHaveRecentCycles) {
                           console.log(`✅ New card data confirmed in database! Found ${currentCardCount} cards (started with ${initialCardCount})`);
                           
                           // For now, proceed if we have more cards (billing cycle check can be added later)
@@ -171,7 +180,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                             continue;
                           }
                           
-                          console.log(`✅ New card confirmed! Cycles: ${billingCycles?.length || 0}`);
+                          console.log(`✅ New card confirmed! All new cards have current + recent closed cycles.`);
                           setLoadingMessage('Card ready!');
                           setLoadingSubMessage('Full transaction history will continue loading in the background.');
                           
