@@ -7,7 +7,7 @@ import { CreditCard, Loader2 } from 'lucide-react';
 import { LoadingOverlay } from './LoadingOverlay';
 
 interface PlaidLinkProps {
-  onSuccess?: (ctx?: { itemId?: string }) => Promise<void> | void;
+  onSuccess?: (ctx?: { itemId?: string; newCardIds?: string[] }) => Promise<void> | void;
 }
 
 export function PlaidLink({ onSuccess }: PlaidLinkProps) {
@@ -188,7 +188,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                           console.log('🎯 PlaidLink: Database confirmed new card - awaiting parent onSuccess to finish refresh');
                           if (onSuccess) {
                             try {
-                              await onSuccess({ itemId: data.itemId });
+                              await onSuccess({ itemId: data.itemId, newCardIds: newCardIdsForItem });
                             } catch (cbErr) {
                               console.warn('onSuccess callback error:', cbErr);
                             }
@@ -217,7 +217,18 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
                   setLoadingSubMessage('Loading your dashboard');
                   if (onSuccess) {
                     try {
-                      await onSuccess({ itemId: data.itemId });
+                      // Best effort: fetch cards to include newCardIds in context
+                      let newIds: string[] | undefined = undefined;
+                      try {
+                        const cRes = await fetch('/api/user/credit-cards', { cache: 'no-store' });
+                        if (cRes.ok) {
+                          const { creditCards } = await cRes.json();
+                          newIds = (creditCards || [])
+                            .filter((c: any) => c.plaidItem?.itemId === data.itemId)
+                            .map((c: any) => c.id);
+                        }
+                      } catch {}
+                      await onSuccess({ itemId: data.itemId, newCardIds: newIds });
                     } catch (cbErr) {
                       console.warn('onSuccess callback error:', cbErr);
                     }

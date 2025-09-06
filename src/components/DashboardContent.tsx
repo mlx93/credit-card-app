@@ -1815,7 +1815,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                           const res = await fetch('/api/user/credit-cards', { cache: 'no-store' });
                           if (res.ok) {
                             const { creditCards: latest } = await res.json();
-                            const newCardsForItem = (latest || []).filter((c: any) => c.plaidItem?.itemId === ctx.itemId).map((c: any) => c.id);
+                            let newCardsForItem = (latest || []).filter((c: any) => c.plaidItem?.itemId === ctx.itemId).map((c: any) => c.id);
+                            // If PlaidLink provided explicit new ids, prefer those
+                            if (ctx.newCardIds && ctx.newCardIds.length > 0) {
+                              newCardsForItem = ctx.newCardIds;
+                            }
                             if (newCardsForItem.length > 0) {
                               setVisualRefreshingIds(prev => Array.from(new Set([...prev, ...newCardsForItem])));
                               // Clear indicator after 30 seconds (visual only)
