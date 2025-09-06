@@ -14,29 +14,49 @@ function isCapitalOneCard(institutionName?: string, cardName?: string): boolean 
 
 // Helper function to identify payment transactions based on transaction name
 export function isPaymentTransaction(transactionName: string): boolean {
+  if (!transactionName) return false;
+  
   const lowerName = transactionName.toLowerCase();
   
   // Common payment indicators across different banks
   const paymentIndicators = [
     'pymt',           // Capital One payments
-    'payment',        // Amex and other banks
+    'payment',        // Amex and other banks (covers "Online Ach Payment Ref")
     'autopay',        // Automatic payments
-    'online payment', // Online payments
-    'mobile payment', // Mobile app payments
-    'phone payment',  // Phone payments
-    'bank payment',   // Bank transfers
-    'ach payment',    // ACH payments
-    'electronic payment', // Electronic payments
-    'web payment',    // Web payments
-    'transfer',       // Bank transfers
-    'credit card payment', // Explicit credit card payments
-    'cc payment',     // Credit card payment abbreviation
-    'bill payment',   // Bill payment
-    'scheduled payment', // Scheduled payments
-    'recurring payment', // Recurring payments
+    'mobile pymt',    // Mobile payments
+    'web pymt',       // Web payments
+    'transfer from', // Bank transfers from checking/savings
+    'transfer to checking', // Transfers to checking
+    'transfer to savings', // Transfers to savings
+    'credit card pymt', // Credit card payments
+    'cc pymt',        // Credit card payment abbreviation
+    'bill pay',       // Bill payment
+    'scheduled pymt', // Scheduled payments
+    'recurring pymt', // Recurring payments
+    'automatic debit', // Automatic debits
+    'direct debit',   // Direct debits
+    'e-payment',      // Electronic payments
+    'epayment',       // Electronic payments (no dash)
+    'online pymt',    // Online payments
+    'phone pymt',     // Phone payments
+    'bank pymt',      // Bank payments
+    'ach credit',     // ACH credits (incoming payments to card)
+    'ach debit',      // ACH debits
+    'wire transfer',  // Wire transfers
+    'balance transfer', // Balance transfers (these reduce balance like payments)
   ];
   
-  return paymentIndicators.some(indicator => lowerName.includes(indicator));
+  // Check for any payment indicator
+  const hasPaymentIndicator = paymentIndicators.some(indicator => lowerName.includes(indicator));
+  
+  // Additional checks for specific patterns that might be missed
+  // Check for "payment" or "pymt" anywhere in the string (already covered above)
+  // Check for "transfer" but exclude "balance transfer fee" or similar fee transactions
+  const isTransferPayment = lowerName.includes('transfer') && 
+                           !lowerName.includes('fee') && 
+                           !lowerName.includes('charge');
+  
+  return hasPaymentIndicator || isTransferPayment;
 }
 
 export interface BillingCycleData {
