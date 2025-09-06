@@ -1841,16 +1841,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                       const cardCycles = (billingCycles || [])
                                         .filter((bc: any) => bc.creditCardId === cardId)
                                         .sort((a: any, b: any) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-                                      // Consider "ready" when at least one historical cycle (beyond current + recent closed)
-                                      // has evidence of data (transactions counted or a statement balance present)
+
+                                      // Ready only when ALL historical cycles (beyond current + recent closed)
+                                      // show evidence of iteration (transactionCount present; can be 0) or a statementBalance value
                                       const historical = cardCycles.slice(2);
-                                      const hasHistoricalWithData = historical.some((c: any) =>
-                                        (typeof c.transactionCount === 'number' && c.transactionCount > 0) ||
-                                        (typeof c.statementBalance === 'number' && c.statementBalance > 0)
+                                      const allHistoricalLoaded = historical.length > 0 && historical.every((c: any) =>
+                                        (typeof c.transactionCount === 'number') ||
+                                        (typeof c.statementBalance === 'number' && c.statementBalance >= 0)
                                       );
-                                      if (historical.length > 0 && hasHistoricalWithData) {
-                                        doneIds.push(cardId);
-                                      }
+                                      if (allHistoricalLoaded) doneIds.push(cardId);
                                     }
                                     if (doneIds.length > 0) {
                                       setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
