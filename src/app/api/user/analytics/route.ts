@@ -148,7 +148,7 @@ export async function GET(request: Request) {
     // Calculate total spend: exclude payment transactions, include charges and legitimate refunds
     const totalSpendThisMonth = thisMonthTransactions.reduce((sum, t) => {
       // Skip payment transactions regardless of sign
-      if (isPaymentTransaction(t.name)) {
+      if (isPaymentTransaction(t.name || '')) {
         return sum;
       }
       // Include all non-payment transactions (charges and refunds)
@@ -166,7 +166,7 @@ export async function GET(request: Request) {
       
       const amount = monthTransactions.reduce((sum, t) => {
         // Skip payment transactions
-        if (isPaymentTransaction(t.name)) {
+        if (isPaymentTransaction(t.name || '')) {
           return sum;
         }
         // Include charges and refunds
@@ -182,7 +182,7 @@ export async function GET(request: Request) {
     const categoryMap = new Map<string, number>();
     thisMonthTransactions.forEach(t => {
       // Skip payment transactions
-      if (isPaymentTransaction(t.name)) {
+      if (isPaymentTransaction(t.name || '')) {
         return;
       }
       
@@ -216,7 +216,7 @@ export async function GET(request: Request) {
     const cardSpendingMap = new Map<string, number>();
     thisMonthTransactions.forEach(t => {
       // Skip payment transactions
-      if (isPaymentTransaction(t.name)) {
+      if (isPaymentTransaction(t.name || '')) {
         return;
       }
       const cardName = t.creditCard?.name || 'Unknown Card';
@@ -242,7 +242,7 @@ export async function GET(request: Request) {
     
     thisMonthTransactions.forEach(t => {
       // Skip payment transactions
-      if (isPaymentTransaction(t.name)) {
+      if (isPaymentTransaction(t.name || '')) {
         return;
       }
       
@@ -263,7 +263,7 @@ export async function GET(request: Request) {
 
     lastMonthTransactions.forEach(t => {
       // Skip payment transactions
-      if (isPaymentTransaction(t.name)) {
+      if (isPaymentTransaction(t.name || '')) {
         return;
       }
       
