@@ -310,7 +310,7 @@ export async function GET(request: Request) {
       categories,
       cardSpending,
       monthlyComparison,
-      transactionCount: thisMonthTransactions.filter(t => !isPaymentTransaction(t.name)).length,
+      transactionCount: thisMonthTransactions.filter(t => !isPaymentTransaction(t.name || '')).length,
       selectedMonth: `${activeMonthStart.getFullYear()}-${String(activeMonthStart.getMonth() + 1).padStart(2, '0')}`,
       availableMonths: Array.from(availableMonths).sort().reverse(),
     });

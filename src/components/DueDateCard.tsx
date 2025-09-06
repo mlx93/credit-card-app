@@ -588,18 +588,21 @@ export function DueDateCard({
                     </svg>
                   </div>
                   <p className="text-[11px] font-semibold text-gray-700">All Paid</p>
-                  {/* Show next due date if there's a current balance */}
+                  {/* Show next due date if there's a current balance (larger text, allow wrap) */}
                   {card.balanceCurrent > 0 && card.nextPaymentDueDate && (
-                    <p className="text-[10px] text-gray-500 mt-0.5 leading-4">
+                    <div className="mt-0.5 text-center leading-4 text-gray-600 whitespace-normal break-words">
                       {(() => {
-                        // Calculate approximate due date for current open cycle
-                        // Add ~1 month to the current due date
                         const currentDueDate = new Date(card.nextPaymentDueDate);
                         const nextCycleDueDate = new Date(currentDueDate);
                         nextCycleDueDate.setMonth(nextCycleDueDate.getMonth() + 1);
-                        return `Next: ${formatDate(nextCycleDueDate)}`;
+                        return (
+                          <>
+                            <span className="block text-[11px]">Next</span>
+                            <span className="block text-[13px] font-semibold">{formatDate(nextCycleDueDate)}</span>
+                          </>
+                        );
                       })()}
-                    </p>
+                    </div>
                   )}
                 </div>
               </div>
