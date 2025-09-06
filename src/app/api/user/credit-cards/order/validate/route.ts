@@ -9,11 +9,15 @@ export async function GET() {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const { data, error } = await supabaseAdmin.rpc('get_card_order', { p_user_id: session.user.id });
+    const { data, error } = await supabaseAdmin
+      .from('user_card_orders')
+      .select('order_ids')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ userId: session.user.id, order: Array.isArray(data) ? data : [] });
+    return NextResponse.json({ userId: session.user.id, order: Array.isArray(data?.order_ids) ? data!.order_ids : [] });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Unknown error' }, { status: 500 });
   }
