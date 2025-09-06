@@ -2025,7 +2025,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                 onRequestDelete={handleRequestDelete}
                 onCreditLimitUpdated={handleCreditLimitUpdated}
                 initialCardOrder={sharedCardOrder}
-                onOrderChange={(order) => {
+                onOrderChange={async (order) => {
                   setSharedCardOrder(order);
                   try {
                     localStorage.setItem('cached_card_order', JSON.stringify(order));
@@ -2034,6 +2034,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     order.forEach(id => next.add(id));
                     setPositionedCardIds(next);
                     localStorage.setItem('positioned_card_ids', JSON.stringify(Array.from(next)));
+                    // Persist immediately to DB to avoid race with later fetches
+                    await fetch('/api/user/credit-cards/order', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ order })
+                    });
                   } catch {}
                 }}
                 visualRefreshingIds={visualRefreshingIds}

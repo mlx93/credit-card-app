@@ -4,14 +4,32 @@ import { isPaymentTransaction } from '@/utils/billingCycles';
 
 export async function GET() {
   try {
-    // Get Robinhood cards
+    // First, let's see all cards and their institution IDs
+    const { data: allCards } = await supabaseAdmin
+      .from('credit_cards')
+      .select('id, name, mask, institutionId, institutionName');
+    
+    console.log('All cards:', allCards?.map(c => ({ 
+      name: c.name, 
+      institutionId: c.institutionId,
+      institutionName: c.institutionName 
+    })));
+
+    // Get Robinhood cards - they might be stored with institutionName instead
     const { data: robinhoodCards } = await supabaseAdmin
       .from('credit_cards')
-      .select('id, name, mask')
-      .eq('institutionId', 'ins_54');
+      .select('id, name, mask, institutionId, institutionName')
+      .or('institutionId.eq.ins_54,institutionName.ilike.%robinhood%');
 
     if (!robinhoodCards || robinhoodCards.length === 0) {
-      return NextResponse.json({ message: 'No Robinhood cards found' });
+      return NextResponse.json({ 
+        message: 'No Robinhood cards found',
+        allCards: allCards?.map(c => ({
+          name: c.name,
+          institutionId: c.institutionId,
+          institutionName: c.institutionName
+        }))
+      });
     }
 
     const results = [];
