@@ -1,56 +1,9 @@
 import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/utils/format';
 import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical, Edit3, Check, X, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { truncateCardName } from '@/utils/cardName';
 
-// Utility function to intelligently truncate credit card names
-const truncateCardName = (cardName: string): string => {
-  const minLength = 20; // Show more characters to avoid harsh truncation - increased for due dates
-  const maxLength = 32; // Longer max for due dates section to show more of the name
-  
-  if (cardName.length <= maxLength) {
-    return cardName;
-  }
-
-  // Common patterns to shorten intelligently
-  const shortenPatterns = [
-    // Remove card network names that don't add value
-    { from: /\bVisa Signature\b/gi, to: '' },
-    { from: /\bVisa\b/gi, to: '' },
-    { from: /\bMastercard\b/gi, to: '' },
-    { from: /\bMasterCard\b/gi, to: '' },
-    { from: /\bSignature\b/gi, to: '' },
-    
-    // Smart abbreviations for common terms
-    { from: /\bCustomized\b/gi, to: 'Custom' },
-    { from: /\bRewards\b/gi, to: 'Rewards' }, // Keep "Rewards" as is
-    { from: /\bCash Rewards\b/gi, to: 'Cash' }, // But "Cash Rewards" becomes just "Cash"
-    { from: /\bPreferred\b/gi, to: 'Pref' },
-    { from: /\bUnlimited\b/gi, to: 'Unlmtd' },
-    { from: /\bBusiness\b/gi, to: 'Biz' },
-    
-    // Bank name abbreviations
-    { from: /\bBank of America\b/gi, to: 'BofA' },
-    { from: /\bAmerican Express\b/gi, to: 'Amex' },
-  ];
-
-  let shortened = cardName;
-  
-  // Apply shortening patterns
-  for (const pattern of shortenPatterns) {
-    shortened = shortened.replace(pattern.from, pattern.to);
-  }
-  
-  // Clean up extra spaces
-  shortened = shortened.replace(/\s+/g, ' ').trim();
-  
-  // If still too long, truncate with ellipsis but respect minimum length
-  if (shortened.length > maxLength) {
-    const truncateLength = Math.max(minLength, maxLength - 3);
-    shortened = shortened.substring(0, truncateLength) + '...';
-  }
-  
-  return shortened;
-};
+// truncateCardName now imported from shared utility for consistency
 import {
   DndContext,
   closestCenter,
