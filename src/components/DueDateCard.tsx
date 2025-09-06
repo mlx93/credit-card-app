@@ -1,7 +1,7 @@
 import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/utils/format';
 import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical, Edit3, Check, X, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { truncateCardName } from '@/utils/cardName';
+import { normalizeCardDisplayName } from '@/utils/cardName';
 
 // truncateCardName now imported from shared utility for consistency
 import {
@@ -539,9 +539,9 @@ export function DueDateCard({
                 <h3 
                   className="font-semibold text-gray-900 leading-tight whitespace-normal break-words"
                   style={{ maxWidth: '220px' }}
-                  title={card.name}
+                  title={normalizeCardDisplayName(card.name, card.mask)}
                 >
-                  {truncateCardName(card.name)}
+                  {normalizeCardDisplayName(card.name, card.mask)}
                 </h3>
                 {hasConnectionIssue && (
                   <WifiOff className="h-4 w-4 text-red-500 flex-shrink-0" title="Connection issue" />

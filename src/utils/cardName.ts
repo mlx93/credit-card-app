@@ -72,3 +72,27 @@ export function truncateCardName(cardName: string): string {
 
   return shortened;
 }
+
+// Remove embedded last-4 patterns from names (e.g., "…8484", "•••• 8484", "(8484)", "ending in 8484")
+function stripEmbeddedLast4(name: string, mask?: string): string {
+  if (!name) return '';
+  let out = name;
+  // Remove masked markers followed by 4 digits
+  out = out.replace(/(?:…|\.{2,}|•{2,}|\*{2,})\s*([0-9]{4})\b/g, '');
+  if (mask && /^[0-9]{4}$/.test(mask)) {
+    const m = mask;
+    // (8484) at end
+    out = out.replace(new RegExp(`\n?\s*\(\s*${m}\s*\)\s*$`, 'i'), '');
+    // "ending in 8484"
+    out = out.replace(new RegExp(`\bending\s+in\s+${m}\b`, 'i'), '');
+    // Trailing separators + 8484 at end
+    out = out.replace(new RegExp(`[\u2026\.\-#\s]*${m}\s*$`, 'i'), '');
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+// Public helper: normalize + truncate consistently, removing any embedded last-4
+export function normalizeCardDisplayName(name: string, mask?: string): string {
+  const stripped = stripEmbeddedLast4(name, mask);
+  return truncateCardName(stripped);
+}

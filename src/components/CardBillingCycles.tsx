@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency, formatDate, getDaysUntil } from '@/utils/format';
-import { truncateCardName } from '@/utils/cardName';
+import { normalizeCardDisplayName } from '@/utils/cardName';
 import { Calendar, CreditCard, ChevronDown, ChevronRight, History, GripVertical } from 'lucide-react';
 
 // truncateCardName now imported from shared utility
@@ -816,10 +816,10 @@ function CardContent({
             <div>
               <div className="flex items-center gap-2">
                 {(() => {
-                  const displayName = card?.name ?? cardName;
+                  const displayName = normalizeCardDisplayName(card?.name ?? cardName, card?.mask);
                   return (
                     <h3 className="font-semibold text-gray-900" title={displayName}>
-                      {truncateCardName(displayName)}
+                      {displayName}
                     </h3>
                   );
                 })()}
