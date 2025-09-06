@@ -69,6 +69,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     institutionName: string;
     itemId: string;
   } | null>(null);
+  const [addMoreSuggestion, setAddMoreSuggestion] = useState<{
+    itemId: string;
+    institutionName: string;
+  } | null>(null);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successPopupData, setSuccessPopupData] = useState<{
     newLimit: number;
@@ -865,6 +869,28 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         setRefreshProgress(0);
         setRefreshStep('');
       }, 1000);
+    }
+  };
+
+  // Wrapper to open Plaid update flow for adding more accounts under the same Item
+  const handleAddAccounts = async (itemId: string) => {
+    try {
+      console.log(`➕ Add Accounts: creating update link for itemId ${itemId}`);
+      const response = await fetch('/api/plaid/reconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId })
+      });
+      const data = await response.json();
+      if (response.ok && data.success && data.link_token) {
+        setUpdateFlow({ linkToken: data.link_token, institutionName: data.institution_name || 'your bank', itemId });
+      } else {
+        console.error('Failed to create update link for add-accounts:', data.error);
+        alert('Could not start add-accounts flow. Please try again.');
+      }
+    } catch (e) {
+      console.error('Add-accounts error:', e);
+      alert('Network error starting add-accounts flow.');
     }
   };
 
@@ -1669,6 +1695,26 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             <div className="flex items-center space-x-3 flex-shrink-0">
               {isLoggedIn ? (
                 <>
+                  {/* Add-another-account CTA after a new bank connection */}
+                  {addMoreSuggestion && (
+                    <div className="hidden sm:flex items-center space-x-2 bg-indigo-50 border border-indigo-200 text-indigo-800 px-3 py-2 rounded-lg">
+                      <span className="text-xs">Add another card from {addMoreSuggestion.institutionName}?</span>
+                      <button
+                        onClick={() => handleAddAccounts(addMoreSuggestion.itemId)}
+                        className="text-xs font-medium bg-indigo-600 text-white rounded px-2 py-1 hover:bg-indigo-700"
+                        title="Add another card"
+                      >
+                        Add Card
+                      </button>
+                      <button
+                        onClick={() => setAddMoreSuggestion(null)}
+                        className="text-xs text-indigo-700 hover:underline"
+                        title="Dismiss"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
                   {/* Elegant sync status showing real database sync times - moved to left of Refresh button */}
                   <div className="flex items-center space-x-2 text-xs">
                     {backgroundSyncing ? (
@@ -1867,6 +1913,20 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                       } catch (e) {
                         console.warn('Unable to set visual refreshing indicator:', e);
                       }
+
+                      // Suggest adding more accounts from the same bank
+                      try {
+                        if (ctx?.itemId) {
+                          const res = await fetch('/api/user/credit-cards', { cache: 'no-store' });
+                          if (res.ok) {
+                            const { creditCards } = await res.json();
+                            const anyCard = (creditCards || []).find((c: any) => c.plaidItem?.itemId === ctx.itemId);
+                            if (anyCard?.plaidItem?.institutionName) {
+                              setAddMoreSuggestion({ itemId: ctx.itemId, institutionName: anyCard.plaidItem.institutionName });
+                            }
+                          }
+                        }
+                      } catch {}
 
                       // Force a re-render by updating a dummy state
                       console.log('🔄 Forcing Dashboard re-render with state update...');
