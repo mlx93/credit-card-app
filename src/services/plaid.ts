@@ -46,13 +46,14 @@ class PlaidServiceImpl implements PlaidService {
     
     // For Robinhood, we can't use liabilities product
     // For other institutions, liabilities already includes balance data
+    // Note: 'transactions' alone works for Robinhood and gets account balance info
     const products = institutionId === 'ins_54'
-      ? ['transactions', 'balance'] // Robinhood: no liabilities support
+      ? ['transactions'] // Robinhood: just transactions (includes account data)
       : ['liabilities', 'transactions']; // Standard: liabilities includes balance
     
     console.log(`Creating link token with products:`, products);
     if (institutionId === 'ins_54') {
-      console.log('🎯 Robinhood institution detected - using balance instead of liabilities');
+      console.log('🎯 Robinhood institution detected - using transactions only (no liabilities support)');
     }
     
     const request: LinkTokenCreateRequest = {
