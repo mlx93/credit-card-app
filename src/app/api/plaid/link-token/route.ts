@@ -11,20 +11,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse request body for oauth_state_id if provided
+    // Parse request body for oauth_state_id and institutionId if provided
     let oauth_state_id: string | undefined;
+    let institutionId: string | undefined;
     try {
       const body = await request.json();
       oauth_state_id = body?.oauth_state_id;
+      institutionId = body?.institutionId;
       
       if (oauth_state_id) {
         console.log('📋 Link token request with oauth_state_id:', oauth_state_id);
       }
+      
+      if (institutionId) {
+        console.log(`📍 Creating link token for specific institution: ${institutionId}`);
+        if (institutionId === 'ins_54') {
+          console.log('🎯 Robinhood institution detected - will use investments product');
+        }
+      }
     } catch {
-      // No body or invalid JSON - that's fine, continue without oauth_state_id
+      // No body or invalid JSON - that's fine, continue without oauth_state_id or institutionId
     }
 
-    const linkToken = await plaidService.createLinkToken(session.user.id, oauth_state_id);
+    const linkToken = await plaidService.createLinkToken(session.user.id, oauth_state_id, institutionId);
     
     return NextResponse.json({ link_token: linkToken });
   } catch (error: any) {

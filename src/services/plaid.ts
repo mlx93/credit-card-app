@@ -15,7 +15,7 @@ import {
 } from 'plaid';
 
 export interface PlaidService {
-  createLinkToken(userId: string, oauth_state_id?: string): Promise<string>;
+  createLinkToken(userId: string, oauth_state_id?: string, institutionId?: string): Promise<string>;
   createUpdateLinkToken(userId: string, itemId: string): Promise<string>;
   exchangePublicToken(publicToken: string, userId: string): Promise<{ accessToken: string; itemId: string }>;
   removeItem(accessToken: string): Promise<void>;
@@ -41,15 +41,24 @@ class PlaidServiceImpl implements PlaidService {
     return institutionMatch || accountMatch;
   }
 
-  async createLinkToken(userId: string, oauth_state_id?: string): Promise<string> {
+  async createLinkToken(userId: string, oauth_state_id?: string, institutionId?: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
+    
+    // For Robinhood, use investments + balance instead of liabilities
+    // Robinhood credit cards appear as investment accounts with negative balances
+    const isRobinhoodInstitution = institutionId === 'ins_54';
+    const products = isRobinhoodInstitution 
+      ? ['investments', 'transactions', 'balance'] 
+      : ['liabilities', 'transactions'];
+    
+    console.log(`Creating link token for ${isRobinhoodInstitution ? 'Robinhood' : 'standard'} institution with products:`, products);
     
     const request: LinkTokenCreateRequest = {
       user: {
         client_user_id: userId,
       },
       client_name: "CardCycle",
-      products: ['liabilities', 'transactions'],
+      products: products as any,
       country_codes: ['US'],
       language: 'en',
       redirect_uri: 'https://www.cardcycle.app/api/plaid/callback', // Must match Plaid registration exactly
@@ -437,7 +446,35 @@ class PlaidServiceImpl implements PlaidService {
   async syncAccounts(accessToken: string, itemId: string): Promise<{ accountsProcessed: number; creditCardsFound: number }> {
     console.log(`🔄 Starting syncAccounts for itemId: ${itemId}`);
     
-    const liabilitiesData = await this.getLiabilities(accessToken);
+    // First, check if this is a Robinhood account by fetching the item details
+    const itemResponse = await plaidClient.itemGet({ access_token: accessToken });
+    const institutionId = itemResponse.data.item.institution_id;
+    const isRobinhood = institutionId === 'ins_54';
+    
+    console.log(`Institution ID: ${institutionId}, Is Robinhood: ${isRobinhood}`);
+    
+    let liabilitiesData: any = { accounts: [], liabilities: { credit: [] } };
+    let investmentsData: any = null;
+    
+    if (isRobinhood) {
+      // For Robinhood, use investments endpoint
+      console.log('🏦 Robinhood detected - using investments endpoint');
+      try {
+        const investmentResponse = await plaidClient.investmentsHoldingsGet({ access_token: accessToken });
+        investmentsData = investmentResponse.data;
+        // Map investment accounts to liability-like structure for compatibility
+        liabilitiesData.accounts = investmentsData.accounts || [];
+      } catch (error) {
+        console.error('Failed to fetch Robinhood investment data:', error);
+        // Fall back to regular accounts
+        const accountsResponse = await plaidClient.accountsGet({ access_token: accessToken });
+        liabilitiesData.accounts = accountsResponse.data.accounts || [];
+      }
+    } else {
+      // Standard flow for non-Robinhood institutions
+      liabilitiesData = await this.getLiabilities(accessToken);
+    }
+    
     await this.delay(300); // Small delay between API calls
     
     const balancesData = await this.getBalances(accessToken);
@@ -470,11 +507,39 @@ class PlaidServiceImpl implements PlaidService {
     let nonCreditCardCount = 0;
 
     for (const account of liabilitiesData.accounts) {
-      if (account.subtype === 'credit card') {
+      // For Robinhood, investment accounts with negative balances are credit cards
+      const isRobinhoodCreditCard = isRobinhood && 
+        (account.type === 'investment' || account.type === 'brokerage') && 
+        account.balances?.current && 
+        account.balances.current < 0;
+      
+      if (account.subtype === 'credit card' || isRobinhoodCreditCard) {
         creditCardCount++;
-        const liability = liabilitiesData.liabilities.credit.find(
-          (c: any) => c.account_id === account.account_id
-        );
+        
+        // For Robinhood, create a synthetic liability object from the investment account
+        let liability = null;
+        if (isRobinhoodCreditCard) {
+          console.log(`🎯 Robinhood credit card detected: ${account.name} with balance: ${account.balances.current}`);
+          // Create synthetic liability data from investment account
+          liability = {
+            account_id: account.account_id,
+            // Use absolute value of negative balance as the current balance
+            balance_current: Math.abs(account.balances.current || 0),
+            // For Robinhood, we won't have traditional credit limit data
+            limit: account.balances.limit || null,
+            // Robinhood doesn't provide these via investments API
+            minimum_payment_amount: null,
+            next_payment_due_date: null,
+            last_statement_issue_date: null,
+            last_statement_balance: null,
+            aprs: []
+          };
+        } else {
+          // Standard credit card liability lookup
+          liability = liabilitiesData.liabilities.credit.find(
+            (c: any) => c.account_id === account.account_id
+          );
+        }
 
         // Find corresponding balance data which might have more complete limit info
         const balanceAccount = balancesData.accounts.find(
