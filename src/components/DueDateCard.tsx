@@ -588,18 +588,15 @@ export function DueDateCard({
                     </svg>
                   </div>
                   <p className="text-[11px] font-semibold text-gray-700">All Paid</p>
-                  {/* Show next due date if there's a current balance (larger text, allow wrap) */}
+                  {/* Show upcoming date (no "Next" label to save vertical space) */}
                   {card.balanceCurrent > 0 && card.nextPaymentDueDate && (
-                    <div className="mt-0.5 text-center leading-4 text-gray-600 whitespace-normal break-words">
+                    <div className="mt-0.5 text-center text-gray-600 whitespace-normal break-words">
                       {(() => {
                         const currentDueDate = new Date(card.nextPaymentDueDate);
                         const nextCycleDueDate = new Date(currentDueDate);
                         nextCycleDueDate.setMonth(nextCycleDueDate.getMonth() + 1);
                         return (
-                          <>
-                            <span className="block text-[11px]">Next</span>
-                            <span className="block text-[13px] font-semibold">{formatDate(nextCycleDueDate)}</span>
-                          </>
+                          <span className="block text-[13px] font-semibold">{formatDate(nextCycleDueDate)}</span>
                         );
                       })()}
                     </div>
@@ -619,7 +616,7 @@ export function DueDateCard({
                   <p className="text-[11px] font-bold text-blue-700 uppercase tracking-wide">DUE</p>
                   <p className="text-[13px] font-semibold text-gray-900">{formatDate(card.nextPaymentDueDate)}</p>
                   {daysUntilDue !== null && (
-                    <p className={`text-[11px] font-medium ${
+                    <p className={`text-[13px] font-semibold ${
                       isOverdue 
                         ? 'text-red-600' 
                         : isDueSoon 
