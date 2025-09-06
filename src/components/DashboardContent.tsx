@@ -2042,12 +2042,45 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     order.forEach(id => next.add(id));
                     setPositionedCardIds(next);
                     localStorage.setItem('positioned_card_ids', JSON.stringify(Array.from(next)));
-                    // Persist immediately to DB to avoid race with later fetches
-                    await fetch('/api/user/credit-cards/order', {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ order })
-                    });
+                    // Persist immediately to DB with small retry/backoff to avoid race with later fetches
+                    const saveWithRetry = async (payload: string[], attempts = 3) => {
+                      let delay = 200;
+                      for (let i = 1; i <= attempts; i++) {
+                        try {
+                          const res = await fetch('/api/user/credit-cards/order', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ order: payload })
+                          });
+                          if (!res.ok) {
+                            const txt = await res.text();
+                            console.error(`Order save attempt ${i} failed:`, res.status, txt);
+                            if (i === attempts) throw new Error(`Save failed: ${res.status}`);
+                          } else {
+                            console.log(`💾 Order saved (attempt ${i})`);
+                            return;
+                          }
+                        } catch (err) {
+                          console.error(`Order save attempt ${i} error:`, err);
+                          if (i === attempts) throw err;
+                        }
+                        await new Promise(r => setTimeout(r, delay));
+                        delay *= 3; // 200 -> 600 -> 1800ms
+                      }
+                    };
+                    await saveWithRetry(order);
+                    // Optional: quick validation log to confirm what's in DB now
+                    try {
+                      const check = await fetch('/api/user/credit-cards/order/validate');
+                      if (check.ok) {
+                        const data = await check.json();
+                        console.log('✅ DB order validation:', data);
+                      } else {
+                        console.warn('Order validation failed with status:', check.status);
+                      }
+                    } catch (e) {
+                      console.warn('Order validation request failed:', e);
+                    }
                     localStorage.setItem('card_order_user_set', '1');
                     setHasUserOrdered(true);
                   } catch {}
