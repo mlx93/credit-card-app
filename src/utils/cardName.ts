@@ -9,6 +9,13 @@ export function truncateCardName(cardName: string): string {
                     .replace(/\s+/g, ' ') // collapse spaces
                     .trim();
 
+  // Insert spaces for common camel-cased brand variants before title-casing
+  // e.g., VentureOne -> Venture One, QuicksilverOne -> Quicksilver One, VentureX -> Venture X
+  src = src
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Za-z])(\d)/g, '$1 $2')
+    .replace(/(\d)([A-Za-z])/g, '$1 $2');
+
   // Title-case for consistency (e.g., BILT -> Bilt), while preserving known brands later
   const toTitle = (s: string) => s
     .split(' ')
@@ -20,6 +27,13 @@ export function truncateCardName(cardName: string): string {
   src = src
     .replace(/\bBofa\b/g, 'BofA')
     .replace(/\bAmex\b/g, 'Amex');
+
+  // Normalize specific known product names
+  src = src
+    .replace(/\bVentureone\b/gi, 'Venture One')
+    .replace(/\bQuicksilverone\b/gi, 'Quicksilver One')
+    .replace(/\bSavorone\b/gi, 'Savor One')
+    .replace(/\bVenturex\b/gi, 'Venture X');
 
   if (src.length <= maxLength) return src;
 
