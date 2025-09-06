@@ -85,8 +85,9 @@ function stripEmbeddedLast4(name: string, mask?: string): string {
     out = out.replace(new RegExp(`\n?\s*\(\s*${m}\s*\)\s*$`, 'i'), '');
     // "ending in 8484"
     out = out.replace(new RegExp(`\bending\s+in\s+${m}\b`, 'i'), '');
-    // Trailing separators + 8484 at end
-    out = out.replace(new RegExp(`[\u2026\.\-#\s]*${m}\s*$`, 'i'), '');
+    // Trailing separators + 8484 at end (place '-' at end of class to avoid ranges)
+    const tailClass = `[\u2026.#\s-]*`;
+    out = out.replace(new RegExp(`${tailClass}${m}\\s*$`, 'i'), '');
   }
   return out.replace(/\s+/g, ' ').trim();
 }
