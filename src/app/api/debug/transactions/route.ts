@@ -41,13 +41,35 @@ export async function GET(request: NextRequest) {
         console.error(`Error counting transactions for item ${item.id}:`, countError);
       }
 
-      // Get recent transactions
-      const { data: recent, error: recentError } = await supabaseAdmin
-        .from('transactions')
-        .select('id, transactionId, date, amount, name, creditCardId')
-        .eq('plaidItemId', item.id)
-        .order('date', { ascending: false })
-        .limit(5);
+      // For Robinhood, get ALL transactions from past 2 months
+      const isRobinhood = item.institutionName?.toLowerCase().includes('robinhood');
+      const twoMonthsAgo = new Date();
+      twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+      
+      let recent;
+      let recentError;
+      
+      if (isRobinhood) {
+        // Get all transactions from past 2 months for Robinhood
+        const result = await supabaseAdmin
+          .from('transactions')
+          .select('id, transactionId, date, amount, name, creditCardId, merchantName')
+          .eq('plaidItemId', item.id)
+          .gte('date', twoMonthsAgo.toISOString())
+          .order('date', { ascending: false });
+        recent = result.data;
+        recentError = result.error;
+      } else {
+        // Get recent 5 for other institutions
+        const result = await supabaseAdmin
+          .from('transactions')
+          .select('id, transactionId, date, amount, name, creditCardId')
+          .eq('plaidItemId', item.id)
+          .order('date', { ascending: false })
+          .limit(5);
+        recent = result.data;
+        recentError = result.error;
+      }
 
       if (recentError) {
         console.error(`Error fetching recent transactions for item ${item.id}:`, recentError);
