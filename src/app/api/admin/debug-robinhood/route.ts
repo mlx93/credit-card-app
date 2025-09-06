@@ -9,13 +9,17 @@ export async function GET() {
       .from('credit_cards')
       .select('id, name, mask, institutionId, institutionName, balanceCurrent, officialName');
     
-    // Robinhood cards typically have negative balances when synced
+    // Known Robinhood card from the debug data
+    const knownRobinhoodCardId = 'a4668ff3-2e74-46b7-93f5-e6ca3d3256ad';
+    
+    // Find cards that are likely Robinhood
     const possibleRobinhoodCards = allCards?.filter(c => 
+      c.id === knownRobinhoodCardId || // Known Robinhood card
       c.institutionId === 'ins_54' || 
       c.institutionName?.toLowerCase().includes('robinhood') ||
       c.officialName?.toLowerCase().includes('robinhood') ||
       c.name?.toLowerCase().includes('robinhood') ||
-      (c.balanceCurrent && c.balanceCurrent < 0) // Negative balance might indicate Robinhood
+      c.name?.toLowerCase().includes('gold') // Robinhood Gold Card
     );
 
     if (!possibleRobinhoodCards || possibleRobinhoodCards.length === 0) {
