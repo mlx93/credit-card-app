@@ -59,6 +59,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const [recentCardAddition, setRecentCardAddition] = useState(false);
   const [cardDeletionInProgress, setCardDeletionInProgress] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
+  const [hasUserOrdered, setHasUserOrdered] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('card_order_user_set') === '1';
+    }
+    return false;
+  });
   // Track which cards have been explicitly positioned by the user at least once
   const [positionedCardIds, setPositionedCardIds] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
@@ -1428,6 +1434,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         // Step 1: Load cached data immediately for instant UI
         console.log('📦 Step 1: Loading cached data for instant UI...');
         // Load cached card order first to avoid visual reordering on first paint
+        let cachedOrderApplied = false;
         try {
           const cachedOrder = localStorage.getItem('cached_card_order');
           if (cachedOrder) {
@@ -1435,6 +1442,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             if (Array.isArray(order) && order.length > 0) {
               setSharedCardOrder(order);
               console.log('✅ Loaded card order from local cache');
+              cachedOrderApplied = true;
             }
           }
         } catch (e) {
@@ -1465,13 +1473,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           }
         }
         
-        // Step 2a: Load saved card order from DB
+        // Step 2a: Load saved card order from DB (only if user hasn't manually set order)
         let loadedOrder: string[] | undefined = undefined;
         try {
           const orderRes = await fetch('/api/user/credit-cards/order', { cache: 'no-store' });
           if (orderRes.ok) {
             const { order } = await orderRes.json();
-            if (Array.isArray(order) && order.length > 0) {
+            if (!hasUserOrdered && !cachedOrderApplied && Array.isArray(order) && order.length > 0) {
               loadedOrder = order;
               setSharedCardOrder(order);
               orderInitializedRef.current = true;

@@ -4,37 +4,37 @@ import { isPaymentTransaction } from '@/utils/billingCycles';
 
 export async function GET() {
   try {
-    // First, let's see all cards and their institution IDs
+    // First, let's see all cards and check for negative balance cards (likely Robinhood)
     const { data: allCards } = await supabaseAdmin
       .from('credit_cards')
-      .select('id, name, mask, institutionId, institutionName');
+      .select('id, name, mask, institutionId, institutionName, balanceCurrent, officialName');
     
-    console.log('All cards:', allCards?.map(c => ({ 
-      name: c.name, 
-      institutionId: c.institutionId,
-      institutionName: c.institutionName 
-    })));
+    // Robinhood cards typically have negative balances when synced
+    const possibleRobinhoodCards = allCards?.filter(c => 
+      c.institutionId === 'ins_54' || 
+      c.institutionName?.toLowerCase().includes('robinhood') ||
+      c.officialName?.toLowerCase().includes('robinhood') ||
+      c.name?.toLowerCase().includes('robinhood') ||
+      (c.balanceCurrent && c.balanceCurrent < 0) // Negative balance might indicate Robinhood
+    );
 
-    // Get Robinhood cards - they might be stored with institutionName instead
-    const { data: robinhoodCards } = await supabaseAdmin
-      .from('credit_cards')
-      .select('id, name, mask, institutionId, institutionName')
-      .or('institutionId.eq.ins_54,institutionName.ilike.%robinhood%');
-
-    if (!robinhoodCards || robinhoodCards.length === 0) {
+    if (!possibleRobinhoodCards || possibleRobinhoodCards.length === 0) {
       return NextResponse.json({ 
-        message: 'No Robinhood cards found',
+        message: 'No Robinhood cards found. Showing all cards for identification:',
         allCards: allCards?.map(c => ({
           name: c.name,
+          officialName: c.officialName,
           institutionId: c.institutionId,
-          institutionName: c.institutionName
+          institutionName: c.institutionName,
+          balance: c.balanceCurrent,
+          mask: c.mask
         }))
       });
     }
 
     const results = [];
     
-    for (const card of robinhoodCards) {
+    for (const card of possibleRobinhoodCards) {
       // Get all transactions for this card
       const { data: transactions } = await supabaseAdmin
         .from('transactions')
