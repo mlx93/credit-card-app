@@ -537,17 +537,11 @@ export function DueDateCard({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1 min-h-[24px]">
                 <h3 
-                  className="font-semibold text-gray-900 leading-tight"
-                  style={{ 
-                    maxWidth: '200px',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 1,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden'
-                  }}
-                  title={card.name} // Show full name on hover
+                  className="font-semibold text-gray-900 leading-tight whitespace-normal break-words"
+                  style={{ maxWidth: '220px' }}
+                  title={card.name}
                 >
-                  {truncateCardName(card.name)} {/* Display truncated name */}
+                  {truncateCardName(card.name)}
                 </h3>
                 {hasConnectionIssue && (
                   <WifiOff className="h-4 w-4 text-red-500 flex-shrink-0" title="Connection issue" />

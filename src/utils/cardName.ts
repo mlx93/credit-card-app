@@ -4,7 +4,24 @@ export function truncateCardName(cardName: string): string {
   const maxLength = 25;
 
   if (!cardName) return '';
-  if (cardName.length <= maxLength) return cardName;
+  // Normalize common symbols and whitespace first
+  let src = cardName.replace(/[®™]/g, '') // remove trademark symbols
+                    .replace(/\s+/g, ' ') // collapse spaces
+                    .trim();
+
+  // Title-case for consistency (e.g., BILT -> Bilt), while preserving known brands later
+  const toTitle = (s: string) => s
+    .split(' ')
+    .map(w => w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w)
+    .join(' ');
+  src = toTitle(src);
+
+  // Preserve brand casing for known terms
+  src = src
+    .replace(/\bBofa\b/g, 'BofA')
+    .replace(/\bAmex\b/g, 'Amex');
+
+  if (src.length <= maxLength) return src;
 
   const shortenPatterns = [
     // Remove network/marketing suffixes
@@ -27,7 +44,7 @@ export function truncateCardName(cardName: string): string {
     { from: /\bAmerican Express\b/gi, to: 'Amex' },
   ];
 
-  let shortened = cardName;
+  let shortened = src;
   for (const pattern of shortenPatterns) {
     shortened = shortened.replace(pattern.from, pattern.to);
   }
@@ -41,4 +58,3 @@ export function truncateCardName(cardName: string): string {
 
   return shortened;
 }
-
