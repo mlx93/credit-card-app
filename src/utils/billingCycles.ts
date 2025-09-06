@@ -224,11 +224,14 @@ async function createOrUpdateCycle(
   const isExactStatementCycle = lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime();
   
   if (hasStatementBalance && creditCard.lastStatementBalance && isExactStatementCycle) {
-    // Only for the exact statement cycle, use the actual statement balance
+    // Even for statement cycles, we should use transaction-based totals for totalSpend
+    // The statement balance includes payments, but totalSpend should be actual spending only
     const statementAmount = Math.abs(creditCard.lastStatementBalance);
-    
-    // For the statement cycle, prefer the actual statement balance
-    totalSpend = statementAmount;
+    console.log(`📊 Statement cycle for ${creditCard.name} ending ${cycleEnd.toISOString().split('T')[0]}`);
+    console.log(`   Statement balance: $${statementAmount.toFixed(2)}`);
+    console.log(`   Actual spend (excluding payments): $${totalSpend.toFixed(2)}`);
+    // Keep the transaction-based totalSpend, don't override with statement balance
+    // totalSpend already calculated above excludes payments correctly
   }
 
   // Check if cycle already exists
@@ -630,9 +633,9 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
       t.date >= currentCycleStart && t.date <= currentCycleEnd
     );
 
-    // Calculate spending for this cycle (exclude payments)
+    // Calculate spending for this cycle (exclude payments but include refunds)
     const totalSpend = cycleTransactions
-      .filter(t => !isPaymentTransaction(t.name || '') && t.amount > 0)
+      .filter(t => !isPaymentTransaction(t.name || ''))
       .reduce((sum, t) => sum + t.amount, 0);
 
     // Create or update the current billing cycle
@@ -788,9 +791,9 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
       return null;
     }
 
-    // Calculate spending for this cycle (exclude payments)
+    // Calculate spending for this cycle (exclude payments but include refunds)
     const totalSpend = cycleTransactions
-      .filter(t => !isPaymentTransaction(t.name || '') && t.amount > 0)
+      .filter(t => !isPaymentTransaction(t.name || ''))
       .reduce((sum, t) => sum + t.amount, 0);
 
     // Create or update the closed billing cycle
