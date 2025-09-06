@@ -86,6 +86,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     itemId: string;
   } | null>(null);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [successPopupData, setSuccessPopupData] = useState<{
     newLimit: number;
     previousLimit: number | null;
@@ -1430,6 +1431,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     const loadInitialData = async () => {
       try {
         console.log('🚀 Starting initial data load on sign-in...');
+        setInitialLoading(true);
         
         // Step 1: Load cached data immediately for instant UI
         console.log('📦 Step 1: Loading cached data for instant UI...');
@@ -1504,9 +1506,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         }, 2000); // Increased delay to 2 seconds to ensure user is actively using the app
         
         console.log('✅ Initial data load complete - showing most recent database data');
+        setInitialLoading(false);
         
       } catch (error) {
         console.error('❌ Failed to load initial data:', error);
+        setInitialLoading(false);
         // Even on error, try to load from cache as fallback
         const cachedCards = localStorage.getItem('cached_credit_cards');
         if (cachedCards) {
@@ -2014,7 +2018,14 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         {/* Revolutionary Horizontal Card Layout */}
         <div className="mb-6">
           
-          {loading ? (
+          {initialLoading ? (
+            <div className="bg-white/50 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg p-8 text-center">
+              <div className="w-full h-2 bg-gray-200 rounded overflow-hidden mb-4">
+                <div className="h-full w-1/3 bg-gradient-to-r from-gray-300 to-gray-400 animate-pulse"></div>
+              </div>
+              <p className="text-gray-600">Loading your dashboard...</p>
+            </div>
+          ) : loading ? (
             <div className="bg-white/50 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg p-12 text-center">
               <div className="flex items-center justify-center mb-4">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
