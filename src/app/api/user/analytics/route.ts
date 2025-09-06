@@ -145,20 +145,6 @@ export async function GET(request: Request) {
       uniqueCreditCards: [...new Set(formattedTransactions.map(t => t.creditCard?.name).filter(Boolean))]
     });
 
-    // Debug: Log payment detection for this month
-    const paymentTransactionsThisMonth = thisMonthTransactions.filter(t => isPaymentTransaction(t.name));
-    const nonPaymentNegativeThisMonth = thisMonthTransactions.filter(t => t.amount < 0 && !isPaymentTransaction(t.name));
-    
-    console.log(`📊 Analytics Debug - This Month (${thisMonthTransactions.length} transactions):`);
-    console.log(`   Detected ${paymentTransactionsThisMonth.length} payment transactions`);
-    if (paymentTransactionsThisMonth.length > 0) {
-      console.log(`   Payment examples:`, paymentTransactionsThisMonth.slice(0, 3).map(t => ({ name: t.name, amount: t.amount })));
-    }
-    console.log(`   Found ${nonPaymentNegativeThisMonth.length} negative non-payment transactions (refunds)`);
-    if (nonPaymentNegativeThisMonth.length > 0) {
-      console.log(`   Potential missed payments:`, nonPaymentNegativeThisMonth.slice(0, 3).map(t => ({ name: t.name, amount: t.amount })));
-    }
-    
     // Calculate total spend: exclude payment transactions, include charges and legitimate refunds
     const totalSpendThisMonth = thisMonthTransactions.reduce((sum, t) => {
       // Skip payment transactions regardless of sign
