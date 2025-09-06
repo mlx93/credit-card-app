@@ -44,14 +44,19 @@ class PlaidServiceImpl implements PlaidService {
   async createLinkToken(userId: string, oauth_state_id?: string, institutionId?: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
     
-    // For Robinhood, use investments + balance instead of liabilities
-    // Robinhood credit cards appear as investment accounts with negative balances
-    const isRobinhoodInstitution = institutionId === 'ins_54';
-    const products = isRobinhoodInstitution 
-      ? ['investments', 'transactions', 'balance'] 
-      : ['liabilities', 'transactions'];
+    // Use a universal product set that works for most institutions
+    // Balance + Transactions works universally, then we try to get liability data separately
+    const products = ['transactions', 'balance'];
     
-    console.log(`Creating link token for ${isRobinhoodInstitution ? 'Robinhood' : 'standard'} institution with products:`, products);
+    // Only add liabilities if NOT Robinhood (since Robinhood doesn't support it)
+    if (institutionId !== 'ins_54') {
+      products.unshift('liabilities'); // Add liabilities as first product for non-Robinhood
+    }
+    
+    console.log(`Creating link token with products:`, products);
+    if (institutionId === 'ins_54') {
+      console.log('🎯 Robinhood institution detected - excluding liabilities product');
+    }
     
     const request: LinkTokenCreateRequest = {
       user: {
@@ -454,25 +459,21 @@ class PlaidServiceImpl implements PlaidService {
     console.log(`Institution ID: ${institutionId}, Is Robinhood: ${isRobinhood}`);
     
     let liabilitiesData: any = { accounts: [], liabilities: { credit: [] } };
-    let investmentsData: any = null;
     
-    if (isRobinhood) {
-      // For Robinhood, use investments endpoint
-      console.log('🏦 Robinhood detected - using investments endpoint');
+    // Always try to get standard liability data first (for non-Robinhood)
+    if (!isRobinhood) {
       try {
-        const investmentResponse = await plaidClient.investmentsHoldingsGet({ access_token: accessToken });
-        investmentsData = investmentResponse.data;
-        // Map investment accounts to liability-like structure for compatibility
-        liabilitiesData.accounts = investmentsData.accounts || [];
+        liabilitiesData = await this.getLiabilities(accessToken);
       } catch (error) {
-        console.error('Failed to fetch Robinhood investment data:', error);
-        // Fall back to regular accounts
+        console.warn('Failed to fetch liabilities, falling back to accounts:', error);
         const accountsResponse = await plaidClient.accountsGet({ access_token: accessToken });
         liabilitiesData.accounts = accountsResponse.data.accounts || [];
       }
     } else {
-      // Standard flow for non-Robinhood institutions
-      liabilitiesData = await this.getLiabilities(accessToken);
+      // For Robinhood, just get accounts - we'll identify credit cards by negative balances
+      console.log('🏦 Robinhood detected - using accounts endpoint to find credit cards');
+      const accountsResponse = await plaidClient.accountsGet({ access_token: accessToken });
+      liabilitiesData.accounts = accountsResponse.data.accounts || [];
     }
     
     await this.delay(300); // Small delay between API calls
@@ -507,11 +508,17 @@ class PlaidServiceImpl implements PlaidService {
     let nonCreditCardCount = 0;
 
     for (const account of liabilitiesData.accounts) {
-      // For Robinhood, investment accounts with negative balances are credit cards
+      // For Robinhood, any account with negative balance is likely their credit card
+      // Robinhood Gold Card shows up as various account types but always has negative balance
       const isRobinhoodCreditCard = isRobinhood && 
-        (account.type === 'investment' || account.type === 'brokerage') && 
         account.balances?.current && 
-        account.balances.current < 0;
+        account.balances.current < 0 &&
+        (account.name?.toLowerCase().includes('gold') || 
+         account.name?.toLowerCase().includes('credit') ||
+         account.name?.toLowerCase().includes('card') ||
+         account.type === 'investment' || 
+         account.type === 'brokerage' ||
+         account.type === 'other');
       
       if (account.subtype === 'credit card' || isRobinhoodCreditCard) {
         creditCardCount++;
