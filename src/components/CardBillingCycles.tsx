@@ -660,7 +660,7 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
       >
         <div className="space-y-6">
           {orderedCards.map(({ cardName, cardCycles }) => {
-            const card = cards.find(c => c.name === cardName);
+            const card = (cards && cards.length === 1) ? cards[0] : cards.find(c => c.name === cardName);
             const colorIndex = getCardColorIndex(cardName, card?.id);
             const isExpanded = expandedCards.has(cardName);
             const olderLoading = card ? olderCyclesLoadingIds.includes(card.id) : false;
