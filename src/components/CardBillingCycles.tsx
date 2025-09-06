@@ -827,9 +827,14 @@ function CardContent({
             <CreditCard className="h-5 w-5 text-gray-600 mr-2" />
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-gray-900" title={cardName}>
-                  {truncateCardName(cardName)}
-                </h3>
+                {(() => {
+                  const displayName = card?.name ?? cardName;
+                  return (
+                    <h3 className="font-semibold text-gray-900" title={displayName}>
+                      {truncateCardName(displayName)}
+                    </h3>
+                  );
+                })()}
               </div>
               {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
             </div>
