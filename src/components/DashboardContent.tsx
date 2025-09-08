@@ -2081,16 +2081,18 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     };
                     await saveWithRetry(order);
                     // Optional: quick validation log to confirm what's in DB now
-                    try {
-                      const check = await fetch('/api/user/credit-cards/order/validate');
-                      if (check.ok) {
-                        const data = await check.json();
-                        console.log('✅ DB order validation:', data);
-                      } else {
-                        console.warn('Order validation failed with status:', check.status);
+                    if (process.env.NODE_ENV !== 'production') {
+                      try {
+                        const check = await fetch('/api/user/credit-cards/order/validate');
+                        if (check.ok) {
+                          const data = await check.json();
+                          console.log('✅ DB order validation:', data);
+                        } else {
+                          console.warn('Order validation failed with status:', check.status);
+                        }
+                      } catch (e) {
+                        console.warn('Order validation request failed:', e);
                       }
-                    } catch (e) {
-                      console.warn('Order validation request failed:', e);
                     }
                     localStorage.setItem('card_order_user_set', '1');
                     setHasUserOrdered(true);

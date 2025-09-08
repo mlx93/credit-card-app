@@ -284,10 +284,8 @@ export function HorizontalCardColumns({
         const newCards = cardIds.filter(id => !validOrder.includes(id));
         const fullOrder = [...validOrder, ...newCards];
         setCardOrder(fullOrder);
-        onOrderChange?.(fullOrder);
       } else {
         setCardOrder(cardIds);
-        onOrderChange?.(cardIds);
       }
       return;
     }
@@ -304,7 +302,6 @@ export function HorizontalCardColumns({
           : missing;
         const updated = [...missingOrdered, ...kept];
         setCardOrder(updated);
-        onOrderChange?.(updated);
       }
     }
   }, [cards, initialCardOrder]);
