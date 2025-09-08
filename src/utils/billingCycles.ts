@@ -133,7 +133,11 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   // Calculate the closed cycle that ends on the statement date (contains the statement balance)
   const closedCycleEnd = new Date(lastStatementDate);
   const closedCycleStart = new Date(closedCycleEnd);
-  closedCycleStart.setDate(closedCycleStart.getDate() - cycleLength + 1);
+  
+  // For monthly billing cycles, go back one month and forward one day
+  // This handles cycles like 29th to 28th correctly regardless of month length
+  closedCycleStart.setMonth(closedCycleStart.getMonth() - 1);
+  closedCycleStart.setDate(closedCycleStart.getDate() + 1);
   
   // Create the closed cycle with statement balance
   await createOrUpdateCycle(creditCardWithTransactions, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true, transactionsWithDates);
@@ -142,7 +146,9 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   const currentCycleStart = new Date(lastStatementDate);
   currentCycleStart.setDate(currentCycleStart.getDate() + 1);
   const currentCycleEnd = new Date(currentCycleStart);
-  currentCycleEnd.setDate(currentCycleEnd.getDate() + cycleLength - 1);
+  // Move forward one month, then back one day for monthly cycles
+  currentCycleEnd.setMonth(currentCycleEnd.getMonth() + 1);
+  currentCycleEnd.setDate(currentCycleEnd.getDate() - 1);
   const currentDueDate = new Date(currentCycleEnd);
   currentDueDate.setDate(currentDueDate.getDate() + 21);
   
@@ -162,7 +168,9 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   
   while (historicalCycleEnd >= earliestCycleDate) {
     const historicalCycleStart = new Date(historicalCycleEnd);
-    historicalCycleStart.setDate(historicalCycleStart.getDate() - cycleLength + 1);
+    // Use month-based calculation for historical cycles too
+    historicalCycleStart.setMonth(historicalCycleStart.getMonth() - 1);
+    historicalCycleStart.setDate(historicalCycleStart.getDate() + 1);
     
     // Skip cycles only if they end before the card open date (no meaningful overlap)
     if (creditCardWithTransactions.openDate && historicalCycleEnd < new Date(creditCardWithTransactions.openDate)) {
