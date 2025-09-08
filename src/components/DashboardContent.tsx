@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2, CheckCircle, Settings, User } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/utils/format';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
@@ -82,6 +82,54 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const [historyRefreshingIds, setHistoryRefreshingIds] = useState<string[]>([]);
   // When true, we are fetching full billing history (beyond recent=1) in background
   const [fullCyclesLoading, setFullCyclesLoading] = useState(false);
+  // Timer/guard to defer and dedupe full-history fetch
+  const fullCyclesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasLoadedFullCyclesRef = useRef<boolean>(false);
+
+  const scheduleFullCyclesFetch = (logLabel: string = '') => {
+    // Avoid duplicate fetches
+    if (hasLoadedFullCyclesRef.current || fullCyclesTimerRef.current) return;
+    fullCyclesTimerRef.current = setTimeout(async () => {
+      fullCyclesTimerRef.current = null;
+      if (hasLoadedFullCyclesRef.current) return;
+      try {
+        setFullCyclesLoading(true);
+        const fullRes = await fetch('/api/user/billing-cycles', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        if (fullRes.ok) {
+          const { billingCycles: fullCycles } = await fullRes.json();
+          setBillingCycles(prev => {
+            const prevLen = Array.isArray(prev) ? prev.length : 0;
+            if (Array.isArray(fullCycles) && fullCycles.length >= prevLen) {
+              return fullCycles;
+            }
+            return prev;
+          });
+          hasLoadedFullCyclesRef.current = true;
+          console.log(`✅ Full billing history loaded${logLabel}`);
+        }
+      } catch (e) {
+        console.warn('Background full cycles fetch failed:', e);
+      } finally {
+        setFullCyclesLoading(false);
+      }
+    }, 2500); // defer a few seconds post-paint
+  };
+
+  // Cleanup any pending deferred fetch timers on unmount
+  useEffect(() => {
+    return () => {
+      if (fullCyclesTimerRef.current) {
+        clearTimeout(fullCyclesTimerRef.current);
+        fullCyclesTimerRef.current = null;
+      }
+    };
+  }, []);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
     institutionName: string;
@@ -526,29 +574,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       const { billingCycles: cycles } = await billingCyclesRes.json();
       const safeCycles = Array.isArray(cycles) ? cycles : [];
       setBillingCycles(safeCycles);
-      // Kick off background fetch for full history so Older Cycles button can show real counts
-      try {
-        if (safeCycles.length > 0) {
-          setFullCyclesLoading(true);
-          const fullRes = await fetch('/api/user/billing-cycles', {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-            }
-          });
-          if (fullRes.ok) {
-            const { billingCycles: fullCycles } = await fullRes.json();
-            if (Array.isArray(fullCycles) && fullCycles.length >= safeCycles.length) {
-              setBillingCycles(fullCycles);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Background full cycles fetch failed:', e);
-      } finally {
-        setFullCyclesLoading(false);
-      }
+      // Defer full-history fetch by a few seconds post-paint
+      if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchAllUserData)');
     }
 
     if (transactionsRes.ok) {
@@ -659,29 +686,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       });
       
       setBillingCycles(safeCycles);
-      // Background fetch of full billing history for accurate Older Cycles counts
-      try {
-        if (safeCycles.length > 0) {
-          setFullCyclesLoading(true);
-          const fullRes = await fetch('/api/user/billing-cycles', {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-            }
-          });
-          if (fullRes.ok) {
-            const { billingCycles: fullCycles } = await fullRes.json();
-            if (Array.isArray(fullCycles) && fullCycles.length >= safeCycles.length) {
-              setBillingCycles(fullCycles);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Background full cycles fetch failed:', e);
-      } finally {
-        setFullCyclesLoading(false);
-      }
+      // Defer full-history fetch by a few seconds post-paint
+      if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchAllUserData)');
     }
 
     if (transactionsRes.ok) {
@@ -1440,30 +1446,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       if (billingCyclesRes.ok) {
         const { billingCycles: cycles } = await billingCyclesRes.json();
         const safeCycles = Array.isArray(cycles) ? cycles : [];
-        setBillingCycles(safeCycles);
-        // Background fetch of full billing history for accurate Older Cycles counts
-        try {
-          if (safeCycles.length > 0) {
-            setFullCyclesLoading(true);
-            const fullRes = await fetch('/api/user/billing-cycles', {
-              cache: 'no-store',
-              headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-              }
-            });
-            if (fullRes.ok) {
-              const { billingCycles: fullCycles } = await fullRes.json();
-              if (Array.isArray(fullCycles) && fullCycles.length >= safeCycles.length) {
-                setBillingCycles(fullCycles);
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Background full cycles fetch failed:', e);
-        } finally {
-          setFullCyclesLoading(false);
-        }
+      setBillingCycles(safeCycles);
+      // Defer full-history fetch by a few seconds post-paint
+      if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchUserDataForNewCard)');
       }
 
       if (transactionsRes.ok) {
