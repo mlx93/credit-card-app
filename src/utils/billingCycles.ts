@@ -335,8 +335,7 @@ async function createOrUpdateCycle(
         
         const recentPayments = transactionsWithDates.filter(t => 
           statementDate && t.date > statementDate && // After statement date
-          isPaymentTransaction(t.name) && // Is a payment transaction
-          t.amount < 0 // Payments are negative amounts
+          isPaymentTransaction(t.name) // Is a payment transaction (amount sign may vary)
         );
         
         console.log(`💰 Filtered payment transactions:`, recentPayments.length);

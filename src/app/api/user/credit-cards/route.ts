@@ -112,8 +112,7 @@ export async function GET(request: NextRequest) {
       const recentPayments = cardTransactions.filter(t => {
         const transactionDate = new Date(t.date);
         return transactionDate > lastStatementDate && // After statement date
-               isPaymentTransaction(t.name) && // Is a payment transaction
-               t.amount < 0; // Payments are negative amounts
+               isPaymentTransaction(t.name); // Is a payment transaction (amount sign may vary by institution)
       });
       
       if (recentPayments.length === 0) {
