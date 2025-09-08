@@ -104,24 +104,18 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const hasLoadedFullCyclesRef = useRef<boolean>(false);
 
   // Merge helper: combine recent cycles with any existing historical cycles in state
-  const mergeRecentCycles = (prev: any[], recent: any[]) => {
+  function mergeRecentCycles(prev: any[], recent: any[]) {
     if (!Array.isArray(prev) || prev.length === 0) return recent;
     if (!Array.isArray(recent) || recent.length === 0) return prev;
     const recentById = new Set(recent.map((c: any) => c.id));
-    const recentByCard = new Map<string, any[]>();
-    for (const c of recent) {
-      const arr = recentByCard.get(c.creditCardId) || [];
-      arr.push(c);
-      recentByCard.set(c.creditCardId, arr);
-    }
     const preserved = prev.filter((c: any) => !recentById.has(c.id));
     const merged = [...recent, ...preserved];
     // Keep cycles per card sorted by endDate desc to maintain UI assumptions
     merged.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
     return merged;
-  };
+  }
 
-  const scheduleFullCyclesFetch = (logLabel: string = '') => {
+  function scheduleFullCyclesFetch(logLabel: string = '') {
     // Avoid duplicate fetches
     if (hasLoadedFullCyclesRef.current || fullCyclesTimerRef.current) return;
     fullCyclesTimerRef.current = setTimeout(async () => {
@@ -154,7 +148,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         setFullCyclesLoading(false);
       }
     }, 2500); // defer a few seconds post-paint
-  };
+  }
 
   // Cleanup any pending deferred fetch timers on unmount
   useEffect(() => {

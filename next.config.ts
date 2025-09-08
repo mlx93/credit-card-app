@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  productionBrowserSourceMaps: true,
   eslint: {
     // Disable ESLint during builds to prevent deployment failures
     ignoreDuringBuilds: true,
