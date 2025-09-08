@@ -462,7 +462,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             'Pragma': 'no-cache'
           }
         }),
-      fetch('/api/user/billing-cycles', {
+      fetch('/api/user/billing-cycles?recent=1', {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -553,7 +553,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           'Pragma': 'no-cache'
         }
       }),
-      fetch('/api/user/billing-cycles', {
+      fetch('/api/user/billing-cycles?recent=1', {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -741,7 +741,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           }
           
           // Fetch billing cycles for completeness (but keep it lightweight)
-          const cyclesResponse = await fetch('/api/user/billing-cycles', {
+          const cyclesResponse = await fetch('/api/user/billing-cycles?recent=1', {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache' }
           });
@@ -1337,7 +1337,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             'Pragma': 'no-cache'
           }
         }),
-        fetch('/api/user/billing-cycles', {
+        fetch('/api/user/billing-cycles?recent=1', {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
@@ -1861,7 +1861,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                               const start = Date.now();
                               const poll = async () => {
                                 try {
-                                  const cyclesRes = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
+                                  const cyclesRes = await fetch('/api/user/billing-cycles?recent=1', { cache: 'no-store' });
                                   if (cyclesRes.ok) {
                                     const { billingCycles } = await cyclesRes.json();
                                     const doneIds: string[] = [];
