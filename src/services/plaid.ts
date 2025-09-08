@@ -1044,20 +1044,33 @@ class PlaidServiceImpl implements PlaidService {
             })
           };
 
-          // For Robinhood cards without statement dates, preserve manual configuration
-          if (isRobinhoodCreditCard && existingCard.manual_dates_configured) {
-            console.log(`🔒 Preserving manual cycle dates for Robinhood card ${existingCard.name}`);
-            // Don't overwrite manual dates with null values
-            if (!cardData.lastStatementIssueDate) {
+          // For ANY card with manual date configuration, preserve it when Plaid doesn't provide dates
+          if (existingCard.manual_dates_configured) {
+            const hasPlaidDates = cardData.lastStatementIssueDate || cardData.nextPaymentDueDate;
+            
+            if (!hasPlaidDates) {
+              // No dates from Plaid, preserve manual configuration
+              console.log(`🔒 Preserving manual cycle dates for ${existingCard.name} (no Plaid dates available)`);
               delete updateData.lastStatementIssueDate;
-            }
-            if (!cardData.nextPaymentDueDate) {
               delete updateData.nextPaymentDueDate;
+              updateData.manual_cycle_day = existingCard.manual_cycle_day;
+              updateData.manual_due_day = existingCard.manual_due_day;
+              updateData.manual_dates_configured = existingCard.manual_dates_configured;
+            } else if (isRobinhoodCreditCard) {
+              // Special case: Robinhood often has unreliable dates, prefer manual if configured
+              console.log(`🔒 Preserving manual cycle dates for Robinhood card ${existingCard.name} (overriding Plaid)`);
+              delete updateData.lastStatementIssueDate;
+              delete updateData.nextPaymentDueDate;
+              updateData.manual_cycle_day = existingCard.manual_cycle_day;
+              updateData.manual_due_day = existingCard.manual_due_day;
+              updateData.manual_dates_configured = existingCard.manual_dates_configured;
+            } else {
+              // Has valid Plaid dates, clear manual configuration
+              console.log(`✅ Using Plaid dates for ${existingCard.name}, clearing manual configuration`);
+              updateData.manual_cycle_day = null;
+              updateData.manual_due_day = null;
+              updateData.manual_dates_configured = false;
             }
-            // Preserve manual cycle configuration fields
-            updateData.manual_cycle_day = existingCard.manual_cycle_day;
-            updateData.manual_due_day = existingCard.manual_due_day;
-            updateData.manual_dates_configured = existingCard.manual_dates_configured;
           }
 
           // Determine if Plaid data is valid
