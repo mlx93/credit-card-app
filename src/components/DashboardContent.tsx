@@ -103,6 +103,24 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const fullCyclesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasLoadedFullCyclesRef = useRef<boolean>(false);
 
+  // Merge helper: combine recent cycles with any existing historical cycles in state
+  const mergeRecentCycles = (prev: any[], recent: any[]) => {
+    if (!Array.isArray(prev) || prev.length === 0) return recent;
+    if (!Array.isArray(recent) || recent.length === 0) return prev;
+    const recentById = new Set(recent.map((c: any) => c.id));
+    const recentByCard = new Map<string, any[]>();
+    for (const c of recent) {
+      const arr = recentByCard.get(c.creditCardId) || [];
+      arr.push(c);
+      recentByCard.set(c.creditCardId, arr);
+    }
+    const preserved = prev.filter((c: any) => !recentById.has(c.id));
+    const merged = [...recent, ...preserved];
+    // Keep cycles per card sorted by endDate desc to maintain UI assumptions
+    merged.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+    return merged;
+  };
+
   const scheduleFullCyclesFetch = (logLabel: string = '') => {
     // Avoid duplicate fetches
     if (hasLoadedFullCyclesRef.current || fullCyclesTimerRef.current) return;
@@ -590,7 +608,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     if (billingCyclesRes.ok) {
       const { billingCycles: cycles } = await billingCyclesRes.json();
       const safeCycles = Array.isArray(cycles) ? cycles : [];
-      setBillingCycles(safeCycles);
+      setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
       // Defer full-history fetch by a few seconds post-paint
       if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchAllUserData)');
     }
@@ -702,7 +720,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         }))
       });
       
-      setBillingCycles(safeCycles);
+      setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
       // Defer full-history fetch by a few seconds post-paint
       if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchAllUserData)');
     }
@@ -820,7 +838,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           if (cyclesResponse.ok) {
             const { billingCycles: cycles } = await cyclesResponse.json();
             const safeCycles = Array.isArray(cycles) ? cycles : [];
-            setBillingCycles(safeCycles);
+            setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
             console.log(`✅ Updated billing cycles: ${safeCycles.length} cycles`);
           }
           
@@ -1020,6 +1038,57 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         // Just refresh Dashboard data from database - no additional API calls needed
         console.log('🔄 Refreshing Dashboard data from database after individual card sync...');
         await fetchUserDataForNewCard(' (after individual card sync - database only)');
+        
+        // Mark only the synced item's cards as loading historical cycles (spinner, disabled button)
+        try {
+          const res = await fetch('/api/user/credit-cards', { cache: 'no-store' });
+          if (res.ok) {
+            const { creditCards: latest } = await res.json();
+            const syncedCardIds = (latest || [])
+              .filter((c: any) => c.plaidItem?.itemId === itemId)
+              .map((c: any) => c.id);
+            if (syncedCardIds.length > 0) {
+              // Show visual spinner for up to 30 seconds
+              setVisualRefreshingIds(prev => Array.from(new Set([...prev, ...syncedCardIds])));
+              setTimeout(() => {
+                setVisualRefreshingIds(prev => prev.filter(id => !syncedCardIds.includes(id)));
+              }, 30000);
+
+              // Show Older Cycles button as loading (unclickable) for just these cards
+              setHistoryRefreshingIds(prev => Array.from(new Set([...prev, ...syncedCardIds])));
+
+              // Lightweight polling until historical cycles show signs of completion
+              const start = Date.now();
+              const poll = async () => {
+                try {
+                  const cyclesRes = await fetch('/api/user/billing-cycles?recent=1', { cache: 'no-store' });
+                  if (cyclesRes.ok) {
+                    const { billingCycles } = await cyclesRes.json();
+                    const doneIds: string[] = [];
+                    for (const cardId of syncedCardIds) {
+                      const cardCycles = (billingCycles || [])
+                        .filter((bc: any) => bc.creditCardId === cardId)
+                        .sort((a: any, b: any) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                      const historical = cardCycles.slice(2);
+                      const allHistoricalLoaded = historical.length > 0 && historical.every((c: any) =>
+                        (typeof c.transactionCount === 'number') ||
+                        (typeof c.statementBalance === 'number' && c.statementBalance >= 0)
+                      );
+                      if (allHistoricalLoaded) doneIds.push(cardId);
+                    }
+                    if (doneIds.length > 0) {
+                      setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
+                    }
+                    if (Date.now() - start < 120000 && doneIds.length < syncedCardIds.length) {
+                      setTimeout(poll, 5000);
+                    }
+                  }
+                } catch {}
+              };
+              setTimeout(poll, 5000);
+            }
+          }
+        } catch {}
         
         // Individual card sync completed successfully - no need to check connection health with API calls
         // If sync was successful, we know the connection is working
@@ -1463,7 +1532,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       if (billingCyclesRes.ok) {
         const { billingCycles: cycles } = await billingCyclesRes.json();
         const safeCycles = Array.isArray(cycles) ? cycles : [];
-      setBillingCycles(safeCycles);
+        setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
       // Defer full-history fetch by a few seconds post-paint
       if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchUserDataForNewCard)');
       }
@@ -2183,9 +2252,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                   } catch {}
                 }}
                 visualRefreshingIds={visualRefreshingIds}
-                olderCyclesLoadingIds={(fullCyclesLoading && Array.isArray(displayCards))
-                  ? (displayCards as any[]).map((c: any) => c.id)
-                  : historyRefreshingIds}
+                olderCyclesLoadingIds={historyRefreshingIds}
               />
             </div>
           ) : isLoggedIn ? (
