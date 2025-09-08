@@ -455,13 +455,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     
     // Skip connection health check during new card addition to avoid rate limits
     const [creditCardsRes, billingCyclesRes, transactionsRes] = await Promise.all([
-      fetch('/api/user/credit-cards', {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      }),
+      fetch('/api/user/credit-cards?light=1', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
       fetch('/api/user/billing-cycles', {
         cache: 'no-store',
         headers: {

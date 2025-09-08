@@ -4,13 +4,16 @@ import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isPaymentTransaction } from '@/utils/billingCycles';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const url = new URL(request.url);
+    const isLight = url.searchParams.get('light') === '1' || url.searchParams.get('light') === 'true';
 
     // Get user's plaid items first
     const { data: plaidItems, error: plaidError } = await supabaseAdmin
@@ -40,20 +43,23 @@ export async function GET() {
 
     const creditCardIds = (creditCards || []).map(card => card.id);
 
-    // Get APRs for all credit cards
-    const { data: aprs, error: aprsError } = await supabaseAdmin
-      .from('aprs')
-      .select('*')
-      .in('creditCardId', creditCardIds);
-
-    if (aprsError) {
-      throw new Error(`Failed to fetch APRs: ${aprsError.message}`);
+    // Get APRs for all credit cards (optional in light mode)
+    let aprs: any[] = [];
+    if (!isLight) {
+      const { data: aprRows, error: aprsError } = await supabaseAdmin
+        .from('aprs')
+        .select('*')
+        .in('creditCardId', creditCardIds);
+      if (aprsError) {
+        throw new Error(`Failed to fetch APRs: ${aprsError.message}`);
+      }
+      aprs = aprRows || [];
     }
 
-    // Get transactions for payment detection and counting
-    const transactionCounts = new Map();
-    const transactionsByCard = new Map();
-    if (creditCardIds.length > 0) {
+    // For light mode, skip heavy transaction scan
+    const transactionCounts = new Map<string, number>();
+    const transactionsByCard = new Map<string, any[]>();
+    if (!isLight && creditCardIds.length > 0) {
       const { data: transactions, error: transactionError } = await supabaseAdmin
         .from('transactions')
         .select('creditCardId, name, amount, date, authorizedDate')
@@ -63,11 +69,8 @@ export async function GET() {
 
       if (!transactionError && transactions) {
         transactions.forEach(t => {
-          // Count transactions
           const count = transactionCounts.get(t.creditCardId) || 0;
           transactionCounts.set(t.creditCardId, count + 1);
-          
-          // Group transactions by card for payment detection
           const cardTransactions = transactionsByCard.get(t.creditCardId) || [];
           cardTransactions.push(t);
           transactionsByCard.set(t.creditCardId, cardTransactions);
@@ -144,18 +147,16 @@ export async function GET() {
       const adjustedCard = {
         ...card,
         plaidItem: plaidItemMap.get(card.plaidItemId) || null,
-        aprs: aprMap.get(card.id) || [],
+        aprs: isLight ? [] : (aprMap.get(card.id) || []),
         _count: {
           transactions: transactionCounts.get(card.id) || 0,
         },
       };
       
-      // Apply payment detection to adjust statement balance and minimum payment
-      if (adjustedCard.lastStatementBalance) {
+      // In light mode, skip heavy payment detection (keep DB values as-is)
+      if (!isLight && adjustedCard.lastStatementBalance) {
         const originalStatementBalance = adjustedCard.lastStatementBalance;
         adjustedCard.lastStatementBalance = calculateRemainingStatementBalance(card);
-        
-        // If statement balance was reduced to 0, set minimum payment to 0 as well
         if (originalStatementBalance > 0 && adjustedCard.lastStatementBalance === 0) {
           adjustedCard.minimumPaymentAmount = 0;
         }
