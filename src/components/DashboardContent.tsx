@@ -636,10 +636,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
 
     if (billingCyclesRes.ok) {
+      // Intentionally do NOT overwrite UI cycles with recent=1 while history loads.
+      // Keep cache/UI stable and defer to full-history replacement.
       const { billingCycles: cycles } = await billingCyclesRes.json();
       const safeCycles = Array.isArray(cycles) ? cycles : [];
-      setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
-      // Defer full-history fetch by a few seconds post-paint
       if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchAllUserData)');
     }
 
@@ -732,26 +732,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
 
     if (billingCyclesRes.ok) {
       const { billingCycles: cycles } = await billingCyclesRes.json();
-      
-      // Ensure cycles is always an array to prevent filter errors
       const safeCycles = Array.isArray(cycles) ? cycles : [];
-      
-      // Debug: Log what we receive from API
-      const amexCycles = safeCycles.filter((c: any) => 
-        c.creditCardName?.toLowerCase().includes('platinum')
-      );
-      console.log(`🔍 DASHBOARD${logPrefix} RECEIVED FROM API:`, {
-        totalCycles: safeCycles.length,
-        amexCycles: amexCycles.length,
-        amexCycleIds: amexCycles.slice(0, 5).map((c: any) => ({
-          id: c.id?.substring(0, 8),
-          startDate: c.startDate,
-          endDate: c.endDate
-        }))
-      });
-      
-      setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
-      // Defer full-history fetch by a few seconds post-paint
+      // Log only; do not update UI with partial data. We'll defer to the full-history fetch.
+      const amexCycles = safeCycles.filter((c: any) => c.creditCardName?.toLowerCase().includes('platinum'));
+      console.log(`🔍 DASHBOARD${logPrefix} RECEIVED FROM API (suppressed UI update):`, { totalCycles: safeCycles.length, amexCycles: amexCycles.length });
       if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchAllUserData)');
     }
 
@@ -866,10 +850,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           });
           
           if (cyclesResponse.ok) {
+            // Suppress partial UI update; wait for full-history later
             const { billingCycles: cycles } = await cyclesResponse.json();
             const safeCycles = Array.isArray(cycles) ? cycles : [];
-            setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
-            console.log(`✅ Updated billing cycles: ${safeCycles.length} cycles`);
+            console.log(`ℹ️ Recent cycles fetched (UI unchanged): ${safeCycles.length}`);
           }
           
           console.log('✅ Hybrid refresh completed - new card visible');
@@ -1106,9 +1090,19 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                       );
                       if (allHistoricalLoaded) doneIds.push(cardId);
                     }
-                    if (doneIds.length > 0) {
-                      setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
-                    }
+                                    if (doneIds.length > 0) {
+                                      setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
+                                      // Fetch full history and overwrite cycles for a unified view
+                                      try {
+                                        const full = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
+                                        if (full.ok) {
+                                          const { billingCycles: all } = await full.json();
+                                          if (Array.isArray(all)) {
+                                            setBillingCycles(dedupeCycles(all));
+                                          }
+                                        }
+                                      } catch {}
+                                    }
                     if (Date.now() - start < 120000 && doneIds.length < syncedCardIds.length) {
                       setTimeout(poll, 5000);
                     }
@@ -2066,6 +2060,16 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                     }
                                     if (doneIds.length > 0) {
                                       setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
+                                      // Fetch full history and fully overwrite cycles once some cards are ready
+                                      try {
+                                        const full = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
+                                        if (full.ok) {
+                                          const { billingCycles: all } = await full.json();
+                                          if (Array.isArray(all)) {
+                                            setBillingCycles(dedupeCycles(all));
+                                          }
+                                        }
+                                      } catch {}
                                     }
                                     if (Date.now() - start < 120000 && doneIds.length < newCardsForItem.length) {
                                       setTimeout(poll, 5000);
