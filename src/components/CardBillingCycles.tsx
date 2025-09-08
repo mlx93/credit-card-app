@@ -352,7 +352,7 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
                       </svg>
                     </div>
                   </div>
-                  <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
+                  {/* Avoid showing the statement amount again when paid to prevent duplicate balances */}
                 </div>
               ) : paymentStatus === 'due' ? (
                 <div 
@@ -372,7 +372,18 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
                     </div>
                     {/* Line 2: Amount + Days Remaining */}
                     <div className="flex justify-between items-center gap-4">
-                      <p className="text-xl font-black text-gray-900">{formatCurrency(cycle.statementBalance)}</p>
+                      <p className="text-xl font-black text-gray-900">{
+                        (() => {
+                          // For the most recent closed cycle, show totalSpend (non-payment spend)
+                          const closed = (allCycles || [])
+                            .filter(c => c.statementBalance && c.statementBalance > 0)
+                            .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                          const mostRecentClosed = closed[0];
+                          const useTotal = mostRecentClosed && cycle.id === mostRecentClosed.id;
+                          const amount = useTotal ? (cycle.totalSpend || 0) : (cycle.statementBalance || 0);
+                          return formatCurrency(amount);
+                        })()
+                      }</p>
                       {daysUntilDue !== null && (
                         <p className="text-xs font-medium text-orange-600 flex-shrink-0">
                           {daysUntilDue > 0 ? `${daysUntilDue} Days Left` : 
@@ -386,17 +397,47 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
               ) : paymentStatus === 'outstanding' ? (
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-red-600">Outstanding</p>
-                  <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
+                  <p className="text-lg font-semibold text-gray-800">{
+                    (() => {
+                      const closed = (allCycles || [])
+                        .filter(c => c.statementBalance && c.statementBalance > 0)
+                        .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                      const mostRecentClosed = closed[0];
+                      const useTotal = mostRecentClosed && cycle.id === mostRecentClosed.id;
+                      const amount = useTotal ? (cycle.totalSpend || 0) : (cycle.statementBalance || 0);
+                      return formatCurrency(amount);
+                    })()
+                  }</p>
                 </div>
               ) : paymentStatus === 'current' ? (
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-gray-500">Current</p>
-                  <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
+                  <p className="text-lg font-semibold text-gray-800">{
+                    (() => {
+                      const closed = (allCycles || [])
+                        .filter(c => c.statementBalance && c.statementBalance > 0)
+                        .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                      const mostRecentClosed = closed[0];
+                      const useTotal = mostRecentClosed && cycle.id === mostRecentClosed.id;
+                      const amount = useTotal ? (cycle.totalSpend || 0) : (cycle.statementBalance || 0);
+                      return formatCurrency(amount);
+                    })()
+                  }</p>
                 </div>
               ) : (
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-gray-500">Balance</p>
-                  <p className="text-lg font-semibold text-gray-800">{formatCurrency(cycle.statementBalance)}</p>
+                  <p className="text-lg font-semibold text-gray-800">{
+                    (() => {
+                      const closed = (allCycles || [])
+                        .filter(c => c.statementBalance && c.statementBalance > 0)
+                        .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                      const mostRecentClosed = closed[0];
+                      const useTotal = mostRecentClosed && cycle.id === mostRecentClosed.id;
+                      const amount = useTotal ? (cycle.totalSpend || 0) : (cycle.statementBalance || 0);
+                      return formatCurrency(amount);
+                    })()
+                  }</p>
                 </div>
               )}
             </div>

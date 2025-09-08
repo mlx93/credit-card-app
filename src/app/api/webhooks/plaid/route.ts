@@ -240,6 +240,37 @@ async function handleTransactionWebhook(webhookCode: string, itemId: string) {
         return; // Return successfully - don't let orphaned items break webhook processing
       }
 
+      // Check if we've synced this item recently (within 12 hours) to avoid unnecessary API calls
+      const lastSyncDate = plaidItem.lastSyncAt ? new Date(plaidItem.lastSyncAt) : null;
+      const twelveHoursAgo = new Date();
+      twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
+      
+      if (lastSyncDate && lastSyncDate > twelveHoursAgo) {
+        const hoursAgo = Math.round((Date.now() - lastSyncDate.getTime()) / (1000 * 60 * 60));
+        console.log(`⏭️ Webhook sync skipped for ${plaidItem.institutionName} - item was synced ${hoursAgo}h ago (less than 12h)`);
+        console.log(`📊 Webhook type: ${webhookCode}, Item: ${itemId}`);
+        console.log(`🕐 Last sync: ${lastSyncDate.toISOString()}, Current time: ${new Date().toISOString()}`);
+        
+        // Log telemetry for skipped webhook sync
+        try {
+          await supabaseAdmin.from('user_sync_telemetry').insert({
+            user_id: plaidItem.userId,
+            event: 'webhook_sync_skipped',
+            details: { 
+              itemId, 
+              webhookCode, 
+              lastSyncAt: lastSyncDate.toISOString(),
+              hoursAgo,
+              reason: '12_hour_staleness_check'
+            }
+          });
+        } catch {}
+        
+        return; // Skip sync - data is fresh enough
+      }
+
+      console.log(`✅ Webhook sync proceeding - data is stale (${lastSyncDate ? 'last synced ' + Math.round((Date.now() - lastSyncDate.getTime()) / (1000 * 60 * 60)) + 'h ago' : 'never synced'})`);
+
       // Decrypt the access token before using it
       const decryptedAccessToken = decrypt(plaidItem.accessToken);
       await plaidService.syncTransactions(plaidItem, decryptedAccessToken);
@@ -270,6 +301,37 @@ async function handleLiabilitiesWebhook(webhookCode: string, itemId: string) {
         await logOrphanedItem(itemId, 'LIABILITIES', webhookCode);
         return; // Return successfully - don't let orphaned items break webhook processing
       }
+
+      // Check if we've synced this item recently (within 12 hours) to avoid unnecessary API calls
+      const lastSyncDate = plaidItem.lastSyncAt ? new Date(plaidItem.lastSyncAt) : null;
+      const twelveHoursAgo = new Date();
+      twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
+      
+      if (lastSyncDate && lastSyncDate > twelveHoursAgo) {
+        const hoursAgo = Math.round((Date.now() - lastSyncDate.getTime()) / (1000 * 60 * 60));
+        console.log(`⏭️ Liabilities webhook sync skipped for ${plaidItem.institutionName} - item was synced ${hoursAgo}h ago (less than 12h)`);
+        console.log(`📊 Webhook type: LIABILITIES, Code: ${webhookCode}, Item: ${itemId}`);
+        console.log(`🕐 Last sync: ${lastSyncDate.toISOString()}, Current time: ${new Date().toISOString()}`);
+        
+        // Log telemetry for skipped webhook sync
+        try {
+          await supabaseAdmin.from('user_sync_telemetry').insert({
+            user_id: plaidItem.userId,
+            event: 'webhook_liabilities_sync_skipped',
+            details: { 
+              itemId, 
+              webhookCode, 
+              lastSyncAt: lastSyncDate.toISOString(),
+              hoursAgo,
+              reason: '12_hour_staleness_check'
+            }
+          });
+        } catch {}
+        
+        return; // Skip sync - data is fresh enough
+      }
+
+      console.log(`✅ Liabilities webhook sync proceeding - data is stale (${lastSyncDate ? 'last synced ' + Math.round((Date.now() - lastSyncDate.getTime()) / (1000 * 60 * 60)) + 'h ago' : 'never synced'})`);
 
       // Decrypt the access token before using it
       const decryptedAccessToken = decrypt(plaidItem.accessToken);

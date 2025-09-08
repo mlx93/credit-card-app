@@ -80,6 +80,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   if (typeof window !== 'undefined') { (window as any).__orderInitRef = orderInitializedRef; }
   const [visualRefreshingIds, setVisualRefreshingIds] = useState<string[]>([]);
   const [historyRefreshingIds, setHistoryRefreshingIds] = useState<string[]>([]);
+  // When true, we are fetching full billing history (beyond recent=1) in background
+  const [fullCyclesLoading, setFullCyclesLoading] = useState(false);
   const [updateFlow, setUpdateFlow] = useState<{
     linkToken: string;
     institutionName: string;
@@ -524,6 +526,29 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       const { billingCycles: cycles } = await billingCyclesRes.json();
       const safeCycles = Array.isArray(cycles) ? cycles : [];
       setBillingCycles(safeCycles);
+      // Kick off background fetch for full history so Older Cycles button can show real counts
+      try {
+        if (safeCycles.length > 0) {
+          setFullCyclesLoading(true);
+          const fullRes = await fetch('/api/user/billing-cycles', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          if (fullRes.ok) {
+            const { billingCycles: fullCycles } = await fullRes.json();
+            if (Array.isArray(fullCycles) && fullCycles.length >= safeCycles.length) {
+              setBillingCycles(fullCycles);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Background full cycles fetch failed:', e);
+      } finally {
+        setFullCyclesLoading(false);
+      }
     }
 
     if (transactionsRes.ok) {
@@ -634,6 +659,29 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       });
       
       setBillingCycles(safeCycles);
+      // Background fetch of full billing history for accurate Older Cycles counts
+      try {
+        if (safeCycles.length > 0) {
+          setFullCyclesLoading(true);
+          const fullRes = await fetch('/api/user/billing-cycles', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          if (fullRes.ok) {
+            const { billingCycles: fullCycles } = await fullRes.json();
+            if (Array.isArray(fullCycles) && fullCycles.length >= safeCycles.length) {
+              setBillingCycles(fullCycles);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Background full cycles fetch failed:', e);
+      } finally {
+        setFullCyclesLoading(false);
+      }
     }
 
     if (transactionsRes.ok) {
@@ -1393,6 +1441,29 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         const { billingCycles: cycles } = await billingCyclesRes.json();
         const safeCycles = Array.isArray(cycles) ? cycles : [];
         setBillingCycles(safeCycles);
+        // Background fetch of full billing history for accurate Older Cycles counts
+        try {
+          if (safeCycles.length > 0) {
+            setFullCyclesLoading(true);
+            const fullRes = await fetch('/api/user/billing-cycles', {
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+              }
+            });
+            if (fullRes.ok) {
+              const { billingCycles: fullCycles } = await fullRes.json();
+              if (Array.isArray(fullCycles) && fullCycles.length >= safeCycles.length) {
+                setBillingCycles(fullCycles);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Background full cycles fetch failed:', e);
+        } finally {
+          setFullCyclesLoading(false);
+        }
       }
 
       if (transactionsRes.ok) {
@@ -2099,7 +2170,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                   } catch {}
                 }}
                 visualRefreshingIds={visualRefreshingIds}
-                olderCyclesLoadingIds={historyRefreshingIds}
+                olderCyclesLoadingIds={(fullCyclesLoading && Array.isArray(displayCards))
+                  ? (displayCards as any[]).map((c: any) => c.id)
+                  : historyRefreshingIds}
               />
             </div>
           ) : isLoggedIn ? (
