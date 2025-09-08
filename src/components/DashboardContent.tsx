@@ -77,6 +77,16 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const [recentCardAddition, setRecentCardAddition] = useState(false);
   const [cardDeletionInProgress, setCardDeletionInProgress] = useState(false);
   const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
+  // Pinned new cards: always placed at the front until the user reorders
+  const [pinnedNewCardIds, setPinnedNewCardIds] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('pinned_new_card_ids');
+        if (raw) return new Set(JSON.parse(raw));
+      } catch {}
+    }
+    return new Set<string>();
+  });
   const [hasUserOrdered, setHasUserOrdered] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('card_order_user_set') === '1';
@@ -601,7 +611,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       setCreditCards(safeCards);
       console.log(`🔄${logPrefix}setCreditCards completed - AFTER setState called (may not be immediately visible)`);
       
-      // Update shared card order to include new cards
+      // Update shared card order to include new cards (pin truly-new to front)
       if (safeCards.length > 0) {
         const currentCardIds = new Set(sharedCardOrder);
         const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
@@ -614,7 +624,14 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         
         if (newCards.length > 0) {
           const newCardIds = newCards.map(card => card.id);
-          const updatedOrder = [...newCardIds, ...sharedCardOrder];
+          // Pin these new cards until the user reorders
+          setPinnedNewCardIds(prev => {
+            const next = new Set(prev);
+            newCardIds.forEach(id => next.add(id));
+            try { localStorage.setItem('pinned_new_card_ids', JSON.stringify(Array.from(next))); } catch {}
+            return next;
+          });
+          const updatedOrder = getEffectiveOrder(sharedCardOrder, safeCards);
           setSharedCardOrder(updatedOrder);
           console.log(`🆕 Adding ${newCards.length} new cards to front of order${logPrefix}:`, {
             newCardNames: newCards.map(c => c.name),
@@ -625,7 +642,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           console.log('📝 New cards detected, will sync during next daily sync');
         } else if (sharedCardOrder.length === 0) {
           const defaultOrder = getDefaultCardOrder(safeCards);
-          setSharedCardOrder(defaultOrder);
+          const effective = getEffectiveOrder(defaultOrder, safeCards);
+          setSharedCardOrder(effective);
           console.log(`Setting default card order${logPrefix}:`, {
             cardCount: safeCards.length,
             defaultOrder,
@@ -700,27 +718,32 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       console.log(`📊${logPrefix} fetchAllUserData - Setting ${safeCards.length} cards:`, safeCards.map(c => ({id: c.id, name: c.name, itemId: c.plaidItem?.itemId})));
       setCreditCards(safeCards);
       
-      // Update shared card order to include new cards
+      // Update shared card order to include new cards (pin truly-new to front)
       if (safeCards.length > 0) {
         const currentCardIds = new Set(sharedCardOrder);
         const newCards = safeCards.filter(card => !currentCardIds.has(card.id));
         
         if (newCards.length > 0) {
-          // Only prepend cards that have never been explicitly positioned by the user
+          // Pin cards that haven't been explicitly positioned by the user
           const unpositionedNew = newCards
             .map(c => c.id)
             .filter(id => !positionedCardIds.has(id));
           if (unpositionedNew.length > 0) {
-            const updatedOrder = [...unpositionedNew, ...sharedCardOrder];
-            setSharedCardOrder(updatedOrder);
-            console.log(`🆕 Prepending ${unpositionedNew.length} truly-new cards${logPrefix}:`, {
-              unpositionedNew
+            setPinnedNewCardIds(prev => {
+              const next = new Set(prev);
+              unpositionedNew.forEach(id => next.add(id));
+              try { localStorage.setItem('pinned_new_card_ids', JSON.stringify(Array.from(next))); } catch {}
+              return next;
             });
+            const updatedOrder = getEffectiveOrder(sharedCardOrder, safeCards);
+            setSharedCardOrder(updatedOrder);
+            console.log(`🆕 Prepending ${unpositionedNew.length} truly-new cards${logPrefix}:`, { unpositionedNew });
           }
         } else if (sharedCardOrder.length === 0) {
           // No existing order - set default order
           const defaultOrder = getDefaultCardOrder(safeCards);
-          setSharedCardOrder(defaultOrder);
+          const effective = getEffectiveOrder(defaultOrder, safeCards);
+          setSharedCardOrder(effective);
           console.log(`Setting default card order${logPrefix}:`, {
             cardCount: safeCards.length,
             defaultOrder,
@@ -1274,6 +1297,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       setCreditCards(prev => prev.filter(c => c.id !== removedCardId));
       setBillingCycles(prev => prev.filter(cycle => cycle.creditCardId !== removedCardId));
       setSharedCardOrder(prev => prev.filter(id => id !== removedCardId));
+      setPinnedNewCardIds(prev => {
+        const next = new Set(prev);
+        next.delete(removedCardId);
+        try { localStorage.setItem('pinned_new_card_ids', JSON.stringify(Array.from(next))); } catch {}
+        return next;
+      });
 
       setDeletionProgress(50);
 
@@ -2232,7 +2261,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                 onRemove={handleCardRemove}
                 onRequestDelete={handleRequestDelete}
                 onCreditLimitUpdated={handleCreditLimitUpdated}
-                initialCardOrder={sharedCardOrder}
+                initialCardOrder={getEffectiveOrder(sharedCardOrder, displayCards)}
                 onOrderChange={async (order) => {
                   setSharedCardOrder(order);
                   try {
@@ -2242,6 +2271,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     order.forEach(id => next.add(id));
                     setPositionedCardIds(next);
                     localStorage.setItem('positioned_card_ids', JSON.stringify(Array.from(next)));
+                    // User reordered: clear pinned-new set
+                    setPinnedNewCardIds(new Set());
+                    localStorage.removeItem('pinned_new_card_ids');
                     // Persist immediately to DB with small retry/backoff to avoid race with later fetches
                     const saveWithRetry = async (payload: string[], attempts = 3) => {
                       let delay = 200;
@@ -2460,3 +2492,13 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     </div>
   );
 }
+  // Compute an effective order that always pins new cards to the front until the user reorders
+  const getEffectiveOrder = (baseOrder: string[], currentCards: any[]): string[] => {
+    const cardIds = currentCards.map(c => c.id);
+    const dedupBase = Array.from(new Set(baseOrder.filter(id => cardIds.includes(id))));
+    const pinned = Array.from(pinnedNewCardIds).filter(id => cardIds.includes(id));
+    const rest = dedupBase.filter(id => !pinned.includes(id));
+    const missing = cardIds.filter(id => !dedupBase.includes(id) && !pinned.includes(id));
+    // Pinned first, then existing order without pinned, then any brand-new not in base order
+    return Array.from(new Set([...pinned, ...rest, ...missing]));
+  };
