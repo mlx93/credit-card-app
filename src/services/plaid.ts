@@ -1758,13 +1758,19 @@ class PlaidServiceImpl implements PlaidService {
     }
 
     const accessToken = decrypt(plaidItem.accessToken);
+    
+    // Check if this is Robinhood to request appropriate products
+    const isRobinhood = plaidItem.institutionId === 'ins_54';
+    const products = isRobinhood 
+      ? ['transactions', 'investments'] // Robinhood: include investments for credit card data
+      : ['liabilities', 'transactions']; // Standard institutions
 
     const request: LinkTokenCreateRequest = {
       user: {
         client_user_id: userId,
       },
       client_name: "CardCycle",
-      products: ['liabilities', 'transactions'],
+      products: products as any,
       country_codes: ['US'],
       language: 'en',
       redirect_uri: 'https://www.cardcycle.app/api/plaid/callback', // Must match Plaid registration exactly
