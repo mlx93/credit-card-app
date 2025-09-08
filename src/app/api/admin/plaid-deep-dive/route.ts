@@ -38,12 +38,34 @@ export async function GET() {
     const accessToken = plaidItems.accessToken;
     const results: any = {};
 
-    // 1. Get Investments Holdings (might have statement info)
+    // First, check what products are actually enabled for this item
     try {
-      const investmentsResponse = await plaidClient.investmentsHoldingsGet({
+      const itemResponse = await plaidClient.itemGet({
         access_token: accessToken,
       });
-      results.investments = {
+      results.itemInfo = {
+        institutionId: itemResponse.data.item.institution_id,
+        products: itemResponse.data.item.products,
+        billedProducts: itemResponse.data.item.billed_products,
+        availableProducts: itemResponse.data.item.available_products,
+        consentedProducts: itemResponse.data.item.consented_products,
+        updateType: itemResponse.data.item.update_type,
+        webhook: itemResponse.data.item.webhook
+      };
+    } catch (error: any) {
+      results.itemInfo = { error: error.message };
+    }
+
+    // 1. Get Investments Holdings (might have statement info) - only if investments is enabled
+    try {
+      const itemResponse = await plaidClient.itemGet({ access_token: accessToken });
+      if (!itemResponse.data.item.products.includes('investments')) {
+        results.investments = { error: 'Investments product not enabled for this item' };
+      } else {
+        const investmentsResponse = await plaidClient.investmentsHoldingsGet({
+          access_token: accessToken,
+        });
+        results.investments = {
         accounts: investmentsResponse.data.accounts.map(acc => ({
           account_id: acc.account_id,
           name: acc.name,
@@ -58,6 +80,7 @@ export async function GET() {
         // Check if there's any statement-related data
         rawSample: investmentsResponse.data.accounts[0]
       };
+      }
     } catch (error: any) {
       results.investments = { error: error.message };
     }
