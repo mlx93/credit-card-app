@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
+import { decrypt } from '@/lib/encryption';
 
 const plaidClient = new PlaidApi(
   new Configuration({
@@ -35,13 +36,16 @@ export async function GET() {
       return NextResponse.json({ error: 'No Robinhood connection found' }, { status: 404 });
     }
 
-    const accessToken = plaidItems.accessToken;
+    // Decrypt the access token
+    const encryptedToken = plaidItems.accessToken;
+    const accessToken = decrypt(encryptedToken);
     const results: any = {};
 
     // Debug info
     results.debug = {
       hasAccessToken: !!accessToken,
       tokenLength: accessToken?.length,
+      tokenFormat: accessToken?.startsWith('access-') ? 'Valid Plaid format' : 'Invalid format',
       itemId: plaidItems.itemId,
       institutionName: plaidItems.institutionName
     };
