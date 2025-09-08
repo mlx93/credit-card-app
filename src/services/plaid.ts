@@ -69,9 +69,15 @@ class PlaidServiceImpl implements PlaidService {
       transactions: {
         days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)
       },
-      // Request statements if supported (won't block connection if unavailable)
-      required_if_supported_products: ['statements'] as any,
     };
+    
+    // Add statements as an optional product for all institutions
+    // This won't block connection if not supported
+    (request as any).optional_products = ['statements'];
+    
+    if (institutionId === 'ins_54') {
+      console.log('📄 Requesting optional statements product for Robinhood');
+    }
 
     // For OAuth resumption, oauth_state_id should be passed when creating the link token
     // but ONLY when resuming an existing OAuth flow, not for new connections
