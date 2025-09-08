@@ -219,7 +219,7 @@ function SortableCardColumn({
                   cards={[card]}
                   cardOrder={[card.id]}
                   olderCyclesLoadingIds={olderCyclesLoadingIds}
-                  fullCyclesLoading={fullCyclesLoading}
+                  fullCyclesLoading={props.fullCyclesLoading}
                   compactMode={true}
                 />
               </div>
