@@ -411,10 +411,48 @@ export function HorizontalCardColumns({
     .filter(Boolean) as CreditCardInfo[];
 
   const getCardCycles = (cardId: string) => {
-    return cycles
-      .filter(cycle => cycle.creditCardId === cardId)
+    // Filter to this card
+    const cardCycles = cycles.filter(cycle => cycle.creditCardId === cardId);
+
+    // De-duplicate by stable composite key (cardId + startDate + endDate)
+    const byKey = new Map<string, any>();
+    for (const c of cardCycles) {
+      const start = new Date(c.startDate).toISOString().split('T')[0];
+      const end = new Date(c.endDate).toISOString().split('T')[0];
+      const key = `${cardId}_${start}_${end}`;
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, c);
+        continue;
+      }
+      // Prefer the richer record:
+      // 1) one that has a statementBalance/minimumPayment/dueDate defined
+      const existingHasStatement = !!(existing.statementBalance || existing.minimumPayment || existing.dueDate);
+      const currentHasStatement = !!(c.statementBalance || c.minimumPayment || c.dueDate);
+      if (currentHasStatement && !existingHasStatement) {
+        byKey.set(key, c);
+        continue;
+      }
+      // 2) higher transactionCount (more complete)
+      const existingCount = typeof existing.transactionCount === 'number' ? existing.transactionCount : -1;
+      const currentCount = typeof c.transactionCount === 'number' ? c.transactionCount : -1;
+      if (currentCount > existingCount) {
+        byKey.set(key, c);
+        continue;
+      }
+      // 3) higher absolute totalSpend (fallback)
+      const existingSpend = typeof existing.totalSpend === 'number' ? Math.abs(existing.totalSpend) : -1;
+      const currentSpend = typeof c.totalSpend === 'number' ? Math.abs(c.totalSpend) : -1;
+      if (currentSpend > existingSpend) {
+        byKey.set(key, c);
+        continue;
+      }
+      // Otherwise keep existing
+    }
+
+    return Array.from(byKey.values())
       .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-    // No artificial limit - let the API's sophisticated logic determine how many cycles to show
+    // No artificial limit - let the API determine how many cycles to show
   };
 
   const getCardColorIndex = (cardName: string, cardId: string): number => {
