@@ -1026,7 +1026,7 @@ class PlaidServiceImpl implements PlaidService {
         };
 
         if (existingCard) {
-          // Prepare update data, preserving manual credit limits
+          // Prepare update data, preserving manual credit limits and cycle dates
           const updateData = {
             ...cardData,
             // Convert dates to ISO strings
@@ -1043,6 +1043,22 @@ class PlaidServiceImpl implements PlaidService {
               annualFeeDueDate: cardData.annualFeeDueDate.toISOString()
             })
           };
+
+          // For Robinhood cards without statement dates, preserve manual configuration
+          if (isRobinhoodCreditCard && existingCard.manual_dates_configured) {
+            console.log(`🔒 Preserving manual cycle dates for Robinhood card ${existingCard.name}`);
+            // Don't overwrite manual dates with null values
+            if (!cardData.lastStatementIssueDate) {
+              delete updateData.lastStatementIssueDate;
+            }
+            if (!cardData.nextPaymentDueDate) {
+              delete updateData.nextPaymentDueDate;
+            }
+            // Preserve manual cycle configuration fields
+            updateData.manual_cycle_day = existingCard.manual_cycle_day;
+            updateData.manual_due_day = existingCard.manual_due_day;
+            updateData.manual_dates_configured = existingCard.manual_dates_configured;
+          }
 
           // Determine if Plaid data is valid
           const plaidLimitIsValid = updateData.balanceLimit && 
