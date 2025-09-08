@@ -162,6 +162,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     return dedupeCycles(merged);
   }
 
+  // Compute an effective order that always pins new cards to the front until the user reorders
+  const getEffectiveOrder = (baseOrder: string[], currentCards: any[]): string[] => {
+    const cardIds = currentCards.map(c => c.id);
+    const dedupBase = Array.from(new Set(baseOrder.filter(id => cardIds.includes(id))));
+    const pinned = Array.from(pinnedNewCardIds).filter(id => cardIds.includes(id));
+    const rest = dedupBase.filter(id => !pinned.includes(id));
+    const missing = cardIds.filter(id => !dedupBase.includes(id) && !pinned.includes(id));
+    // Pinned first, then existing order without pinned, then any brand-new not in base order
+    return Array.from(new Set([...pinned, ...rest, ...missing]));
+  };
+
   function scheduleFullCyclesFetch(logLabel: string = '') {
     // Avoid duplicate fetches
     if (hasLoadedFullCyclesRef.current || fullCyclesTimerRef.current) return;
@@ -2501,13 +2512,3 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     </div>
   );
 }
-  // Compute an effective order that always pins new cards to the front until the user reorders
-  const getEffectiveOrder = (baseOrder: string[], currentCards: any[]): string[] => {
-    const cardIds = currentCards.map(c => c.id);
-    const dedupBase = Array.from(new Set(baseOrder.filter(id => cardIds.includes(id))));
-    const pinned = Array.from(pinnedNewCardIds).filter(id => cardIds.includes(id));
-    const rest = dedupBase.filter(id => !pinned.includes(id));
-    const missing = cardIds.filter(id => !dedupBase.includes(id) && !pinned.includes(id));
-    // Pinned first, then existing order without pinned, then any brand-new not in base order
-    return Array.from(new Set([...pinned, ...rest, ...missing]));
-  };
