@@ -104,6 +104,43 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const fullCyclesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasLoadedFullCyclesRef = useRef<boolean>(false);
 
+  // De-duplicate cycles by (creditCardId, startDate, endDate), preferring richer records
+  function dedupeCycles(list: any[]): any[] {
+    if (!Array.isArray(list) || list.length === 0) return [];
+    const byKey = new Map<string, any>();
+    for (const c of list) {
+      const cardId = c.creditCardId;
+      const start = new Date(c.startDate).toISOString().split('T')[0];
+      const end = new Date(c.endDate).toISOString().split('T')[0];
+      const key = `${cardId}_${start}_${end}`;
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, c);
+        continue;
+      }
+      const existingHasStatement = !!(existing.statementBalance || existing.minimumPayment || existing.dueDate);
+      const currentHasStatement = !!(c.statementBalance || c.minimumPayment || c.dueDate);
+      if (currentHasStatement && !existingHasStatement) {
+        byKey.set(key, c);
+        continue;
+      }
+      const existingCount = typeof existing.transactionCount === 'number' ? existing.transactionCount : -1;
+      const currentCount = typeof c.transactionCount === 'number' ? c.transactionCount : -1;
+      if (currentCount > existingCount) {
+        byKey.set(key, c);
+        continue;
+      }
+      const existingSpend = typeof existing.totalSpend === 'number' ? Math.abs(existing.totalSpend) : -1;
+      const currentSpend = typeof c.totalSpend === 'number' ? Math.abs(c.totalSpend) : -1;
+      if (currentSpend > existingSpend) {
+        byKey.set(key, c);
+        continue;
+      }
+      // else keep existing
+    }
+    return Array.from(byKey.values()).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  }
+
   // Merge helper: combine recent cycles with any existing historical cycles in state
   function mergeRecentCycles(prev: any[], recent: any[]) {
     if (!Array.isArray(prev) || prev.length === 0) return recent;
@@ -111,9 +148,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     const recentById = new Set(recent.map((c: any) => c.id));
     const preserved = prev.filter((c: any) => !recentById.has(c.id));
     const merged = [...recent, ...preserved];
-    // Keep cycles per card sorted by endDate desc to maintain UI assumptions
-    merged.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-    return merged;
+    return dedupeCycles(merged);
   }
 
   function scheduleFullCyclesFetch(logLabel: string = '') {
@@ -136,7 +171,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           setBillingCycles(prev => {
             const prevLen = Array.isArray(prev) ? prev.length : 0;
             if (Array.isArray(fullCycles) && fullCycles.length >= prevLen) {
-              return fullCycles;
+              return dedupeCycles(fullCycles);
             }
             return prev;
           });
@@ -1608,8 +1643,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         if (cachedCycles) {
           const cycles = JSON.parse(cachedCycles);
           if (Array.isArray(cycles) && cycles.length > 0) {
-            setBillingCycles(cycles);
-            console.log(`✅ Loaded ${cycles.length} billing cycles from cache instantly`);
+            const deduped = dedupeCycles(cycles);
+            setBillingCycles(deduped);
+            console.log(`✅ Loaded ${deduped.length} billing cycles from cache instantly (deduped)`);
           }
         }
         
