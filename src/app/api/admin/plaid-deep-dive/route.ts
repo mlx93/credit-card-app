@@ -38,6 +38,14 @@ export async function GET() {
     const accessToken = plaidItems.accessToken;
     const results: any = {};
 
+    // Debug info
+    results.debug = {
+      hasAccessToken: !!accessToken,
+      tokenLength: accessToken?.length,
+      itemId: plaidItems.itemId,
+      institutionName: plaidItems.institutionName
+    };
+
     // First, check what products are actually enabled for this item
     try {
       const itemResponse = await plaidClient.itemGet({
@@ -53,7 +61,14 @@ export async function GET() {
         webhook: itemResponse.data.item.webhook
       };
     } catch (error: any) {
-      results.itemInfo = { error: error.message };
+      console.error('ItemGet error:', error.response?.data || error.message);
+      results.itemInfo = { 
+        error: error.message,
+        errorCode: error.response?.data?.error_code,
+        errorType: error.response?.data?.error_type,
+        errorMessage: error.response?.data?.error_message,
+        displayMessage: error.response?.data?.display_message
+      };
     }
 
     // 1. Get Investments Holdings (might have statement info) - only if investments is enabled
@@ -129,15 +144,11 @@ export async function GET() {
       startDate.setMonth(startDate.getMonth() - 2);
       const endDate = new Date();
       
+      // Try basic transaction call first
       const transResponse = await plaidClient.transactionsGet({
         access_token: accessToken,
         start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-        options: {
-          include_personal_finance_category: true,
-          include_payment_meta: true,
-          include_merchant_data: true
-        }
+        end_date: endDate.toISOString().split('T')[0]
       });
       
       // Look for patterns in transaction metadata
