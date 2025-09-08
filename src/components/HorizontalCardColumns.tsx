@@ -75,6 +75,7 @@ interface HorizontalCardColumnsProps {
   onOrderChange?: (cardOrder: string[]) => void;
   visualRefreshingIds?: string[];
   olderCyclesLoadingIds?: string[];
+  fullCyclesLoading?: boolean;
   onCreditLimitUpdated?: (data: {
     newLimit: number;
     previousLimit: number | null;
@@ -218,6 +219,7 @@ function SortableCardColumn({
                   cards={[card]}
                   cardOrder={[card.id]}
                   olderCyclesLoadingIds={olderCyclesLoadingIds}
+                  fullCyclesLoading={fullCyclesLoading}
                   compactMode={true}
                 />
               </div>
@@ -246,6 +248,7 @@ export function HorizontalCardColumns({
   onOrderChange,
   visualRefreshingIds,
   olderCyclesLoadingIds,
+  fullCyclesLoading,
   onCreditLimitUpdated 
 }: HorizontalCardColumnsProps) {
   const [cardOrder, setCardOrder] = useState<string[]>(Array.from(new Set(initialCardOrder || [])));

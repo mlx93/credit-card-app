@@ -176,15 +176,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   function scheduleFullCyclesFetch(logLabel: string = '') {
     // Avoid duplicate fetches
     if (hasLoadedFullCyclesRef.current || fullCyclesTimerRef.current) return;
+    
+    // Set loading state immediately when scheduling (don't wait for timeout)
+    const allCardIds = creditCards.map(c => c.id);
+    setHistoryRefreshingIds(allCardIds);
+    setFullCyclesLoading(true);
+    console.log(`📅 Setting Older Cycles loading state for ${allCardIds.length} cards${logLabel}`);
+    
     fullCyclesTimerRef.current = setTimeout(async () => {
       fullCyclesTimerRef.current = null;
       if (hasLoadedFullCyclesRef.current) return;
       try {
-        setFullCyclesLoading(true);
-        // Set all card IDs as loading to show the loading state on Older Cycles buttons
-        const allCardIds = creditCards.map(c => c.id);
-        setHistoryRefreshingIds(allCardIds);
-        
         const fullRes = await fetch('/api/user/billing-cycles', {
           cache: 'no-store',
           headers: {
@@ -2351,6 +2353,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                 }}
                 visualRefreshingIds={visualRefreshingIds}
                 olderCyclesLoadingIds={historyRefreshingIds}
+                fullCyclesLoading={fullCyclesLoading}
               />
             </div>
           ) : isLoggedIn ? (

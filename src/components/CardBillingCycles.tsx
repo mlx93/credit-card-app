@@ -61,6 +61,7 @@ interface CardBillingCyclesProps {
   onOrderChange?: (order: string[]) => void; // Callback to sync order changes with parent
   compactMode?: boolean; // For horizontal card columns display
   olderCyclesLoadingIds?: string[]; // Card IDs whose historical cycles are still loading
+  fullCyclesLoading?: boolean; // Global loading state for when full cycles are being fetched
 }
 
 // Generate consistent colors for cards
@@ -508,7 +509,7 @@ function SortableCard({
   );
 }
 
-export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onOrderChange, compactMode = false, olderCyclesLoadingIds = [] }: CardBillingCyclesProps) {
+export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onOrderChange, compactMode = false, olderCyclesLoadingIds = [], fullCyclesLoading = false }: CardBillingCyclesProps) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [cardOrder, setCardOrder] = useState<string[]>([]);
 
@@ -645,7 +646,7 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
             const card = (cards && cards.length === 1) ? cards[0] : cards.find(c => c.name === cardName);
             const colorIndex = getCardColorIndex(cardName, card?.id);
             const isExpanded = expandedCards.has(cardName);
-            const olderLoading = card ? olderCyclesLoadingIds.includes(card.id) : false;
+            const olderLoading = (card ? olderCyclesLoadingIds.includes(card.id) : false) || fullCyclesLoading;
 
             return (
               <SortableCard
