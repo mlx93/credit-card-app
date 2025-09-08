@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CreditCard, Calendar, DollarSign, TrendingUp, RefreshCw, Loader2, CheckCircle, Settings, User } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/utils/format';
+import { normalizeCardDisplayName } from '@/utils/cardName';
 import { CardBillingCycles } from '@/components/CardBillingCycles';
 import { DueDateCard, DueDateCards } from '@/components/DueDateCard';
 import { HorizontalCardColumns } from '@/components/HorizontalCardColumns';
@@ -1829,7 +1830,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   }, [isLoggedIn]);
 
   const displayCardsRaw = isLoggedIn ? (Array.isArray(creditCards) ? creditCards : []) : mockCards;
-  const displayCards = Array.from(new Map(displayCardsRaw.map(c => [c.id, c])).values());
+  // Deduplicate cards visually by a stable identity key: normalized name + mask
+  const displayCards = (() => {
+    const byKey = new Map<string, any>();
+    for (const c of displayCardsRaw) {
+      const key = `${normalizeCardDisplayName(c.name || '', c.mask || '')}|${c.mask || ''}`.toLowerCase();
+      if (!byKey.has(key)) byKey.set(key, c);
+    }
+    return Array.from(byKey.values());
+  })();
   const displayCycles = isLoggedIn ? (Array.isArray(billingCycles) ? billingCycles : []) : mockCycles.map(cycle => ({
     ...cycle,
     startDate: new Date(cycle.startDate),
