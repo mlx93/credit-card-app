@@ -666,11 +666,14 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
 
     if (billingCyclesRes.ok) {
-      // Intentionally do NOT overwrite UI cycles with recent=1 while history loads.
-      // Keep cache/UI stable and defer to full-history replacement.
+      // Merge recent cycles (current + most recent closed) for immediate visibility
+      // while full historical billing cycles load in the background.
       const { billingCycles: cycles } = await billingCyclesRes.json();
       const safeCycles = Array.isArray(cycles) ? cycles : [];
-      if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchAllUserData)');
+      if (safeCycles.length > 0) {
+        setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
+        scheduleFullCyclesFetch(' (after fetchUserDataForNewCard)');
+      }
     }
 
     if (transactionsRes.ok) {
