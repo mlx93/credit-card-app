@@ -666,12 +666,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
 
     if (billingCyclesRes.ok) {
-      // Merge recent cycles (current + most recent closed) for immediate visibility
+      // Replace billing cycles with fresh data (don't merge to avoid duplicates)
       // while full historical billing cycles load in the background.
       const { billingCycles: cycles } = await billingCyclesRes.json();
       const safeCycles = Array.isArray(cycles) ? cycles : [];
       if (safeCycles.length > 0) {
-        setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
+        setBillingCycles(dedupeCycles(safeCycles));
         scheduleFullCyclesFetch(' (after fetchUserDataForNewCard)');
       }
     }
@@ -1600,9 +1600,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       if (billingCyclesRes.ok) {
         const { billingCycles: cycles } = await billingCyclesRes.json();
         const safeCycles = Array.isArray(cycles) ? cycles : [];
-        setBillingCycles(prev => mergeRecentCycles(prev, safeCycles));
-      // Defer full-history fetch by a few seconds post-paint
-      if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchUserDataForNewCard)');
+        // Replace entirely with fresh data to avoid duplicates
+        setBillingCycles(dedupeCycles(safeCycles));
+        // Defer full-history fetch by a few seconds post-paint
+        if (safeCycles.length > 0) scheduleFullCyclesFetch(' (after fetchDatabaseDataOnly)');
       }
 
       if (transactionsRes.ok) {
