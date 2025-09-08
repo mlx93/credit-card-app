@@ -75,12 +75,12 @@ class PlaidServiceImpl implements PlaidService {
     // This won't block connection if not supported
     (request as any).optional_products = ['statements'];
     (request as any).statements = {
-      start_date: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 6 months ago
+      start_date: new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 24 months ago (matches transactions.days_requested)
       end_date: new Date().toISOString().split('T')[0] // Today
     };
     
     if (institutionId === 'ins_54') {
-      console.log('📄 Requesting optional statements product for Robinhood with 6 months of history');
+      console.log('📄 Requesting optional statements product for Robinhood with 24 months of history');
     }
 
     // For OAuth resumption, oauth_state_id should be passed when creating the link token
