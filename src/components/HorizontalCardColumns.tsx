@@ -248,7 +248,7 @@ export function HorizontalCardColumns({
   olderCyclesLoadingIds,
   onCreditLimitUpdated 
 }: HorizontalCardColumnsProps) {
-  const [cardOrder, setCardOrder] = useState<string[]>(initialCardOrder || []);
+  const [cardOrder, setCardOrder] = useState<string[]>(Array.from(new Set(initialCardOrder || [])));
   const [userReordered, setUserReordered] = useState(false);
   // Initialize with all cards expanded by default
   const [expandedCards, setExpandedCards] = useState<Set<string>>(() => {
@@ -326,13 +326,14 @@ export function HorizontalCardColumns({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = cardOrder.indexOf(active.id as string);
-      const newIndex = cardOrder.indexOf(over.id as string);
-      
-      const newOrder = arrayMove(cardOrder, oldIndex, newIndex);
-      setCardOrder(newOrder);
+      const baseOrder = Array.from(new Set(cardOrder));
+      const oldIndex = baseOrder.indexOf(active.id as string);
+      const newIndex = baseOrder.indexOf(over.id as string);
+      const newOrder = arrayMove(baseOrder, oldIndex, newIndex);
+      const deduped = Array.from(new Set(newOrder));
+      setCardOrder(deduped);
       setUserReordered(true);
-      onOrderChange?.(newOrder);
+      onOrderChange?.(deduped);
     }
   };
 
@@ -340,12 +341,14 @@ export function HorizontalCardColumns({
   // and the user hasn't manually reordered yet in this session, adopt it.
   useEffect(() => {
     if (!initialCardOrder || initialCardOrder.length === 0) return;
-    const sameLength = initialCardOrder.length === cardOrder.length;
-    const sameOrder = sameLength && initialCardOrder.every((id, i) => id === cardOrder[i]);
-    const sameSet = initialCardOrder.every(id => cardOrder.includes(id)) && cardOrder.every(id => initialCardOrder.includes(id));
+    const dedupInit = Array.from(new Set(initialCardOrder));
+    const dedupCurrent = Array.from(new Set(cardOrder));
+    const sameLength = dedupInit.length === dedupCurrent.length;
+    const sameOrder = sameLength && dedupInit.every((id, i) => id === dedupCurrent[i]);
+    const sameSet = dedupInit.every(id => dedupCurrent.includes(id)) && dedupCurrent.every(id => dedupInit.includes(id));
     if (!userReordered && (!sameOrder || !sameLength) && sameSet) {
-      setCardOrder(initialCardOrder);
-      onOrderChange?.(initialCardOrder);
+      setCardOrder(dedupInit);
+      onOrderChange?.(dedupInit);
     }
   }, [JSON.stringify(initialCardOrder)]);
 
@@ -402,12 +405,15 @@ export function HorizontalCardColumns({
   }, [cards.length]);
 
   // Ensure any cards not yet in cardOrder still render (appended) to avoid missing new cards
+  const uniqueCardsMap = new Map(cards.map(c => [c.id, c]));
+  const baseOrder = Array.from(new Set(cardOrder));
+  const cardIds = Array.from(uniqueCardsMap.keys());
   const fullDisplayOrder = [
-    ...cardOrder,
-    ...cards.map(c => c.id).filter(id => !cardOrder.includes(id)),
+    ...baseOrder,
+    ...cardIds.filter(id => !baseOrder.includes(id)),
   ];
   const orderedCards = fullDisplayOrder
-    .map(id => cards.find(card => card.id === id))
+    .map(id => uniqueCardsMap.get(id))
     .filter(Boolean) as CreditCardInfo[];
 
   const getCardCycles = (cardId: string) => {
@@ -501,7 +507,7 @@ export function HorizontalCardColumns({
           onDragEnd={handleDragEnd}
         >
           <SortableContext 
-            items={cardOrder}
+            items={Array.from(new Set(cardOrder))}
             strategy={horizontalListSortingStrategy}
           >
             <div className="relative">

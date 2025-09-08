@@ -1805,7 +1805,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
   }, [isLoggedIn]);
 
-  const displayCards = isLoggedIn ? (Array.isArray(creditCards) ? creditCards : []) : mockCards;
+  const displayCardsRaw = isLoggedIn ? (Array.isArray(creditCards) ? creditCards : []) : mockCards;
+  const displayCards = Array.from(new Map(displayCardsRaw.map(c => [c.id, c])).values());
   const displayCycles = isLoggedIn ? (Array.isArray(billingCycles) ? billingCycles : []) : mockCycles.map(cycle => ({
     ...cycle,
     startDate: new Date(cycle.startDate),
