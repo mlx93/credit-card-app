@@ -181,6 +181,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       if (hasLoadedFullCyclesRef.current) return;
       try {
         setFullCyclesLoading(true);
+        // Set all card IDs as loading to show the loading state on Older Cycles buttons
+        const allCardIds = creditCards.map(c => c.id);
+        setHistoryRefreshingIds(allCardIds);
+        
         const fullRes = await fetch('/api/user/billing-cycles', {
           cache: 'no-store',
           headers: {
@@ -204,6 +208,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         console.warn('Background full cycles fetch failed:', e);
       } finally {
         setFullCyclesLoading(false);
+        // Clear all loading states
+        setHistoryRefreshingIds([]);
       }
     }, 2500); // defer a few seconds post-paint
   }
