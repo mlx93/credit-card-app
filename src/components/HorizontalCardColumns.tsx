@@ -236,21 +236,22 @@ function SortableCardColumn({
   );
 }
 
-export function HorizontalCardColumns({ 
-  cards, 
-  cycles, 
-  connectionHealth,
-  onSync, 
-  onReconnect, 
-  onRemove, 
-  onRequestDelete,
-  initialCardOrder, 
-  onOrderChange,
-  visualRefreshingIds,
-  olderCyclesLoadingIds,
-  onCreditLimitUpdated,
-  fullCyclesLoading = false 
-}: HorizontalCardColumnsProps) {
+export function HorizontalCardColumns(props: HorizontalCardColumnsProps) {
+  const { 
+    cards, 
+    cycles, 
+    connectionHealth,
+    onSync, 
+    onReconnect, 
+    onRemove, 
+    onRequestDelete,
+    initialCardOrder, 
+    onOrderChange,
+    visualRefreshingIds,
+    olderCyclesLoadingIds,
+    onCreditLimitUpdated,
+    fullCyclesLoading = false 
+  } = props;
   console.log('🔍 HorizontalCardColumns props:', { fullCyclesLoading, olderCyclesLoadingIds });
   const [cardOrder, setCardOrder] = useState<string[]>(Array.from(new Set(initialCardOrder || [])));
   const [userReordered, setUserReordered] = useState(false);
