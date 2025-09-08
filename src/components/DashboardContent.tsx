@@ -48,7 +48,24 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       localStorage.setItem('cached_billing_cycles', JSON.stringify(billingCycles));
     }
   }, [billingCycles, isLoggedIn]);
-  const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
+  
+  // Cache current month transactions for instant UI on next load
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isLoggedIn && currentMonthTransactions.length > 0) {
+      try {
+        localStorage.setItem('cached_transactions_current_month', JSON.stringify(currentMonthTransactions));
+      } catch {}
+    }
+  }, [currentMonthTransactions, isLoggedIn]);
+  const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>(() => {
+    if (typeof window !== 'undefined' && isLoggedIn) {
+      try {
+        const cached = localStorage.getItem('cached_transactions_current_month');
+        return cached ? JSON.parse(cached) : [];
+      } catch {}
+    }
+    return [];
+  });
   const [connectionHealth, setConnectionHealth] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -1508,6 +1525,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         }
         const cachedCards = localStorage.getItem('cached_credit_cards');
         const cachedCycles = localStorage.getItem('cached_billing_cycles');
+        const cachedTxns = localStorage.getItem('cached_transactions_current_month');
         
         let hasCachedData = false;
         
@@ -1529,6 +1547,16 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             setBillingCycles(cycles);
             console.log(`✅ Loaded ${cycles.length} billing cycles from cache instantly`);
           }
+        }
+        
+        if (cachedTxns) {
+          try {
+            const txns = JSON.parse(cachedTxns);
+            if (Array.isArray(txns) && txns.length > 0) {
+              setCurrentMonthTransactions(txns);
+              console.log(`✅ Loaded ${txns.length} transactions from cache instantly`);
+            }
+          } catch {}
         }
         
         // Step 2a: Load saved card order from DB (only if user hasn't manually set order)
