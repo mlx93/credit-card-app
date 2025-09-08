@@ -525,20 +525,55 @@ class PlaidServiceImpl implements PlaidService {
         let liability = null;
         if (isRobinhoodCreditCard) {
           console.log(`🎯 Robinhood credit card detected: ${account.name} with balance: ${account.balances.current}`);
-          // Create synthetic liability data from investment account
-          liability = {
-            account_id: account.account_id,
-            // Use absolute value of negative balance as the current balance
-            balance_current: Math.abs(account.balances.current || 0),
-            // For Robinhood, we won't have traditional credit limit data
-            limit: account.balances.limit || null,
-            // Robinhood doesn't provide these via investments API
-            minimum_payment_amount: null,
-            next_payment_due_date: null,
-            last_statement_issue_date: null,
-            last_statement_balance: null,
-            aprs: []
-          };
+          
+          // Import and use enhanced Robinhood billing extraction
+          try {
+            const { getRobinhoodBillingInfo } = await import('@/services/robinhoodPlaidEnhanced');
+            const billingInfo = await getRobinhoodBillingInfo(accessToken, account.account_id);
+            
+            if (billingInfo.confidence >= 0.5) {
+              console.log(`✅ Enhanced Robinhood billing data extracted with ${(billingInfo.confidence * 100).toFixed(0)}% confidence`);
+              liability = {
+                account_id: account.account_id,
+                // Use absolute value of negative balance as the current balance
+                balance_current: Math.abs(account.balances.current || 0),
+                // For Robinhood, we won't have traditional credit limit data
+                limit: account.balances.limit || null,
+                // Use extracted billing info if available
+                minimum_payment_amount: billingInfo.minimumPayment,
+                next_payment_due_date: billingInfo.dueDate?.toISOString().split('T')[0] || null,
+                last_statement_issue_date: billingInfo.statementDate?.toISOString().split('T')[0] || null,
+                last_statement_balance: billingInfo.statementBalance,
+                aprs: []
+              };
+            } else {
+              console.log(`⚠️ Low confidence (${(billingInfo.confidence * 100).toFixed(0)}%) in Robinhood billing data, using defaults`);
+              // Fallback to synthetic data
+              liability = {
+                account_id: account.account_id,
+                balance_current: Math.abs(account.balances.current || 0),
+                limit: account.balances.limit || null,
+                minimum_payment_amount: null,
+                next_payment_due_date: null,
+                last_statement_issue_date: null,
+                last_statement_balance: null,
+                aprs: []
+              };
+            }
+          } catch (error) {
+            console.error('Failed to get enhanced Robinhood billing info:', error);
+            // Fallback to synthetic data
+            liability = {
+              account_id: account.account_id,
+              balance_current: Math.abs(account.balances.current || 0),
+              limit: account.balances.limit || null,
+              minimum_payment_amount: null,
+              next_payment_due_date: null,
+              last_statement_issue_date: null,
+              last_statement_balance: null,
+              aprs: []
+            };
+          }
         } else {
           // Standard credit card liability lookup
           liability = liabilitiesData.liabilities.credit.find(
