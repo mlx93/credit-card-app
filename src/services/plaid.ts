@@ -44,16 +44,16 @@ class PlaidServiceImpl implements PlaidService {
   async createLinkToken(userId: string, oauth_state_id?: string, institutionId?: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
     
-    // For Robinhood, we can't use liabilities product but we can use investments
-    // For other institutions, liabilities already includes balance data
-    // Note: 'investments' product can provide better data for Robinhood credit cards
+    // For Robinhood, we can't use liabilities product
+    // We only use transactions to ensure credit card accounts are visible
+    // Investments product filters out credit cards in Plaid Link UI
     const products = institutionId === 'ins_54'
-      ? ['transactions', 'investments'] // Robinhood: transactions + investments for better credit card data
+      ? ['transactions'] // Robinhood: transactions only to see credit card accounts
       : ['liabilities', 'transactions']; // Standard: liabilities includes balance
     
     console.log(`Creating link token with products:`, products);
     if (institutionId === 'ins_54') {
-      console.log('🎯 Robinhood institution detected - requesting transactions + investments for enhanced credit card data');
+      console.log('🎯 Robinhood institution detected - using transactions only (credit cards not visible with investments product)');
     }
     
     const request: LinkTokenCreateRequest = {
@@ -1762,7 +1762,7 @@ class PlaidServiceImpl implements PlaidService {
     // Check if this is Robinhood to request appropriate products
     const isRobinhood = plaidItem.institutionId === 'ins_54';
     const products = isRobinhood 
-      ? ['transactions', 'investments'] // Robinhood: include investments for credit card data
+      ? ['transactions'] // Robinhood: transactions only (investments filters out credit cards)
       : ['liabilities', 'transactions']; // Standard institutions
 
     const request: LinkTokenCreateRequest = {
