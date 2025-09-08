@@ -49,14 +49,6 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
   }, [billingCycles, isLoggedIn]);
   
-  // Cache current month transactions for instant UI on next load
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isLoggedIn && currentMonthTransactions.length > 0) {
-      try {
-        localStorage.setItem('cached_transactions_current_month', JSON.stringify(currentMonthTransactions));
-      } catch {}
-    }
-  }, [currentMonthTransactions, isLoggedIn]);
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>(() => {
     if (typeof window !== 'undefined' && isLoggedIn) {
       try {
@@ -66,6 +58,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
     return [];
   });
+  
+  // Cache current month transactions for instant UI on next load
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isLoggedIn && currentMonthTransactions.length > 0) {
+      try {
+        localStorage.setItem('cached_transactions_current_month', JSON.stringify(currentMonthTransactions));
+      } catch {}
+    }
+  }, [currentMonthTransactions, isLoggedIn]);
   const [connectionHealth, setConnectionHealth] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
