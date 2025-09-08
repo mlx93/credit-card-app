@@ -827,7 +827,7 @@ function CardContent({
               {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
             </div>
           </div>
-          {historical.length > 0 && (
+          {(historical.length > 0 || olderLoading) && (
             <button
               onClick={() => {
                 console.log(`🔘 Historical cycles button clicked for ${cardName}:`, {
