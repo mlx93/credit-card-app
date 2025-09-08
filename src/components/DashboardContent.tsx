@@ -2284,6 +2284,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
             </div>
           ) : displayCards.length > 0 ? (
             <div className="relative -mx-7">
+              {console.log('🔍 DashboardContent passing fullCyclesLoading:', fullCyclesLoading)}
               <HorizontalCardColumns
                 cards={displayCards}
                 cycles={displayCycles}
