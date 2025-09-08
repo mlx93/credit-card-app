@@ -69,6 +69,8 @@ class PlaidServiceImpl implements PlaidService {
       transactions: {
         days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)
       },
+      // Request statements if supported (won't block connection if unavailable)
+      required_if_supported_products: ['statements'] as any,
     };
 
     // For OAuth resumption, oauth_state_id should be passed when creating the link token
@@ -526,43 +528,57 @@ class PlaidServiceImpl implements PlaidService {
         if (isRobinhoodCreditCard) {
           console.log(`🎯 Robinhood credit card detected: ${account.name} with balance: ${account.balances.current}`);
           
-          // Import and use enhanced Robinhood billing extraction
+          // Try multiple methods to get Robinhood billing data
           try {
-            const { getRobinhoodBillingInfo } = await import('@/services/robinhoodPlaidEnhanced');
-            const billingInfo = await getRobinhoodBillingInfo(accessToken, account.account_id);
+            // Method 1: Try Statements API first (most accurate)
+            const { getStatementDates } = await import('@/services/plaidStatements');
+            const statementDates = await getStatementDates(accessToken, account.account_id);
             
-            if (billingInfo.confidence >= 0.5) {
-              console.log(`✅ Enhanced Robinhood billing data extracted with ${(billingInfo.confidence * 100).toFixed(0)}% confidence`);
+            if (statementDates && statementDates.confidence >= 0.9) {
+              console.log(`✅ Robinhood statement dates extracted from Statements API (${(statementDates.confidence * 100).toFixed(0)}% confidence)`);
               liability = {
                 account_id: account.account_id,
-                // Use absolute value of negative balance as the current balance
                 balance_current: Math.abs(account.balances.current || 0),
-                // For Robinhood, we won't have traditional credit limit data
                 limit: account.balances.limit || null,
-                // Use extracted billing info if available
-                minimum_payment_amount: billingInfo.minimumPayment,
-                next_payment_due_date: billingInfo.dueDate?.toISOString().split('T')[0] || null,
-                last_statement_issue_date: billingInfo.statementDate?.toISOString().split('T')[0] || null,
-                last_statement_balance: billingInfo.statementBalance,
+                minimum_payment_amount: null, // Would need PDF parsing for this
+                next_payment_due_date: statementDates.dueDate?.toISOString().split('T')[0] || null,
+                last_statement_issue_date: statementDates.statementDate?.toISOString().split('T')[0] || null,
+                last_statement_balance: null, // Would need PDF parsing for this
                 aprs: []
               };
             } else {
-              console.log(`⚠️ Low confidence (${(billingInfo.confidence * 100).toFixed(0)}%) in Robinhood billing data, using defaults`);
-              // Fallback to synthetic data
-              liability = {
-                account_id: account.account_id,
-                balance_current: Math.abs(account.balances.current || 0),
-                limit: account.balances.limit || null,
-                minimum_payment_amount: null,
-                next_payment_due_date: null,
-                last_statement_issue_date: null,
-                last_statement_balance: null,
-                aprs: []
-              };
+              // Method 2: Fall back to transaction analysis
+              const { getRobinhoodBillingInfo } = await import('@/services/robinhoodPlaidEnhanced');
+              const billingInfo = await getRobinhoodBillingInfo(accessToken, account.account_id);
+              
+              if (billingInfo.confidence >= 0.5) {
+                console.log(`✅ Robinhood billing data extracted from transactions (${(billingInfo.confidence * 100).toFixed(0)}% confidence)`);
+                liability = {
+                  account_id: account.account_id,
+                  balance_current: Math.abs(account.balances.current || 0),
+                  limit: account.balances.limit || null,
+                  minimum_payment_amount: billingInfo.minimumPayment,
+                  next_payment_due_date: billingInfo.dueDate?.toISOString().split('T')[0] || null,
+                  last_statement_issue_date: billingInfo.statementDate?.toISOString().split('T')[0] || null,
+                  last_statement_balance: billingInfo.statementBalance,
+                  aprs: []
+                };
+              } else {
+                console.log(`⚠️ Low confidence in Robinhood data extraction, using defaults`);
+                liability = {
+                  account_id: account.account_id,
+                  balance_current: Math.abs(account.balances.current || 0),
+                  limit: account.balances.limit || null,
+                  minimum_payment_amount: null,
+                  next_payment_due_date: null,
+                  last_statement_issue_date: null,
+                  last_statement_balance: null,
+                  aprs: []
+                };
+              }
             }
           } catch (error) {
-            console.error('Failed to get enhanced Robinhood billing info:', error);
-            // Fallback to synthetic data
+            console.error('Failed to get Robinhood billing info:', error);
             liability = {
               account_id: account.account_id,
               balance_current: Math.abs(account.balances.current || 0),
