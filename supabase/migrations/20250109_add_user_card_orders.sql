@@ -12,15 +12,15 @@ alter table public.user_card_orders enable row level security;
 -- RLS: Users can manage only their own order (idempotent via drop/create)
 drop policy if exists "select own order" on public.user_card_orders;
 create policy "select own order" on public.user_card_orders
-  for select using (auth.uid()::text::uuid = user_id);
+  for select using (auth.uid() = user_id);
 
 drop policy if exists "upsert own order" on public.user_card_orders;
 create policy "upsert own order" on public.user_card_orders
-  for insert with check (auth.uid()::text::uuid = user_id);
+  for insert with check (auth.uid() = user_id);
 
 drop policy if exists "update own order" on public.user_card_orders;
 create policy "update own order" on public.user_card_orders
-  for update using (auth.uid()::text::uuid = user_id);
+  for update using (auth.uid() = user_id);
 
 -- Getter RPC
 create or replace function public.get_card_order()
@@ -29,7 +29,7 @@ language sql
 security definer
 set search_path = public
 as $$
-  select coalesce(order_ids, '{}') from public.user_card_orders where user_id = next_auth.uid();
+  select coalesce(order_ids, '{}') from public.user_card_orders where user_id = auth.uid();
 $$;
 
 -- Setter RPC
@@ -41,7 +41,7 @@ set search_path = public
 as $$
 begin
   insert into public.user_card_orders(user_id, order_ids, updated_at)
-  values (next_auth.uid(), p_order, now())
+  values (auth.uid(), p_order, now())
   on conflict (user_id) do update set order_ids = excluded.order_ids, updated_at = now();
   return true;
 exception when others then
@@ -52,7 +52,7 @@ $$;
 -- Store lightweight sync telemetry
 create table if not exists public.sync_telemetry (
   id uuid primary key default gen_random_uuid(),
-  plaid_item_id uuid not null references public.plaid_items(id) on delete cascade,
+  plaid_item_id text not null references public.plaid_items(id) on delete cascade,
   trigger_source text not null check (trigger_source in ('manual', 'webhook', 'automatic')),
   sync_type text not null check (sync_type in ('instant', 'comprehensive', 'fast', 'update', 'reconnection')),
   started_at timestamptz not null default now(),
