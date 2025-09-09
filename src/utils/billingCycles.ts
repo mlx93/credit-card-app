@@ -259,13 +259,12 @@ async function createOrUpdateCycle(
     // totalSpend already calculated above excludes payments correctly
   }
 
-  // Check if cycle already exists
+  // Check if cycle already exists - match by start date to prevent overlapping cycles
   const { data: existingCycle, error: findError } = await supabaseAdmin
     .from('billing_cycles')
     .select('*')
     .eq('creditCardId', creditCard.id)
     .eq('startDate', cycleStart.toISOString())
-    .eq('endDate', cycleEnd.toISOString())
     .single();
 
   if (findError && findError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
@@ -458,12 +457,18 @@ async function createOrUpdateCycle(
       transactionCount: cycleTransactions?.filter(t => !isPaymentTransaction(t.name || '')).length || 0,
     });
   } else {
+    console.log(`🔄 Updating existing billing cycle for ${creditCard.name} starting ${cycleStart.toDateString()}`);
+    if (existingCycle.endDate !== cycleEnd.toISOString()) {
+      console.log(`📅 End date changed: ${existingCycle.endDate} → ${cycleEnd.toISOString()}`);
+    }
+    
     // Always update existing cycles to ensure transaction-based totals are current
     const { data: updatedCycle, error: updateError } = await supabaseAdmin
       .from('billing_cycles')
       .update({
         creditcardname: creditCard.name,
         transactioncount: cycleTransactions?.length || 0,
+        endDate: cycleEnd.toISOString(), // Update end date if calculation changed
         statementBalance,
         minimumPayment,
         dueDate: dueDate?.toISOString() || null,
