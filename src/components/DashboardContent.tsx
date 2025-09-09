@@ -1044,7 +1044,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       const response = await fetch('/api/sync', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId })
+        body: JSON.stringify({ itemId, forceSync: true }) // Force sync to bypass any caching
       });
       
       if (response.ok) {

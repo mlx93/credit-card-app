@@ -83,8 +83,10 @@ export async function POST(request: NextRequest) {
         const decryptedAccessToken = decrypt(item.accessToken);
         
         console.log('Step 1: Syncing accounts...');
+        console.log('Syncing with forceSync:', forceSync);
         const accountSyncResult = await plaidService.syncAccounts(decryptedAccessToken, item.itemId);
         console.log('Step 1: Account sync completed');
+        console.log('Account sync result:', accountSyncResult);
         
         // Track account sync details for response
         const accountsProcessed = accountSyncResult?.accountsProcessed || 0;

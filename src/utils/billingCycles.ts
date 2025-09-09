@@ -762,7 +762,7 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
           endDate: currentCycleEnd.toISOString().split('T')[0],
           totalSpend,
           transactionCount: nonPaymentTransactions.length,
-          paymentStatus: 'current', // Current cycle is always in progress
+          paymentstatus: 'current', // Current cycle is always in progress
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
@@ -895,7 +895,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
           transactionCount: nonPaymentTransactions.length,
           // Use the determined statement balance (either Plaid's for matching cycle or totalSpend)
           statementBalance: cycleStatementBalance,
-          paymentStatus: 'due', // Closed cycles are typically due
+          paymentstatus: 'due', // Closed cycles are typically due
           updatedAt: new Date().toISOString(),
         })
         .eq('id', existingCycle.id)
@@ -939,7 +939,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
           transactionCount: nonPaymentTransactions.length,
           statementBalance: cycleStatementBalance, // Use the determined statement balance
           dueDate: dueDateVal,
-          paymentStatus: 'due', // Closed cycles are typically due
+          paymentstatus: 'due', // Closed cycles are typically due
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })

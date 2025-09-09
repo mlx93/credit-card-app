@@ -923,6 +923,15 @@ class PlaidServiceImpl implements PlaidService {
           finalAvailableBalance: availableBalance
         });
 
+        // Log liability data before building cardData
+        console.log(`📊 Liability data for ${account.name}:`, {
+          hasLiability: !!liability,
+          lastStatementIssueDate: liability?.last_statement_issue_date,
+          lastStatementBalance: liability?.last_statement_balance,
+          minimumPaymentAmount: liability?.minimum_payment_amount,
+          nextPaymentDueDate: liability?.next_payment_due_date
+        });
+        
         const cardData = {
           name: account.name,
           officialName: account.official_name,
@@ -1101,6 +1110,13 @@ class PlaidServiceImpl implements PlaidService {
             }
           }
 
+          console.log(`🔄 Updating card ${existingCard.name} with liability data:`, {
+            lastStatementBalance: updateData.lastStatementBalance,
+            lastStatementIssueDate: updateData.lastStatementIssueDate,
+            minimumPaymentAmount: updateData.minimumPaymentAmount,
+            currentBalance: updateData.balanceCurrent
+          });
+          
           const { error: updateError } = await supabaseAdmin
             .from('credit_cards')
             .update(updateData)
@@ -1108,6 +1124,8 @@ class PlaidServiceImpl implements PlaidService {
 
           if (updateError) {
             console.error('Failed to update credit card:', updateError);
+          } else {
+            console.log(`✅ Successfully updated ${existingCard.name} in database`);
           }
         } else {
           // Double-check that no card was created by another concurrent process
