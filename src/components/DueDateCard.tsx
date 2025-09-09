@@ -91,6 +91,13 @@ interface DueDateCardProps {
     newUtilization: number;
     cardName: string;
   }) => void;
+  recentCycles?: Array<{
+    id: string;
+    startDate: Date;
+    endDate: Date;
+    statementBalance?: number;
+    minimumPayment?: number;
+  }>;
 }
 
 // Darker shades for Due Date cards to distinguish from Billing Cycles
@@ -704,29 +711,58 @@ export function DueDateCard({
         
         const searchFromDate = statementIssueDate || sixtyDaysAgo;
         
-        console.log(`🔍 Main statement balance check for ${card.name}:`, {
-          hasRecentTransactions: !!(card.recentTransactions && card.recentTransactions.length > 0),
-          transactionCount: card.recentTransactions?.length || 0,
+        // Check if recent billing cycles indicate the statement was paid off
+        // Use the same logic as CardBillingCycles: minimumPayment === 0 indicates payment
+        const hasRecentPaidCycle = (card.recentCycles || []).some(cycle => {
+          const cycleEnd = new Date(cycle.endDate);
+          const today = new Date();
+          const cycleEnded = cycleEnd < today;
+          const wasStatementPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
+          
+          return cycleEnded && wasStatementPaidOff;
+        });
+        
+        console.log(`🔍 Statement balance check for ${card.name}:`, {
           statementBalance,
-          minimumPayment
+          minimumPayment,
+          hasRecentCycles: !!(card.recentCycles && card.recentCycles.length > 0),
+          cycleCount: card.recentCycles?.length || 0,
+          hasRecentPaidCycle,
+          recentCycles: card.recentCycles?.map(c => ({
+            endDate: c.endDate.toDateString ? c.endDate.toDateString() : c.endDate,
+            minimumPayment: c.minimumPayment,
+            statementBalance: c.statementBalance,
+            isPaid: c.minimumPayment === 0 && c.statementBalance && c.statementBalance > 0
+          }))
         });
         
-        const recentPayments = (card.recentTransactions || []).filter(t => {
-          const transactionDate = new Date(t.date);
-          return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
-        });
+        // Hide statement balance if a recent cycle was paid off 
+        // OR fallback to transaction detection if no cycle data
+        if (hasRecentPaidCycle) {
+          console.log(`📊 HIDING statement balance for ${card.name} - recent cycle was paid off`);
+          return false;
+        }
         
-        // Check if there's a payment that matches the statement balance (within $5 tolerance)
-        const statementMatchingPayment = recentPayments.find(t => {
-          const paymentAmount = Math.abs(t.amount);
-          const difference = Math.abs(paymentAmount - statementBalance);
-          return difference <= 5; // Allow $5 tolerance for rounding/fees
-        });
+        // Fallback to transaction-based detection when no cycle data available
+        if (card.recentTransactions) {
+          const recentPayments = (card.recentTransactions || []).filter(t => {
+            const transactionDate = new Date(t.date);
+            return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
+          });
+          
+          const statementMatchingPayment = recentPayments.find(t => {
+            const paymentAmount = Math.abs(t.amount);
+            const difference = Math.abs(paymentAmount - statementBalance);
+            return difference <= 5;
+          });
+          
+          console.log(`📊 Fallback transaction check for ${card.name}: ${statementMatchingPayment ? 'HIDE' : 'SHOW'}`);
+          return !statementMatchingPayment;
+        }
         
-        console.log(`📊 Statement balance decision for ${card.name}: ${statementMatchingPayment ? 'HIDE' : 'SHOW'} (found ${recentPayments.length} payments)`);
-        
-        // Show statement balance only if no matching payment was found
-        return !statementMatchingPayment;
+        // Final fallback: show statement balance if we can't determine payment status
+        console.log(`📊 SHOWING statement balance for ${card.name} - no payment detection data available`);
+        return true;
       })() ? (
         <div className="grid grid-cols-3 gap-4 mb-auto min-h-[48px] -mt-1">
           <div>
@@ -767,49 +803,41 @@ export function DueDateCard({
               const statementBalance = Math.abs(card.lastStatementBalance || 0);
               const currentBalance = Math.abs(card.balanceCurrent || 0);
               
+              // Use same logic as statement balance hiding: check for recent paid cycles first
+              const hasRecentPaidCycle = (card.recentCycles || []).some(cycle => {
+                const cycleEnd = new Date(cycle.endDate);
+                const today = new Date();
+                const cycleEnded = cycleEnd < today;
+                const wasStatementPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
+                
+                return cycleEnded && wasStatementPaidOff;
+              });
+              
+              if (hasRecentPaidCycle) {
+                return true;
+              }
+              
+              // Fallback to transaction-based detection
               if (card.recentTransactions) {
-                // Use transaction-based detection
                 const statementIssueDate = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
                 const sixtyDaysAgo = new Date();
                 sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
                 const searchFromDate = statementIssueDate || sixtyDaysAgo;
-                
-                console.log(`🔍 DueDateCard payment detection for ${card.name}:`, {
-                  statementBalance,
-                  totalTransactions: card.recentTransactions.length,
-                  statementIssueDate: statementIssueDate?.toDateString(),
-                  searchFromDate: searchFromDate.toDateString(),
-                  allTransactions: card.recentTransactions.map(t => ({
-                    name: t.name,
-                    amount: t.amount,
-                    date: t.date,
-                    isPayment: isPaymentTransaction(t.name)
-                  }))
-                });
                 
                 const recentPayments = card.recentTransactions.filter(t => {
                   const transactionDate = new Date(t.date);
                   return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
                 });
                 
-                console.log(`💰 Found ${recentPayments.length} payment transactions:`, recentPayments);
-                
                 const statementMatchingPayment = recentPayments.find(t => {
                   const paymentAmount = Math.abs(t.amount);
                   const difference = Math.abs(paymentAmount - statementBalance);
-                  console.log(`  Checking payment: $${paymentAmount} vs statement: $${statementBalance}, diff: $${difference}`);
                   return difference <= 5;
                 });
                 
-                if (statementMatchingPayment) {
-                  console.log(`✅ Found matching payment for ${card.name}:`, statementMatchingPayment);
-                } else {
-                  console.log(`❌ No matching payment found for ${card.name} statement balance of $${statementBalance}`);
-                }
-                
                 return !!statementMatchingPayment;
               } else {
-                // Fallback to balance ratio when no transaction data
+                // Final fallback to balance ratio when no cycle or transaction data
                 const balanceRatio = statementBalance > 0 ? currentBalance / statementBalance : 0;
                 return balanceRatio < 0.5 || (currentBalance < 50 && currentBalance < statementBalance * 0.8);
               }
