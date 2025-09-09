@@ -801,43 +801,52 @@ export function DueDateCard({
         let minimumPayment = 0;
         let usingCycleData = false;
         
-        if (plaidStatementIsPaid) {
-          // Plaid's data is for an old paid cycle, use most recent cycle if available
-          if (mostRecentUnpaidCycle) {
-            // Prefer totalSpend over statementBalance as it's more accurate
-            statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
-            minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
-            usingCycleData = true;
-          }
-          // Otherwise, no statement to show (all paid)
-        } else if (plaidStatementBalance > 0) {
-          // Use Plaid's data if it's not identified as paid
+        // Check if Plaid's statement balance corresponds to the most recent closed cycle
+        const plaidMatchesMostRecent = mostRecentCycle && (
+          (mostRecentCycle.totalSpend && Math.abs(plaidStatementBalance - Math.abs(mostRecentCycle.totalSpend)) <= 5) ||
+          (mostRecentCycle.statementBalance && Math.abs(plaidStatementBalance - Math.abs(mostRecentCycle.statementBalance)) <= 5)
+        );
+        
+        if (plaidStatementBalance > 0 && !plaidStatementIsPaid) {
+          // Plaid has a statement balance that's not paid - always use it
           statementBalance = plaidStatementBalance;
           minimumPayment = plaidMinimumPayment;
-        } else if (mostRecentUnpaidCycle) {
-          // No Plaid data, use cycle data
+        } else if (plaidStatementIsPaid && mostRecentUnpaidCycle) {
+          // Plaid's data is for an old paid cycle, use most recent cycle's totalSpend as fallback
+          // totalSpend is only a substitute when we don't have the real statement balance
+          statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
+          minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
+          usingCycleData = true;
+        } else if (!plaidStatementBalance && mostRecentUnpaidCycle) {
+          // No Plaid data at all, use cycle data as fallback
           statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
           minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
           usingCycleData = true;
         }
+        // Otherwise, no statement to show (all paid or no data)
         
         console.log(`🔍 Statement balance check for ${card.name}:`, {
           plaidStatementBalance,
           plaidMinimumPayment,
           plaidStatementIsPaid,
+          plaidMatchesMostRecent,
           statementBalance,
           minimumPayment,
           usingCycleData,
+          currentBalance,
+          currentBalanceMatchesRecentCycle,
           closedCyclesCount: closedCycles.length,
           mostRecentUnpaidCycle: mostRecentUnpaidCycle ? {
             endDate: mostRecentUnpaidCycle.endDate,
             statementBalance: mostRecentUnpaidCycle.statementBalance,
+            totalSpend: mostRecentUnpaidCycle.totalSpend,
             minimumPayment: mostRecentUnpaidCycle.minimumPayment
           } : null,
           recentCycles: closedCycles.slice(0, 3).map(c => ({
             endDate: c.endDate,
             minimumPayment: c.minimumPayment,
             statementBalance: c.statementBalance,
+            totalSpend: c.totalSpend,
             isPaid: c.minimumPayment === 0 && c.statementBalance && c.statementBalance > 0
           }))
         });
