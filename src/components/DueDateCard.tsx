@@ -695,51 +695,83 @@ export function DueDateCard({
 
       {/* Balance Information - Show statement balance only when unpaid */}
       {(() => {
-        // Only show statement balance if it appears to be unpaid
-        // Check for payment transactions that match the statement balance amount
-        const statementBalance = Math.abs(card.lastStatementBalance || 0);
-        const minimumPayment = card.minimumPaymentAmount || 0;
+        const plaidStatementBalance = Math.abs(card.lastStatementBalance || 0);
+        const plaidMinimumPayment = card.minimumPaymentAmount || 0;
         
-        if (!card.lastStatementBalance || minimumPayment <= 0) {
-          return false;
-        }
+        // Get the most recent closed cycles
+        const today = new Date();
+        const closedCycles = (card.recentCycles || [])
+          .filter(cycle => new Date(cycle.endDate) < today)
+          .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
         
-        // Look for payment transactions in the last 60 days that match the statement balance
-        const statementIssueDate = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
-        const sixtyDaysAgo = new Date();
-        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        
-        const searchFromDate = statementIssueDate || sixtyDaysAgo;
-        
-        // Check if recent billing cycles indicate the statement was paid off
-        // Use the same logic as CardBillingCycles: minimumPayment === 0 indicates payment
-        const hasRecentPaidCycle = (card.recentCycles || []).some(cycle => {
-          const cycleEnd = new Date(cycle.endDate);
-          const today = new Date();
-          const cycleEnded = cycleEnd < today;
-          const wasStatementPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
-          
-          return cycleEnded && wasStatementPaidOff;
+        // Check if Plaid's statement balance matches a paid-off cycle
+        const plaidStatementIsPaid = closedCycles.some(cycle => {
+          const cycleBalance = Math.abs(cycle.statementBalance || 0);
+          const difference = Math.abs(cycleBalance - plaidStatementBalance);
+          const isPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
+          return difference <= 5 && isPaidOff;
         });
         
+        // Find the most recent closed cycle that hasn't been paid
+        const mostRecentUnpaidCycle = closedCycles.find(cycle => {
+          // Skip cycles that are paid off
+          if (cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0) {
+            return false;
+          }
+          // Skip cycles without statement balance
+          if (!cycle.statementBalance || cycle.statementBalance <= 0) {
+            return false;
+          }
+          return true;
+        });
+        
+        // Determine which statement balance to show
+        let statementBalance = 0;
+        let minimumPayment = 0;
+        let usingCycleData = false;
+        
+        if (plaidStatementIsPaid) {
+          // Plaid's data is for an old paid cycle, use most recent unpaid cycle if available
+          if (mostRecentUnpaidCycle) {
+            statementBalance = Math.abs(mostRecentUnpaidCycle.statementBalance);
+            minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
+            usingCycleData = true;
+          }
+          // Otherwise, no statement to show (all paid)
+        } else if (plaidStatementBalance > 0) {
+          // Use Plaid's data if it's not identified as paid
+          statementBalance = plaidStatementBalance;
+          minimumPayment = plaidMinimumPayment;
+        } else if (mostRecentUnpaidCycle) {
+          // No Plaid data, use cycle data
+          statementBalance = Math.abs(mostRecentUnpaidCycle.statementBalance);
+          minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
+          usingCycleData = true;
+        }
+        
         console.log(`🔍 Statement balance check for ${card.name}:`, {
+          plaidStatementBalance,
+          plaidMinimumPayment,
+          plaidStatementIsPaid,
           statementBalance,
           minimumPayment,
-          hasRecentCycles: !!(card.recentCycles && card.recentCycles.length > 0),
-          cycleCount: card.recentCycles?.length || 0,
-          hasRecentPaidCycle,
-          recentCycles: card.recentCycles?.map(c => ({
-            endDate: c.endDate.toDateString ? c.endDate.toDateString() : c.endDate,
+          usingCycleData,
+          closedCyclesCount: closedCycles.length,
+          mostRecentUnpaidCycle: mostRecentUnpaidCycle ? {
+            endDate: mostRecentUnpaidCycle.endDate,
+            statementBalance: mostRecentUnpaidCycle.statementBalance,
+            minimumPayment: mostRecentUnpaidCycle.minimumPayment
+          } : null,
+          recentCycles: closedCycles.slice(0, 3).map(c => ({
+            endDate: c.endDate,
             minimumPayment: c.minimumPayment,
             statementBalance: c.statementBalance,
             isPaid: c.minimumPayment === 0 && c.statementBalance && c.statementBalance > 0
           }))
         });
         
-        // Hide statement balance if a recent cycle was paid off 
-        // OR fallback to transaction detection if no cycle data
-        if (hasRecentPaidCycle) {
-          console.log(`📊 HIDING statement balance for ${card.name} - recent cycle was paid off`);
+        // Don't show statement section if there's no statement balance or it's been paid
+        if (!statementBalance || minimumPayment <= 0) {
           return false;
         }
         
@@ -768,7 +800,39 @@ export function DueDateCard({
           <div>
             <p className="text-xs text-gray-600">Statement Balance</p>
             <p className="font-bold text-lg text-blue-600">
-              {formatCurrency(Math.abs(card.lastStatementBalance))}
+              {formatCurrency((() => {
+                const plaidStatementBalance = Math.abs(card.lastStatementBalance || 0);
+                const today = new Date();
+                const closedCycles = (card.recentCycles || [])
+                  .filter(cycle => new Date(cycle.endDate) < today)
+                  .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                
+                const plaidStatementIsPaid = closedCycles.some(cycle => {
+                  const cycleBalance = Math.abs(cycle.statementBalance || 0);
+                  const difference = Math.abs(cycleBalance - plaidStatementBalance);
+                  const isPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
+                  return difference <= 5 && isPaidOff;
+                });
+                
+                const mostRecentUnpaidCycle = closedCycles.find(cycle => {
+                  if (cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0) {
+                    return false;
+                  }
+                  if (!cycle.statementBalance || cycle.statementBalance <= 0) {
+                    return false;
+                  }
+                  return true;
+                });
+                
+                if (plaidStatementIsPaid && mostRecentUnpaidCycle) {
+                  return Math.abs(mostRecentUnpaidCycle.statementBalance);
+                } else if (plaidStatementBalance > 0 && !plaidStatementIsPaid) {
+                  return plaidStatementBalance;
+                } else if (mostRecentUnpaidCycle) {
+                  return Math.abs(mostRecentUnpaidCycle.statementBalance);
+                }
+                return plaidStatementBalance;
+              })())}
             </p>
             <p className="text-xs text-blue-500">Due Soon</p>
           </div>
