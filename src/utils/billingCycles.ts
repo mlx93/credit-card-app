@@ -76,7 +76,7 @@ export interface BillingCycleData {
 export async function calculateBillingCycles(
   creditCardId: string,
   options?: {
-    statementPeriods?: { startDate: Date | null; endDate: Date }[];
+    statementPeriods?: { startDate: Date | null; endDate: Date; dueDate?: Date | null }[];
     baselineDueDate?: Date | null;
   }
 ): Promise<BillingCycleData[]> {
@@ -157,7 +157,7 @@ export async function calculateBillingCycles(
         continue;
       }
       const isMostRecentClosed = lastStatementDate && period.endDate.getTime() === lastStatementDate.getTime();
-      const due = isMostRecentClosed ? (nextDueDate || null) : estimateHistoricalDue(period.endDate);
+      const due = isMostRecentClosed ? (nextDueDate || null) : (period.dueDate ?? estimateHistoricalDue(period.endDate));
       await createOrUpdateCycle(
         creditCardWithTransactions,
         cycles,

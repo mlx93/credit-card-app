@@ -21,6 +21,7 @@ export interface StatementPeriod {
   startDate: Date | null; // null for most recent if predecessor unknown
   endDate: Date; // statement closing/issue date
   dateSource: 'posted' | 'derived';
+  dueDate?: Date | null; // parsed from PDF when available
 }
 
 /**
@@ -263,7 +264,8 @@ export async function downloadStatementPDF(
 export async function listStatementPeriods(
   accessToken: string,
   accountId: string,
-  monthsBack: number = 13
+  monthsBack: number = 13,
+  issuerName?: string
 ): Promise<StatementPeriod[]> {
   // Compute date range for listing
   const end = new Date();
@@ -312,6 +314,95 @@ export async function listStatementPeriods(
       dateSource: entry.dateSource,
     };
   });
+
+  // Enrich with PDF-parsed dates when helpful: fill newest startDate (opening date) and dueDate for historical
+  try {
+    // Helper: normalize PDF text
+    const normalize = (buf: Buffer) =>
+      buf.toString('utf8').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const tryParseDate = (str?: string | null): Date | null => {
+      if (!str) return null;
+      // Try native Date first for named months
+      const d1 = new Date(str);
+      if (!isNaN(d1.getTime())) return d1;
+      // Try mm/dd/yyyy or mm-dd-yyyy
+      const m = str.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+      if (m) {
+        const mm = parseInt(m[1], 10) - 1;
+        const dd = parseInt(m[2], 10);
+        const yy = parseInt(m[3], 10);
+        const yyyy = yy < 100 ? 2000 + yy : yy;
+        const dt = new Date(yyyy, mm, dd);
+        return isNaN(dt.getTime()) ? null : dt;
+      }
+      return null;
+    };
+
+    const parseFromText = (text: string) => {
+      const findings: { opening?: Date; closing?: Date; due?: Date } = {};
+      const patterns: Array<{ key: 'opening' | 'closing' | 'due'; re: RegExp[] }> = [
+        {
+          key: 'closing',
+          re: [
+            /(statement\s+closing\s+date|closing\s+date|cycle\s+end)[:\-\s]*([A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+            /(statement\s+date)[:\-\s]*([A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+          ],
+        },
+        {
+          key: 'opening',
+          re: [
+            /(opening\s+date|cycle\s+start)[:\-\s]*([A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+            /(statement\s+period)[:\-\s]*([A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*(?:to|-|–|—)\s*([A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+          ],
+        },
+        {
+          key: 'due',
+          re: [
+            /(payment\s+due\s+date|due\s+date)[:\-\s]*([A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+          ],
+        },
+      ];
+      for (const p of patterns) {
+        for (const re of p.re) {
+          const m = text.match(re);
+          if (m) {
+            if (p.key === 'opening' && re.source.includes('statement\\s+period') && m[2] && m[3]) {
+              const o = tryParseDate(m[2]);
+              const c = tryParseDate(m[3]);
+              if (o) findings.opening = o;
+              if (c) findings.closing = c;
+              break;
+            }
+            const d = tryParseDate(m[m.length - 1]);
+            if (d) {
+              findings[p.key] = d;
+              break;
+            }
+          }
+        }
+      }
+      return findings;
+    };
+
+    // Try newest (index 0) if it lacks startDate; also parse due dates for all
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i];
+      const needsOpening = i === 0 && !p.startDate;
+      const wantsDueDate = true;
+      if (!needsOpening && !wantsDueDate) continue;
+      try {
+        const pdf = await downloadStatementPDF(accessToken, p.statementId);
+        if (!pdf) continue;
+        const text = normalize(pdf);
+        const found = parseFromText(text);
+        if (needsOpening && found.opening) p.startDate = found.opening;
+        if (wantsDueDate && found.due) p.dueDate = found.due;
+        // If closing not posted and found, prefer it
+        if ((withEnds[i].dateSource === 'derived') && found.closing) p.endDate = found.closing;
+      } catch {}
+    }
+  } catch {}
 
   return periods;
 }
