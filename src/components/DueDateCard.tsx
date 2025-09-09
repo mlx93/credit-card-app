@@ -679,8 +679,22 @@ export function DueDateCard({
         </div>
       </div>
 
-      {/* Balance Information - Show statement balance only when there's an amount due */}
-      {card.lastStatementBalance && (card.minimumPaymentAmount && card.minimumPaymentAmount > 0) ? (
+      {/* Balance Information - Show statement balance only when unpaid */}
+      {(() => {
+        // Only show statement balance if it appears to be unpaid
+        // If current balance is significantly lower than statement balance, it's likely been paid
+        const statementBalance = Math.abs(card.lastStatementBalance || 0);
+        const currentBalance = Math.abs(card.balanceCurrent || 0);
+        const minimumPayment = card.minimumPaymentAmount || 0;
+        
+        // Consider statement paid if:
+        // 1. Current balance is less than 50% of statement balance (major payment made), OR
+        // 2. Current balance is within $10 of being fully paid off and much lower than statement
+        const balanceRatio = statementBalance > 0 ? currentBalance / statementBalance : 0;
+        const isLikelyPaid = balanceRatio < 0.5 || (currentBalance < 50 && currentBalance < statementBalance * 0.8);
+        
+        return card.lastStatementBalance && minimumPayment > 0 && !isLikelyPaid;
+      })() ? (
         <div className="grid grid-cols-3 gap-4 mb-auto min-h-[48px] -mt-1">
           <div>
             <p className="text-xs text-gray-600">Statement Balance</p>
@@ -713,6 +727,9 @@ export function DueDateCard({
             </p>
             {isPaidOff && (
               <p className="text-xs text-green-600 font-medium mt-0.5">All statements paid</p>
+            )}
+            {!isPaidOff && card.lastStatementBalance && (
+              <p className="text-xs text-green-600 font-medium mt-0.5">Statement paid ✓</p>
             )}
           </div>
           {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (

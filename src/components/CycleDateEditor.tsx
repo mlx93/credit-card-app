@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Pencil, X, Check, AlertCircle } from 'lucide-react';
 
 interface CycleDateEditorProps {
@@ -62,25 +63,25 @@ export default function CycleDateEditor({
 
   if (!isEditing) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 mt-1">
         {needsConfiguration ? (
           <>
-            <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
-              <AlertCircle className="w-4 h-4" />
-              <span className="text-sm">Billing dates needed</span>
+            <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="text-xs font-medium whitespace-nowrap">Setup billing dates</span>
             </div>
             <button
               onClick={() => setIsEditing(true)}
               className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
               title="Set billing cycle dates"
             >
-              <Pencil className="w-4 h-4 text-gray-500" />
+              <Pencil className="w-3.5 h-3.5 text-gray-500" />
             </button>
           </>
         ) : (
           <>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Statement closes: Day {currentCycleDay} • Due: Day {currentDueDay}
+            <div className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+              Close: Day {currentCycleDay} • Due: Day {currentDueDay}
             </div>
             <button
               onClick={() => setIsEditing(true)}
@@ -95,8 +96,8 @@ export default function CycleDateEditor({
     );
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 sm:p-6 md:p-8">
+  const modal = (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 sm:p-6 md:p-8">
       <div className="bg-white dark:bg-gray-900 rounded-lg p-6 sm:p-8 w-full max-w-2xl lg:max-w-4xl xl:max-w-5xl h-auto max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-6 sm:mb-8">
           <div>
@@ -213,4 +214,8 @@ export default function CycleDateEditor({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' 
+    ? createPortal(modal, document.body)
+    : null;
 }
