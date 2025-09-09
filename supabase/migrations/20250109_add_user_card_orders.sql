@@ -2,7 +2,7 @@
 
 -- Store card order as an array of credit card UUIDs per user
 create table if not exists public.user_card_orders (
-  user_id uuid primary key references next_auth.users(id) on delete cascade,
+  user_id uuid primary key references public.users(id) on delete cascade,
   order_ids uuid[] not null default '{}',
   updated_at timestamptz not null default now()
 );
@@ -12,15 +12,15 @@ alter table public.user_card_orders enable row level security;
 -- RLS: Users can manage only their own order (idempotent via drop/create)
 drop policy if exists "select own order" on public.user_card_orders;
 create policy "select own order" on public.user_card_orders
-  for select using (next_auth.uid() = user_id);
+  for select using (auth.uid()::text::uuid = user_id);
 
 drop policy if exists "upsert own order" on public.user_card_orders;
 create policy "upsert own order" on public.user_card_orders
-  for insert with check (next_auth.uid() = user_id);
+  for insert with check (auth.uid()::text::uuid = user_id);
 
 drop policy if exists "update own order" on public.user_card_orders;
 create policy "update own order" on public.user_card_orders
-  for update using (next_auth.uid() = user_id);
+  for update using (auth.uid()::text::uuid = user_id);
 
 -- Getter RPC
 create or replace function public.get_card_order()

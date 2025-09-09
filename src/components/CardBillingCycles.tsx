@@ -967,24 +967,32 @@ function CardContent({
                   />
                 ))}
 
-                {/* Historical cycles (collapsible) */}
-                {isExpanded && historical.length > 0 && (
-                  <div className="border-t pt-3 mt-3">
-                    <p className="text-sm font-medium text-gray-600 mb-3 flex items-center">
-                      <History className="h-4 w-4 mr-1" />
-                      Historical Cycles
-                    </p>
-                    <div className="space-y-2">
-                      {historical.map(cycle => (
-                        <BillingCycleItem 
-                          key={cycle.id} 
-                          cycle={cycle}
-                          card={card}
-                          isHistorical={true}
-                          allCycles={allCycles}
-                          compactMode={compactMode}
-                        />
-                      ))}
+                {/* Historical cycles (collapsible with smooth animation) */}
+                {historical.length > 0 && (
+                  <div 
+                    className={`overflow-hidden transition-all duration-300 ease-out ${
+                      isExpanded 
+                        ? 'max-h-[1500px] opacity-100 transform translate-y-0' 
+                        : 'max-h-0 opacity-0 transform -translate-y-2'
+                    }`}
+                  >
+                    <div className="border-t pt-3 mt-3">
+                      <p className="text-sm font-medium text-gray-600 mb-3 flex items-center">
+                        <History className="h-4 w-4 mr-1" />
+                        Historical Cycles
+                      </p>
+                      <div className="space-y-2">
+                        {historical.map(cycle => (
+                          <BillingCycleItem 
+                            key={cycle.id} 
+                            cycle={cycle}
+                            card={card}
+                            isHistorical={true}
+                            allCycles={allCycles}
+                            compactMode={compactMode}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
