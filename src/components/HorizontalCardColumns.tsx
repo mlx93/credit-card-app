@@ -175,7 +175,10 @@ function SortableCardColumn({
             </div>
 
             <DueDateCard
-              card={card}
+              card={{
+                ...card,
+                recentCycles: cycles // Pass the cycles data to DueDateCard
+              }}
               colorIndex={colorIndex}
               connectionHealth={connectionHealth}
               onSync={onSync}
