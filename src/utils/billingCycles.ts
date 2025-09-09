@@ -866,6 +866,15 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
     const nonPaymentTransactions = cycleTransactions.filter(t => !isPaymentTransaction(t.name || ''));
     const totalSpend = nonPaymentTransactions.reduce((sum, t) => sum + t.amount, 0);
 
+    // Check if this cycle matches Plaid's statement date
+    const lastStatementDate = creditCard.lastStatementIssueDate ? new Date(creditCard.lastStatementIssueDate) : null;
+    const isExactStatementCycle = lastStatementDate && closedCycleEnd.getTime() === lastStatementDate.getTime();
+    
+    // Only use Plaid's statement balance for the exact matching cycle
+    const cycleStatementBalance = isExactStatementCycle && creditCard.lastStatementBalance 
+      ? creditCard.lastStatementBalance 
+      : totalSpend;
+
     // Create or update the closed billing cycle
     const cycleId = `${creditCardId}_${closedCycleStart.toISOString().split('T')[0]}_${closedCycleEnd.toISOString().split('T')[0]}`;
 
@@ -884,8 +893,8 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
         .update({
           totalSpend,
           transactionCount: nonPaymentTransactions.length,
-          // For closed cycles, try to get statement balance from Plaid data
-          statementBalance: creditCard.lastStatementBalance || totalSpend,
+          // Use the determined statement balance (either Plaid's for matching cycle or totalSpend)
+          statementBalance: cycleStatementBalance,
           paymentStatus: 'due', // Closed cycles are typically due
           updatedAt: new Date().toISOString(),
         })
@@ -928,7 +937,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
           endDate: closedCycleEnd.toISOString().split('T')[0],
           totalSpend,
           transactionCount: nonPaymentTransactions.length,
-          statementBalance: creditCard.lastStatementBalance || totalSpend,
+          statementBalance: cycleStatementBalance, // Use the determined statement balance
           dueDate: dueDateVal,
           paymentStatus: 'due', // Closed cycles are typically due
           createdAt: new Date().toISOString(),
