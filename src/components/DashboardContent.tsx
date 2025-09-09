@@ -1130,11 +1130,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                         .filter((bc: any) => bc.creditCardId === cardId)
                         .sort((a: any, b: any) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
                       const historical = cardCycles.slice(2);
-                      const allHistoricalLoaded = historical.length > 0 && historical.every((c: any) =>
+                      // Consider done if no historical cycles expected (new card) or all are loaded
+                      const allHistoricalLoaded = historical.length === 0 || historical.every((c: any) =>
                         (typeof c.transactionCount === 'number') ||
                         (typeof c.statementBalance === 'number' && c.statementBalance >= 0)
                       );
-                      if (allHistoricalLoaded) doneIds.push(cardId);
+                      if (allHistoricalLoaded || cardCycles.length >= 2) doneIds.push(cardId);
                     }
                                     if (doneIds.length > 0) {
                                       setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
@@ -1151,6 +1152,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                     }
                     if (Date.now() - start < 120000 && doneIds.length < syncedCardIds.length) {
                       setTimeout(poll, 5000);
+                    } else if (doneIds.length < syncedCardIds.length) {
+                      // Timeout reached but some cards still loading - clear their loading state
+                      console.log('⏱️ Polling timeout reached, clearing loading state for remaining cards');
+                      setHistoryRefreshingIds(prev => prev.filter(id => !syncedCardIds.includes(id)));
                     }
                   }
                 } catch {}
@@ -2113,11 +2118,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                       // Ready only when ALL historical cycles (beyond current + recent closed)
                                       // show evidence of iteration (transactionCount present; can be 0) or a statementBalance value
                                       const historical = cardCycles.slice(2);
-                                      const allHistoricalLoaded = historical.length > 0 && historical.every((c: any) =>
+                                      // Consider done if no historical cycles expected (new card) or all are loaded
+                                      const allHistoricalLoaded = historical.length === 0 || historical.every((c: any) =>
                                         (typeof c.transactionCount === 'number') ||
                                         (typeof c.statementBalance === 'number' && c.statementBalance >= 0)
                                       );
-                                      if (allHistoricalLoaded) doneIds.push(cardId);
+                                      if (allHistoricalLoaded || cardCycles.length >= 2) doneIds.push(cardId);
                                     }
                                     if (doneIds.length > 0) {
                                       setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
@@ -2134,6 +2140,10 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                     }
                                     if (Date.now() - start < 120000 && doneIds.length < newCardsForItem.length) {
                                       setTimeout(poll, 5000);
+                                    } else if (doneIds.length < newCardsForItem.length) {
+                                      // Timeout reached but some cards still loading - clear their loading state
+                                      console.log('⏱️ Polling timeout reached, clearing loading state for remaining cards');
+                                      setHistoryRefreshingIds(prev => prev.filter(id => !newCardsForItem.includes(id)));
                                     }
                                   }
                                 } catch {}
