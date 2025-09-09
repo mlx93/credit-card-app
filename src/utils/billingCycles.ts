@@ -1,6 +1,4 @@
 import { supabaseAdmin } from '@/lib/supabase';
-import { decrypt } from '@/lib/encryption';
-import { listStatementPeriods, StatementPeriod } from '@/services/plaidStatements';
 import { addMonths, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
 
 // Helper function to detect Capital One cards based on institution and card names
@@ -662,8 +660,11 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
     try {
       const plaidItem = plaidItemMap.get(card.plaidItemId);
       if (plaidItem?.accessToken && card.accountId) {
+        // Dynamic import to avoid bundling server-only modules into client
+        const { decrypt } = await import('@/lib/encryption');
+        const { listStatementPeriods } = await import('@/services/plaidStatements');
         const accessToken = decrypt(plaidItem.accessToken);
-        const periods: StatementPeriod[] = await listStatementPeriods(accessToken, card.accountId, 13);
+        const periods: any[] = await listStatementPeriods(accessToken, card.accountId, 13);
         // Use only periods that have both start and end (skip newest if start is null)
         const usable = periods
           .filter(p => p.endDate && (p.startDate instanceof Date))
