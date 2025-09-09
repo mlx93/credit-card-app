@@ -252,7 +252,6 @@ export function HorizontalCardColumns(props: HorizontalCardColumnsProps) {
     onCreditLimitUpdated,
     fullCyclesLoading = false 
   } = props;
-  console.log('🔍 HorizontalCardColumns props:', { fullCyclesLoading, olderCyclesLoadingIds });
   const [cardOrder, setCardOrder] = useState<string[]>(Array.from(new Set(initialCardOrder || [])));
   const [userReordered, setUserReordered] = useState(false);
   // Initialize with all cards expanded by default
