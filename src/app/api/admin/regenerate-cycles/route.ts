@@ -3,8 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { calculateBillingCycles } from '@/utils/billingCycles';
+import { requireAdminAccess } from '@/lib/adminSecurity';
 
 export async function POST(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'admin-regenerate-cycles',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const session = await getServerSession(authOptions);
     

@@ -1,8 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isPaymentTransaction } from '@/utils/billingCycles';
+import { requireAdminAccess } from '@/lib/adminSecurity';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'admin-debug-robinhood',
+    logAccess: true
+  });
+  if (securityError) return securityError;
   try {
     // Get plaid items to find Robinhood by institutionName
     const { data: plaidItems } = await supabaseAdmin
