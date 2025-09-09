@@ -22,27 +22,38 @@ export default function CycleDateEditor({
   isRobinhood = false
 }: CycleDateEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [cycleDay, setCycleDay] = useState(currentCycleDay || 1);
-  const [dueDay, setDueDay] = useState(currentDueDay || 1);
+  const [cycleDayInput, setCycleDayInput] = useState((currentCycleDay || 1).toString());
+  const [dueDayInput, setDueDayInput] = useState((currentDueDay || 1).toString());
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setError(null);
     
-    // Validate days
-    if (cycleDay < 1 || cycleDay > 31) {
+    // Parse and validate cycle day
+    const cycleDayNum = parseInt(cycleDayInput.trim());
+    if (isNaN(cycleDayNum) || !Number.isInteger(cycleDayNum)) {
+      setError('Statement close day must be a valid number');
+      return;
+    }
+    if (cycleDayNum < 1 || cycleDayNum > 31) {
       setError('Statement close day must be between 1 and 31');
       return;
     }
     
-    if (dueDay < 1 || dueDay > 31) {
+    // Parse and validate due day
+    const dueDayNum = parseInt(dueDayInput.trim());
+    if (isNaN(dueDayNum) || !Number.isInteger(dueDayNum)) {
+      setError('Payment due day must be a valid number');
+      return;
+    }
+    if (dueDayNum < 1 || dueDayNum > 31) {
       setError('Payment due day must be between 1 and 31');
       return;
     }
     
     // Validate that due date is after statement close (accounting for month wrap)
-    const daysBetween = dueDay > cycleDay ? dueDay - cycleDay : (31 - cycleDay + dueDay);
+    const daysBetween = dueDayNum > cycleDayNum ? dueDayNum - cycleDayNum : (31 - cycleDayNum + dueDayNum);
     if (daysBetween < 15 || daysBetween > 28) {
       setError('Payment due date should be 15-28 days after statement close');
       return;
@@ -50,7 +61,7 @@ export default function CycleDateEditor({
     
     setIsSaving(true);
     try {
-      await onSave(cycleDay, dueDay);
+      await onSave(cycleDayNum, dueDayNum);
       setIsEditing(false);
     } catch (err) {
       setError('Failed to save dates. Please try again.');
@@ -128,11 +139,10 @@ export default function CycleDateEditor({
               <span className="text-gray-500 font-normal ml-2 text-base">(Day of month: 1-31)</span>
             </label>
             <input
-              type="number"
-              min="1"
-              max="31"
-              value={cycleDay}
-              onChange={(e) => setCycleDay(parseInt(e.target.value) || 1)}
+              type="text"
+              inputMode="numeric"
+              value={cycleDayInput}
+              onChange={(e) => setCycleDayInput(e.target.value)}
               className="w-full px-4 py-4 text-lg border border-gray-300 dark:border-gray-700 rounded-xl 
                        bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
                        transition-all duration-200"
@@ -149,11 +159,10 @@ export default function CycleDateEditor({
               <span className="text-gray-500 font-normal ml-2 text-base">(Day of month: 1-31)</span>
             </label>
             <input
-              type="number"
-              min="1"
-              max="31"
-              value={dueDay}
-              onChange={(e) => setDueDay(parseInt(e.target.value) || 1)}
+              type="text"
+              inputMode="numeric"
+              value={dueDayInput}
+              onChange={(e) => setDueDayInput(e.target.value)}
               className="w-full px-4 py-4 text-lg border border-gray-300 dark:border-gray-700 rounded-xl 
                        bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
                        transition-all duration-200"
@@ -174,13 +183,13 @@ export default function CycleDateEditor({
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-4 mt-8 sm:mt-12">
+        <div className="flex flex-col sm:flex-row gap-4 mt-8 sm:mt-12 justify-center">
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-xl text-lg font-semibold
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold
                      disabled:opacity-50 disabled:cursor-not-allowed transition-colors
-                     flex items-center justify-center gap-3"
+                     flex items-center justify-center gap-3 min-w-fit"
           >
             {isSaving ? (
               <>
@@ -197,9 +206,9 @@ export default function CycleDateEditor({
           <button
             onClick={() => setIsEditing(false)}
             disabled={isSaving}
-            className="px-6 py-4 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-lg font-semibold
+            className="px-8 py-4 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-lg font-semibold
                      hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors
-                     disabled:opacity-50"
+                     disabled:opacity-50 min-w-fit"
           >
             Cancel
           </button>
