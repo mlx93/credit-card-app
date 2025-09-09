@@ -77,6 +77,6 @@ create policy "view own telemetry" on public.sync_telemetry
     exists (
       select 1 from public.plaid_items
       where plaid_items.id = sync_telemetry.plaid_item_id
-      and plaid_items."userId" = next_auth.uid()
+      and plaid_items."userId" = auth.uid()
     )
   );

@@ -940,42 +940,34 @@ function CardContent({
           </div>
           {(historical.length > 0 || olderLoading) && (
             olderLoading ? (
-              // iOS-style loading state - compact and contained
-              <div className="flex items-center justify-center py-3 mb-3">
-                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-gray-100/80 backdrop-blur-sm">
-                  {/* iOS-style activity indicator */}
-                  <div className="relative w-5 h-5">
-                    {/* Outer ring */}
-                    <div className="absolute inset-0 rounded-full border-2 border-gray-300/30"></div>
+              // iOS-style loading state - compact and responsive
+              <div className="flex items-center justify-center py-2 mb-3 max-w-full">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100/80 backdrop-blur-sm max-w-full">
+                  {/* Compact iOS-style activity indicator */}
+                  <div className="relative w-4 h-4 flex-shrink-0">
                     {/* Spinning gradient ring */}
                     <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-gray-600 animate-spin"></div>
                     {/* Inner dot pulse */}
-                    <div className="absolute inset-[6px] rounded-full bg-gray-400 animate-pulse"></div>
+                    <div className="absolute inset-[4px] rounded-full bg-gray-400 animate-pulse"></div>
                   </div>
-                  <span className="text-sm font-medium text-gray-600">
-                    Loading history
+                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">
+                    Loading...
                   </span>
-                  {/* iOS-style dots animation */}
-                  <div className="flex gap-1">
-                    <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                    <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                    <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                  </div>
                 </div>
               </div>
             ) : (
-              // Normal expandable button
+              // Normal expandable button - responsive width
               <button
                 onClick={() => {
                   if (!olderLoading) onToggleExpand();
                 }}
-                className="group relative inline-flex items-center text-sm px-3 py-2 rounded-lg border transition-all duration-300 mb-3 ml-6 mr-4 shadow-sm backdrop-blur-sm text-gray-500 hover:text-gray-700 bg-gradient-to-r from-gray-50/80 to-white/90 hover:from-gray-100/90 hover:to-gray-50/80 border-gray-200 hover:border-gray-300 hover:shadow-md"
+                className="group relative inline-flex items-center text-sm px-3 py-2 rounded-lg border transition-all duration-300 mb-3 ml-2 mr-2 shadow-sm backdrop-blur-sm text-gray-500 hover:text-gray-700 bg-gradient-to-r from-gray-50/80 to-white/90 hover:from-gray-100/90 hover:to-gray-50/80 border-gray-200 hover:border-gray-300 hover:shadow-md max-w-full"
               >
-                <div className={`flex items-center justify-center w-5 h-5 rounded-full mr-2 transition-all duration-300 bg-gradient-to-br from-gray-200 to-gray-300 group-hover:from-gray-300 group-hover:to-gray-400 ${isExpanded ? 'rotate-90' : ''}`}>
-                  <ChevronRight className="h-3 w-3 text-gray-600 group-hover:text-gray-700" />
+                <div className={`flex items-center justify-center w-4 h-4 rounded-full mr-1.5 transition-all duration-300 bg-gradient-to-br from-gray-200 to-gray-300 group-hover:from-gray-300 group-hover:to-gray-400 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>
+                  <ChevronRight className="h-2.5 w-2.5 text-gray-600 group-hover:text-gray-700" />
                 </div>
-                <span className="font-medium">
-                  {`${historical.length} older cycle${historical.length !== 1 ? 's' : ''}`}
+                <span className="font-medium text-xs whitespace-nowrap">
+                  {`${historical.length} older`}
                 </span>
               </button>
             )
