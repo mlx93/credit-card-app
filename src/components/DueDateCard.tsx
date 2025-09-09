@@ -705,11 +705,37 @@ export function DueDateCard({
           .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
         
         // Check if Plaid's statement balance matches a paid-off cycle
-        const plaidStatementIsPaid = closedCycles.some(cycle => {
+        // A statement is considered paid if:
+        // 1. minimumPayment is 0 (explicitly marked as paid), OR
+        // 2. There's a newer closed cycle with a statement balance (old cycle must be paid), OR  
+        // 3. Current balance is significantly less than statement balance
+        const currentBalance = Math.abs(card.balanceCurrent || 0);
+        
+        const plaidStatementIsPaid = closedCycles.some((cycle, index) => {
           const cycleBalance = Math.abs(cycle.statementBalance || 0);
           const difference = Math.abs(cycleBalance - plaidStatementBalance);
-          const isPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
-          return difference <= 5 && isPaidOff;
+          
+          if (difference > 5) return false; // Not a match
+          
+          // Check if explicitly marked as paid
+          if (cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0) {
+            return true;
+          }
+          
+          // Check if there's a newer closed cycle with statement balance (means this one is paid)
+          const hasNewerCycleWithStatement = closedCycles.slice(0, index).some(newerCycle => 
+            newerCycle.statementBalance && newerCycle.statementBalance > 0
+          );
+          if (hasNewerCycleWithStatement) {
+            return true;
+          }
+          
+          // Check if current balance suggests payment (less than 30% of statement)
+          if (currentBalance < cycleBalance * 0.3) {
+            return true;
+          }
+          
+          return false;
         });
         
         // Find the most recent closed cycle that hasn't been paid
