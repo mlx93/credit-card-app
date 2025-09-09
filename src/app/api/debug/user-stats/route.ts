@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireAdminAccess } from '@/lib/adminSecurity';
 
 // Helper function to mask sensitive data in production
 function maskSensitiveData(data: any, isProduction: boolean, userEmail?: string) {
@@ -23,7 +24,14 @@ function maskSensitiveData(data: any, isProduction: boolean, userEmail?: string)
   };
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'debug-user-stats',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     console.log('📊 USER STATS ENDPOINT CALLED');
     
@@ -31,26 +39,6 @@ export async function GET(request: Request) {
     
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // SECURITY: Only allow admin users or the app owner to access this endpoint
-    const adminEmails = ['mylesethan93@gmail.com']; // Replace with your admin emails
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const isAdmin = adminEmails.includes(session.user.email || '');
-    
-    if (!isDevelopment && !isAdmin) {
-      console.log('🚫 Unauthorized access attempt to user-stats by:', session.user.email);
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-    }
-
-    // Additional security: Check for specific environment variable
-    const debugAccessKey = process.env.ADMIN_DEBUG_KEY;
-    const { searchParams } = new URL(request.url);
-    const providedKey = searchParams.get('key');
-    
-    if (process.env.NODE_ENV === 'production' && debugAccessKey && providedKey !== debugAccessKey) {
-      console.log('🚫 Invalid debug key provided by:', session.user.email);
-      return NextResponse.json({ error: 'Forbidden: Invalid access key' }, { status: 403 });
     }
 
     // Get comprehensive user statistics
