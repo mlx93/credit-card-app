@@ -16,6 +16,13 @@ interface StatementDates {
   source: string;
 }
 
+export interface StatementPeriod {
+  statementId: string;
+  startDate: Date | null; // null for most recent if predecessor unknown
+  endDate: Date; // statement closing/issue date
+  dateSource: 'posted' | 'derived';
+}
+
 /**
  * Fetches statement metadata for credit card accounts
  * This is the primary method for getting accurate billing dates from Robinhood
@@ -245,6 +252,68 @@ export async function downloadStatementPDF(
     console.error('Error downloading statement:', error);
     return null;
   }
+}
+
+/**
+ * List statement periods (end dates and derived start dates) for a specific account
+ * - endDate prefers statement.date_posted if present; otherwise derives from year/month
+ * - startDate is derived as (next statement's endDate + 1 day). For the newest statement,
+ *   startDate may be null if no predecessor exists (caller may choose how to handle).
+ */
+export async function listStatementPeriods(
+  accessToken: string,
+  accountId: string,
+  monthsBack: number = 13
+): Promise<StatementPeriod[]> {
+  // Compute date range for listing
+  const end = new Date();
+  const start = new Date(end);
+  start.setMonth(start.getMonth() - Math.max(1, monthsBack));
+  const request: StatementsListRequest = {
+    access_token: accessToken,
+    start_date: start.toISOString().split('T')[0],
+    end_date: end.toISOString().split('T')[0],
+  };
+
+  const res = await plaidClient.statementsList(request);
+  const statements = (res.data.statements || []).filter(s => s.account_id === accountId);
+
+  if (statements.length === 0) return [];
+
+  // Map to endDate with best available precision
+  const withEnds = statements.map(s => {
+    const posted = (s as any).date_posted ? new Date((s as any).date_posted) : null;
+    let endDate: Date;
+    let dateSource: 'posted' | 'derived';
+    if (posted && !isNaN(posted.getTime())) {
+      endDate = posted;
+      dateSource = 'posted';
+    } else {
+      // Derive last day of the statement month as a fallback
+      const year = parseInt(s.year, 10);
+      const monthIdx = parseInt(s.month, 10) - 1; // 0-based
+      // day 0 of next month is last day of current month
+      endDate = new Date(year, monthIdx + 1, 0);
+      dateSource = 'derived';
+    }
+    return { statement: s, endDate, dateSource } as const;
+  })
+  // Sort newest first by end date
+  .sort((a, b) => b.endDate.getTime() - a.endDate.getTime());
+
+  // Build periods computing start from the next item (older)
+  const periods: StatementPeriod[] = withEnds.map((entry, idx) => {
+    const next = withEnds[idx + 1]; // older statement
+    const startDate = next ? new Date(next.endDate.getFullYear(), next.endDate.getMonth(), next.endDate.getDate() + 1) : null;
+    return {
+      statementId: entry.statement.statement_id,
+      startDate,
+      endDate: entry.endDate,
+      dateSource: entry.dateSource,
+    };
+  });
+
+  return periods;
 }
 
 /**

@@ -1,4 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { decrypt } from '@/lib/encryption';
+import { listStatementPeriods, StatementPeriod } from '@/services/plaidStatements';
 import { addMonths, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
 
 // Helper function to detect Capital One cards based on institution and card names
@@ -73,7 +75,13 @@ export interface BillingCycleData {
   transactionCount: number;
 }
 
-export async function calculateBillingCycles(creditCardId: string): Promise<BillingCycleData[]> {
+export async function calculateBillingCycles(
+  creditCardId: string,
+  options?: {
+    statementPeriods?: { startDate: Date | null; endDate: Date }[];
+    baselineDueDate?: Date | null;
+  }
+): Promise<BillingCycleData[]> {
   // Get credit card data
   const { data: creditCard, error: cardError } = await supabaseAdmin
     .from('credit_cards')
@@ -121,7 +129,70 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   
   const lastStatementDate = creditCardWithTransactions.lastStatementIssueDate;
   const nextDueDate = creditCardWithTransactions.nextPaymentDueDate;
-  
+
+  // If explicit statement periods are provided, build cycles strictly from them
+  if (options?.statementPeriods && options.statementPeriods.length > 0) {
+    const provided = [...options.statementPeriods]
+      .filter(p => p.endDate instanceof Date && !isNaN(p.endDate.getTime()))
+      .sort((a, b) => b.endDate.getTime() - a.endDate.getTime());
+
+    const baselineDue = options.baselineDueDate || nextDueDate || null;
+    const baselineDay = baselineDue ? new Date(baselineDue).getDate() : null;
+
+    // Helper to estimate historical due date as same day-of-month as baseline due date
+    const estimateHistoricalDue = (cycleEnd: Date): Date | null => {
+      if (!baselineDay) return null;
+      const m = cycleEnd.getMonth() + 1; // next month
+      const y = cycleEnd.getFullYear() + (m > 11 ? 1 : 0);
+      const nextMonth = (m % 12);
+      const daysInMonth = new Date(y, nextMonth + 1, 0).getDate();
+      const day = Math.min(baselineDay, daysInMonth);
+      return new Date(y, nextMonth, day);
+    };
+
+    // Create cycles for each statement period (historical closed cycles)
+    for (let i = 0; i < provided.length; i++) {
+      const period = provided[i];
+      // Skip if startDate is missing (cannot create a proper window) and there is no older statement to infer
+      if (!period.startDate) {
+        // If we have the next older period, it would have given us a start; skip this one
+        continue;
+      }
+      const isMostRecentClosed = lastStatementDate && period.endDate.getTime() === lastStatementDate.getTime();
+      const due = isMostRecentClosed ? (nextDueDate || null) : estimateHistoricalDue(period.endDate);
+      await createOrUpdateCycle(
+        creditCardWithTransactions,
+        cycles,
+        period.startDate,
+        period.endDate,
+        due,
+        true,
+        transactionsWithDates
+      );
+    }
+
+    // Also include current open cycle if we have a last statement anchor
+    if (lastStatementDate) {
+      const currentCycleStart = new Date(lastStatementDate);
+      currentCycleStart.setDate(currentCycleStart.getDate() + 1);
+      const today = new Date();
+      const currentCycleEnd = today; // open cycle ends today for spend calc
+      const currentDue = baselineDay ? estimateHistoricalDue(new Date(currentCycleEnd)) : null;
+      await createOrUpdateCycle(
+        creditCardWithTransactions,
+        cycles,
+        currentCycleStart,
+        currentCycleEnd,
+        currentDue,
+        false,
+        transactionsWithDates
+      );
+    }
+
+    return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+  }
+
+  // Fallback: original behavior if no statement periods available
   if (!lastStatementDate) {
     return generateEstimatedCycles(creditCardWithTransactions, cycles);
   }
@@ -586,7 +657,29 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
   });
   
   for (const card of creditCards || []) {
-    const cycles = await calculateBillingCycles(card.id);
+    // Attempt statements-based periods when possible
+    let statementPeriods: { startDate: Date | null; endDate: Date }[] | null = null;
+    try {
+      const plaidItem = plaidItemMap.get(card.plaidItemId);
+      if (plaidItem?.accessToken && card.accountId) {
+        const accessToken = decrypt(plaidItem.accessToken);
+        const periods: StatementPeriod[] = await listStatementPeriods(accessToken, card.accountId, 13);
+        // Use only periods that have both start and end (skip newest if start is null)
+        const usable = periods
+          .filter(p => p.endDate && (p.startDate instanceof Date))
+          .map(p => ({ startDate: p.startDate!, endDate: p.endDate }));
+        if (usable.length > 0) {
+          statementPeriods = usable;
+        }
+      }
+    } catch (e) {
+      console.warn('Statements-based period listing failed; falling back to heuristic cycles:', e);
+    }
+
+    const cycles = await calculateBillingCycles(card.id, {
+      statementPeriods: statementPeriods || undefined,
+      baselineDueDate: card.nextPaymentDueDate ? new Date(card.nextPaymentDueDate) : null,
+    });
     
     // Get the associated plaid item
     const plaidItem = plaidItemMap.get(card.plaidItemId);
