@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdminAccess } from '@/lib/adminSecurity';
 import { supabaseAdmin } from '@/lib/supabase';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'admin-robinhood-statement-check',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     const robinhoodCardId = 'a4668ff3-2e74-46b7-93f5-e6ca3d3256ad';
     

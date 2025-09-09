@@ -1,8 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdminAccess } from '@/lib/adminSecurity';
 import { supabaseAdmin } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Security check - admin only
+  const securityError = await requireAdminAccess(request, {
+    endpointName: 'admin-analyze-robinhood-cycles',
+    logAccess: true
+  });
+  if (securityError) return securityError;
+
   try {
     // Get the Robinhood card
     const robinhoodCardId = 'a4668ff3-2e74-46b7-93f5-e6ca3d3256ad';
