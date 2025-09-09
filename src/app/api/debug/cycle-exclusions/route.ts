@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const cardId = url.searchParams.get('cardId');
+    const startDateParam = url.searchParams.get('startDate');
+    const endDateParam = url.searchParams.get('endDate');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
 
     // Get user's credit cards
     const { data: plaidItems, error: plaidError } = await supabaseAdmin
@@ -58,13 +61,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ cycleExclusions: [] });
     }
 
-    // Get billing cycles for these cards
-    const { data: billingCycles, error: cyclesError } = await supabaseAdmin
+    // Build billing cycles query with optional date filtering
+    let cyclesQuery = supabaseAdmin
       .from('billing_cycles')
       .select('*')
       .in('creditCardId', cards.map(c => c.id))
       .order('endDate', { ascending: false })
-      .limit(10); // Last 10 cycles
+      .limit(limit);
+
+    // Add date filtering if provided
+    if (startDateParam && endDateParam) {
+      const startDate = new Date(startDateParam);
+      const endDate = new Date(endDateParam);
+      
+      // Validate dates
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return NextResponse.json({ 
+          error: 'Invalid date format. Use YYYY-MM-DD format.' 
+        }, { status: 400 });
+      }
+      
+      if (startDate > endDate) {
+        return NextResponse.json({ 
+          error: 'Start date must be before end date.' 
+        }, { status: 400 });
+      }
+
+      // Filter cycles that overlap with the date range
+      cyclesQuery = cyclesQuery
+        .lte('startDate', endDate.toISOString())
+        .gte('endDate', startDate.toISOString());
+    }
+
+    const { data: billingCycles, error: cyclesError } = await cyclesQuery;
 
     if (cyclesError) {
       throw new Error(`Failed to fetch billing cycles: ${cyclesError.message}`);
@@ -171,6 +200,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       cycleExclusions: result,
+      dateRange: startDateParam && endDateParam ? {
+        start: startDateParam,
+        end: endDateParam,
+        explicit: true
+      } : {
+        explicit: false,
+        note: `Last ${limit} cycles`
+      },
       summary: {
         totalCycles: result.length,
         totalExcludedPayments: result.reduce((sum, r) => sum + r.transactions.excludedPayments, 0),

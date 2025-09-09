@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const cardId = url.searchParams.get('cardId');
+    const startDateParam = url.searchParams.get('startDate');
+    const endDateParam = url.searchParams.get('endDate');
     const days = parseInt(url.searchParams.get('days') || '90');
 
     // Get user's credit cards
@@ -59,10 +61,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ filteredTransactions: [], summary: { total: 0 } });
     }
 
-    // Calculate date range
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    // Calculate date range - support both explicit dates and days parameter
+    let startDate: Date;
+    let endDate: Date;
+
+    if (startDateParam && endDateParam) {
+      // Use explicit date range
+      startDate = new Date(startDateParam);
+      endDate = new Date(endDateParam);
+      
+      // Validate dates
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return NextResponse.json({ 
+          error: 'Invalid date format. Use YYYY-MM-DD format.' 
+        }, { status: 400 });
+      }
+      
+      if (startDate > endDate) {
+        return NextResponse.json({ 
+          error: 'Start date must be before end date.' 
+        }, { status: 400 });
+      }
+    } else {
+      // Fallback to days parameter
+      endDate = new Date();
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    }
 
     // Get all transactions in the date range
     const { data: allTransactions, error: transError } = await supabaseAdmin
@@ -159,7 +184,8 @@ export async function GET(request: NextRequest) {
       dateRange: {
         start: startDate.toISOString(),
         end: endDate.toISOString(),
-        days
+        days: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)),
+        explicit: !!(startDateParam && endDateParam)
       },
       cards: cards.map(c => ({ id: c.id, name: c.name, mask: c.mask }))
     });
