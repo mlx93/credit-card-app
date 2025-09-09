@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { formatCurrency, formatDate, getDaysUntil } from '@/utils/format';
 import { normalizeCardDisplayName } from '@/utils/cardName';
 import { Calendar, CreditCard, ChevronDown, ChevronRight, History, GripVertical } from 'lucide-react';
+import CycleDateEditor from './CycleDateEditor';
 
 // truncateCardName now imported from shared utility
 import {
@@ -44,6 +45,13 @@ interface CreditCardInfo {
   balanceLimit: number;
   nextPaymentDueDate?: Date;
   minimumPaymentAmount?: number;
+  manual_cycle_day?: number | null;
+  manual_due_day?: number | null;
+  manual_dates_configured?: boolean;
+  plaidItem?: {
+    institutionName?: string;
+    institutionId?: string;
+  };
 }
 
 // Helper function to detect Capital One cards
@@ -885,17 +893,49 @@ function CardContent({
             </div>
             <CreditCard className="h-5 w-5 text-gray-600 mr-2" />
             <div>
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const displayName = normalizeCardDisplayName(card?.name ?? cardName, card?.mask);
-                  return (
-                    <h3 className="font-semibold text-gray-900" title={displayName}>
-                      {displayName}
-                    </h3>
-                  );
-                })()}
-              </div>
-              {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
+              {(() => {
+                const displayName = normalizeCardDisplayName(card?.name ?? cardName, card?.mask);
+                return (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900" title={displayName}>
+                        {displayName}
+                      </h3>
+                    </div>
+                    {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
+                    {card && (
+                      <CycleDateEditor
+                        cardId={card.id}
+                        cardName={displayName}
+                        currentCycleDay={card.manual_cycle_day}
+                        currentDueDay={card.manual_due_day}
+                        isRobinhood={card.plaidItem?.institutionId === 'ins_54'}
+                        onSave={async (cycleDay: number, dueDay: number) => {
+                          try {
+                            const response = await fetch(`/api/credit-cards/${card.id}/cycle-dates`, {
+                              method: 'PATCH',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({ cycleDay, dueDay }),
+                            });
+                            
+                            if (!response.ok) {
+                              throw new Error('Failed to update cycle dates');
+                            }
+                            
+                            // Refresh the page to show updated billing cycles
+                            window.location.reload();
+                          } catch (error) {
+                            console.error('Error updating cycle dates:', error);
+                            throw error;
+                          }
+                        }}
+                      />
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
           {(historical.length > 0 || olderLoading) && (

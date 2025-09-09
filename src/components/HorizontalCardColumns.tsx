@@ -17,10 +17,14 @@ interface CreditCardInfo {
   balanceLimit?: number;
   nextPaymentDueDate?: string;
   minimumPaymentAmount?: number;
+  manual_cycle_day?: number | null;
+  manual_due_day?: number | null;
+  manual_dates_configured?: boolean;
   plaidItem?: {
     id: string;
     itemId: string;
     institutionName: string;
+    institutionId?: string;
     status: string;
     lastSyncAt?: Date;
     errorMessage?: string;
