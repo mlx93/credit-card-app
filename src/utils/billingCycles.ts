@@ -180,9 +180,9 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
     const historicalDueDate = new Date(historicalCycleEnd);
     historicalDueDate.setDate(historicalDueDate.getDate() + 21);
     
-    // Historical cycles that have ended should be treated as having statement balances
-    const isCompletedCycle = historicalCycleEnd < now;
-    await createOrUpdateCycle(creditCardWithTransactions, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, isCompletedCycle, transactionsWithDates);
+    // Historical cycles should NOT get Plaid's statement balance (that's only for the matching cycle)
+    // Pass false for hasStatementBalance so they use totalSpend instead
+    await createOrUpdateCycle(creditCardWithTransactions, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, false, transactionsWithDates);
     
     historicalCycleEnd = new Date(historicalCycleStart);
     historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
