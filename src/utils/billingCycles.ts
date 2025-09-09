@@ -204,9 +204,13 @@ async function createOrUpdateCycle(
   const today = new Date();
   const effectiveEndDate = cycleEnd > today ? today : cycleEnd;
   
-  const cycleTransactions = creditCard.transactions.filter((t: any) => 
-    t.date >= cycleStart && t.date <= effectiveEndDate
-  );
+  // For statement cycles, use authorization date if available (matches how banks create statements)
+  // For other cycles, fall back to posted date
+  const cycleTransactions = creditCard.transactions.filter((t: any) => {
+    // Use authorization date if available, otherwise use posted date
+    const transactionDate = t.authorizedDate ? new Date(t.authorizedDate) : t.date;
+    return transactionDate >= cycleStart && transactionDate <= effectiveEndDate;
+  });
 
   // Properly calculate spend: include charges and refunds, but exclude payments
   let totalSpend = cycleTransactions.reduce((sum: number, t: any) => {
