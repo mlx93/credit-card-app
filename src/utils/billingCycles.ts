@@ -298,8 +298,15 @@ async function createOrUpdateCycle(
       hasStatementBalance,
       isStatementCycle,
       dueDate: dueDate?.toDateString(),
-      exactDateMatch: lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime()
+      exactDateMatch: lastStatementDate && cycleEnd.getTime() === lastStatementDate.getTime(),
+      willGetPaymentDetection: isStatementCycle
     });
+    
+    if (isStatementCycle) {
+      console.log(`🎯 STATEMENT CYCLE CONFIRMED for ${creditCard.name} ending ${cycleEnd.toDateString()} - will check for payments`);
+    } else {
+      console.log(`❌ NOT statement cycle for ${creditCard.name} ending ${cycleEnd.toDateString()} - no payment detection`);
+    }
     
     if (isStatementCycle) {
       // This is the exact cycle that corresponds to the last statement
@@ -381,7 +388,26 @@ async function createOrUpdateCycle(
           const remainingStatementBalance = Math.max(0, originalStatementBalance - totalPayments);
           if (remainingStatementBalance === 0) {
             minimumPayment = 0;
-            console.log(`✅ Setting minimumPayment = 0 for ${creditCard.name} cycle ending ${cycleEnd.toDateString()}`);
+            console.log(`✅ PAYMENT DETECTED - Setting minimumPayment = 0 for ${creditCard.name} cycle ending ${cycleEnd.toDateString()}`, {
+              originalStatementBalance,
+              totalPayments,
+              remainingStatementBalance,
+              currentBalance,
+              cycleEndDate: cycleEnd.toDateString(),
+              paymentTransactions: recentPayments.map(p => ({
+                name: p.name,
+                amount: p.amount,
+                date: p.date.toDateString()
+              }))
+            });
+          } else {
+            console.log(`⚠️ NO PAYMENT DETECTED for ${creditCard.name} cycle ending ${cycleEnd.toDateString()}`, {
+              originalStatementBalance,
+              totalPayments,
+              remainingStatementBalance,
+              currentBalance,
+              recentPaymentsCount: recentPayments.length
+            });
           }
         }
       }
