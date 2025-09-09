@@ -134,10 +134,9 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   const closedCycleEnd = new Date(lastStatementDate);
   const closedCycleStart = new Date(closedCycleEnd);
   
-  // For monthly billing cycles, go back one month and forward one day
-  // This handles cycles like 29th to 28th correctly regardless of month length
-  closedCycleStart.setMonth(closedCycleStart.getMonth() - 1);
-  closedCycleStart.setDate(closedCycleStart.getDate() + 1);
+  // Use the estimated cycle length from Plaid data for accurate cycle boundaries
+  // This respects actual cycle lengths (28-31 days) rather than forcing calendar months
+  closedCycleStart.setDate(closedCycleStart.getDate() - cycleLength + 1);
   
   // Create the closed cycle with statement balance
   await createOrUpdateCycle(creditCardWithTransactions, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true, transactionsWithDates);
@@ -146,9 +145,8 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   const currentCycleStart = new Date(lastStatementDate);
   currentCycleStart.setDate(currentCycleStart.getDate() + 1);
   const currentCycleEnd = new Date(currentCycleStart);
-  // Move forward one month, then back one day for monthly cycles
-  currentCycleEnd.setMonth(currentCycleEnd.getMonth() + 1);
-  currentCycleEnd.setDate(currentCycleEnd.getDate() - 1);
+  // Use the same cycle length for consistency
+  currentCycleEnd.setDate(currentCycleEnd.getDate() + cycleLength - 1);
   const currentDueDate = new Date(currentCycleEnd);
   currentDueDate.setDate(currentDueDate.getDate() + 21);
   
@@ -168,9 +166,8 @@ export async function calculateBillingCycles(creditCardId: string): Promise<Bill
   
   while (historicalCycleEnd >= earliestCycleDate) {
     const historicalCycleStart = new Date(historicalCycleEnd);
-    // Use month-based calculation for historical cycles too
-    historicalCycleStart.setMonth(historicalCycleStart.getMonth() - 1);
-    historicalCycleStart.setDate(historicalCycleStart.getDate() + 1);
+    // Use the same cycle length for historical cycles
+    historicalCycleStart.setDate(historicalCycleStart.getDate() - cycleLength + 1);
     
     // Skip cycles only if they end before the card open date (no meaningful overlap)
     if (creditCardWithTransactions.openDate && historicalCycleEnd < new Date(creditCardWithTransactions.openDate)) {
