@@ -351,6 +351,23 @@ async function createOrUpdateCycle(
         // Sum up the payment amounts (they're negative, so we need to make them positive)
         const totalPayments = recentPayments.reduce((sum, t) => sum + Math.abs(t.amount), 0);
         
+        // Check if there's a payment that matches the statement balance (within $5 tolerance)
+        const statementMatchingPayment = recentPayments.find(t => {
+          const paymentAmount = Math.abs(t.amount);
+          const difference = Math.abs(paymentAmount - originalStatementBalance);
+          return difference <= 5; // Allow $5 tolerance for rounding/fees
+        });
+        
+        if (statementMatchingPayment) {
+          console.log(`✅ Found statement balance payment for ${creditCard.name}:`, {
+            paymentAmount: Math.abs(statementMatchingPayment.amount),
+            statementBalance: originalStatementBalance,
+            difference: Math.abs(Math.abs(statementMatchingPayment.amount) - originalStatementBalance),
+            paymentDate: statementMatchingPayment.date.toDateString(),
+            paymentName: statementMatchingPayment.name
+          });
+        }
+        
         if (totalPayments > 0) {
           console.log(`💳 Payment detected for ${creditCard.name}:`, {
             currentBalance,

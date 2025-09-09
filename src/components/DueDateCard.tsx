@@ -2,6 +2,7 @@ import { formatCurrency, formatDate, getDaysUntil, formatPercentage } from '@/ut
 import { AlertTriangle, CreditCard, WifiOff, RefreshCw, Trash2, ExternalLink, GripVertical, Edit3, Check, X, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { normalizeCardDisplayName } from '@/utils/cardName';
+import { isPaymentTransaction } from '@/utils/billingCycles';
 
 // truncateCardName now imported from shared utility for consistency
 import {
@@ -31,8 +32,14 @@ interface CreditCardInfo {
   manualcreditlimit?: number | null;
   ismanuallimit?: boolean;
   lastStatementBalance?: number;
+  lastStatementIssueDate?: string | null;
   nextPaymentDueDate?: Date;
   minimumPaymentAmount?: number;
+  recentTransactions?: Array<{
+    name: string;
+    amount: number;
+    date: string;
+  }>;
   plaidItem?: {
     id: string;
     itemId: string;
@@ -682,18 +689,35 @@ export function DueDateCard({
       {/* Balance Information - Show statement balance only when unpaid */}
       {(() => {
         // Only show statement balance if it appears to be unpaid
-        // If current balance is significantly lower than statement balance, it's likely been paid
+        // Check for payment transactions that match the statement balance amount
         const statementBalance = Math.abs(card.lastStatementBalance || 0);
-        const currentBalance = Math.abs(card.balanceCurrent || 0);
         const minimumPayment = card.minimumPaymentAmount || 0;
         
-        // Consider statement paid if:
-        // 1. Current balance is less than 50% of statement balance (major payment made), OR
-        // 2. Current balance is within $10 of being fully paid off and much lower than statement
-        const balanceRatio = statementBalance > 0 ? currentBalance / statementBalance : 0;
-        const isLikelyPaid = balanceRatio < 0.5 || (currentBalance < 50 && currentBalance < statementBalance * 0.8);
+        if (!card.lastStatementBalance || minimumPayment <= 0) {
+          return false;
+        }
         
-        return card.lastStatementBalance && minimumPayment > 0 && !isLikelyPaid;
+        // Look for payment transactions in the last 60 days that match the statement balance
+        const statementIssueDate = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        
+        const searchFromDate = statementIssueDate || sixtyDaysAgo;
+        
+        const recentPayments = (card.recentTransactions || []).filter(t => {
+          const transactionDate = new Date(t.date);
+          return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
+        });
+        
+        // Check if there's a payment that matches the statement balance (within $5 tolerance)
+        const statementMatchingPayment = recentPayments.find(t => {
+          const paymentAmount = Math.abs(t.amount);
+          const difference = Math.abs(paymentAmount - statementBalance);
+          return difference <= 5; // Allow $5 tolerance for rounding/fees
+        });
+        
+        // Show statement balance only if no matching payment was found
+        return !statementMatchingPayment;
       })() ? (
         <div className="grid grid-cols-3 gap-4 mb-auto min-h-[48px] -mt-1">
           <div>
@@ -728,7 +752,37 @@ export function DueDateCard({
             {isPaidOff && (
               <p className="text-xs text-green-600 font-medium mt-0.5">All statements paid</p>
             )}
-            {!isPaidOff && card.lastStatementBalance && (
+            {!isPaidOff && card.lastStatementBalance && (() => {
+              // Show "Statement paid ✓" if we have transaction data and found a matching payment,
+              // or if we don't have transaction data but balance suggests payment (fallback)
+              const statementBalance = Math.abs(card.lastStatementBalance || 0);
+              const currentBalance = Math.abs(card.balanceCurrent || 0);
+              
+              if (card.recentTransactions) {
+                // Use transaction-based detection
+                const statementIssueDate = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
+                const sixtyDaysAgo = new Date();
+                sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+                const searchFromDate = statementIssueDate || sixtyDaysAgo;
+                
+                const recentPayments = card.recentTransactions.filter(t => {
+                  const transactionDate = new Date(t.date);
+                  return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
+                });
+                
+                const statementMatchingPayment = recentPayments.find(t => {
+                  const paymentAmount = Math.abs(t.amount);
+                  const difference = Math.abs(paymentAmount - statementBalance);
+                  return difference <= 5;
+                });
+                
+                return !!statementMatchingPayment;
+              } else {
+                // Fallback to balance ratio when no transaction data
+                const balanceRatio = statementBalance > 0 ? currentBalance / statementBalance : 0;
+                return balanceRatio < 0.5 || (currentBalance < 50 && currentBalance < statementBalance * 0.8);
+              }
+            })() && (
               <p className="text-xs text-green-600 font-medium mt-0.5">Statement paid ✓</p>
             )}
           </div>
