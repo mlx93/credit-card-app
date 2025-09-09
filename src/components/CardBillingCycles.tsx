@@ -904,36 +904,43 @@ function CardContent({
                       </h3>
                     </div>
                     {card && <p className="text-sm text-gray-600">•••• {card.mask}</p>}
-                    {card && (
-                      <CycleDateEditor
-                        cardId={card.id}
-                        cardName={displayName}
-                        currentCycleDay={card.manual_cycle_day}
-                        currentDueDay={card.manual_due_day}
-                        isRobinhood={card.plaidItem?.institutionId === 'ins_54'}
-                        onSave={async (cycleDay: number, dueDay: number) => {
-                          try {
-                            const response = await fetch(`/api/credit-cards/${card.id}/cycle-dates`, {
-                              method: 'PATCH',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({ cycleDay, dueDay }),
-                            });
-                            
-                            if (!response.ok) {
-                              throw new Error('Failed to update cycle dates');
+                    {card && (() => {
+                      // Only show editor if card needs manual configuration
+                      const hasPlaidDates = card.lastStatementIssueDate || card.nextPaymentDueDate;
+                      const hasManualDates = card.manual_dates_configured;
+                      const needsManualConfig = !hasPlaidDates || hasManualDates;
+                      
+                      return needsManualConfig ? (
+                        <CycleDateEditor
+                          cardId={card.id}
+                          cardName={displayName}
+                          currentCycleDay={card.manual_cycle_day}
+                          currentDueDay={card.manual_due_day}
+                          isRobinhood={card.plaidItem?.institutionId === 'ins_54'}
+                          onSave={async (cycleDay: number, dueDay: number) => {
+                            try {
+                              const response = await fetch(`/api/credit-cards/${card.id}/cycle-dates`, {
+                                method: 'PATCH',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ cycleDay, dueDay }),
+                              });
+                              
+                              if (!response.ok) {
+                                throw new Error('Failed to update cycle dates');
+                              }
+                              
+                              // Refresh the page to show updated billing cycles
+                              window.location.reload();
+                            } catch (error) {
+                              console.error('Error updating cycle dates:', error);
+                              throw error;
                             }
-                            
-                            // Refresh the page to show updated billing cycles
-                            window.location.reload();
-                          } catch (error) {
-                            console.error('Error updating cycle dates:', error);
-                            throw error;
-                          }
-                        }}
-                      />
-                    )}
+                          }}
+                        />
+                      ) : null;
+                    })()}
                   </>
                 );
               })()}

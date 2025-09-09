@@ -15,7 +15,8 @@ interface CreditCardInfo {
   mask: string;
   balanceCurrent: number;
   balanceLimit?: number;
-  nextPaymentDueDate?: string;
+  lastStatementIssueDate?: string | null;
+  nextPaymentDueDate?: string | null;
   minimumPaymentAmount?: number;
   manual_cycle_day?: number | null;
   manual_due_day?: number | null;
