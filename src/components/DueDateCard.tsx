@@ -704,6 +704,13 @@ export function DueDateCard({
         
         const searchFromDate = statementIssueDate || sixtyDaysAgo;
         
+        console.log(`🔍 Main statement balance check for ${card.name}:`, {
+          hasRecentTransactions: !!(card.recentTransactions && card.recentTransactions.length > 0),
+          transactionCount: card.recentTransactions?.length || 0,
+          statementBalance,
+          minimumPayment
+        });
+        
         const recentPayments = (card.recentTransactions || []).filter(t => {
           const transactionDate = new Date(t.date);
           return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
@@ -715,6 +722,8 @@ export function DueDateCard({
           const difference = Math.abs(paymentAmount - statementBalance);
           return difference <= 5; // Allow $5 tolerance for rounding/fees
         });
+        
+        console.log(`📊 Statement balance decision for ${card.name}: ${statementMatchingPayment ? 'HIDE' : 'SHOW'} (found ${recentPayments.length} payments)`);
         
         // Show statement balance only if no matching payment was found
         return !statementMatchingPayment;
@@ -765,16 +774,38 @@ export function DueDateCard({
                 sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
                 const searchFromDate = statementIssueDate || sixtyDaysAgo;
                 
+                console.log(`🔍 DueDateCard payment detection for ${card.name}:`, {
+                  statementBalance,
+                  totalTransactions: card.recentTransactions.length,
+                  statementIssueDate: statementIssueDate?.toDateString(),
+                  searchFromDate: searchFromDate.toDateString(),
+                  allTransactions: card.recentTransactions.map(t => ({
+                    name: t.name,
+                    amount: t.amount,
+                    date: t.date,
+                    isPayment: isPaymentTransaction(t.name)
+                  }))
+                });
+                
                 const recentPayments = card.recentTransactions.filter(t => {
                   const transactionDate = new Date(t.date);
                   return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
                 });
                 
+                console.log(`💰 Found ${recentPayments.length} payment transactions:`, recentPayments);
+                
                 const statementMatchingPayment = recentPayments.find(t => {
                   const paymentAmount = Math.abs(t.amount);
                   const difference = Math.abs(paymentAmount - statementBalance);
+                  console.log(`  Checking payment: $${paymentAmount} vs statement: $${statementBalance}, diff: $${difference}`);
                   return difference <= 5;
                 });
+                
+                if (statementMatchingPayment) {
+                  console.log(`✅ Found matching payment for ${card.name}:`, statementMatchingPayment);
+                } else {
+                  console.log(`❌ No matching payment found for ${card.name} statement balance of $${statementBalance}`);
+                }
                 
                 return !!statementMatchingPayment;
               } else {

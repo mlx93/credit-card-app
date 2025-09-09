@@ -108,8 +108,8 @@ export default function CycleDateEditor({
   }
 
   const modal = (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 sm:p-6 md:p-8">
-      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 sm:p-8 w-full max-w-2xl lg:max-w-4xl xl:max-w-5xl h-auto max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 sm:p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 sm:p-8 w-full max-w-md sm:max-w-lg h-auto max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-6 sm:mb-8">
           <div>
             <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Set Billing Cycle Dates</h3>
@@ -132,43 +132,47 @@ export default function CycleDateEditor({
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+        <div className="space-y-6">
           <div>
-            <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            <label className="block text-lg font-semibold mb-3 text-gray-900 dark:text-white">
               Statement Close Day
-              <span className="text-gray-500 font-normal ml-2 text-base">(Day of month: 1-31)</span>
             </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={cycleDayInput}
-              onChange={(e) => setCycleDayInput(e.target.value)}
-              className="w-full px-4 py-4 text-lg border border-gray-300 dark:border-gray-700 rounded-xl 
-                       bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
-                       transition-all duration-200"
-              placeholder="e.g., 15"
-            />
-            <p className="text-sm text-gray-500 mt-3">
+            <div className="flex items-center gap-3 mb-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={cycleDayInput}
+                onChange={(e) => setCycleDayInput(e.target.value)}
+                className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
+                         bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                         transition-all duration-200"
+                placeholder="15"
+              />
+              <span className="text-gray-600 dark:text-gray-400">day of the month (1-31)</span>
+            </div>
+            <p className="text-sm text-gray-500">
               The day your statement period ends each month
             </p>
           </div>
 
           <div>
-            <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            <label className="block text-lg font-semibold mb-3 text-gray-900 dark:text-white">
               Payment Due Day
-              <span className="text-gray-500 font-normal ml-2 text-base">(Day of month: 1-31)</span>
             </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={dueDayInput}
-              onChange={(e) => setDueDayInput(e.target.value)}
-              className="w-full px-4 py-4 text-lg border border-gray-300 dark:border-gray-700 rounded-xl 
-                       bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
-                       transition-all duration-200"
-              placeholder="e.g., 10"
-            />
-            <p className="text-sm text-gray-500 mt-3">
+            <div className="flex items-center gap-3 mb-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={dueDayInput}
+                onChange={(e) => setDueDayInput(e.target.value)}
+                className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
+                         bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                         transition-all duration-200"
+                placeholder="10"
+              />
+              <span className="text-gray-600 dark:text-gray-400">day of the month (1-31)</span>
+            </div>
+            <p className="text-sm text-gray-500">
               The day your payment is due each month
             </p>
           </div>
@@ -183,13 +187,13 @@ export default function CycleDateEditor({
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-4 mt-8 sm:mt-12 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 mt-8 justify-center">
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-base font-semibold
                      disabled:opacity-50 disabled:cursor-not-allowed transition-colors
-                     flex items-center justify-center gap-3 min-w-fit"
+                     flex items-center justify-center gap-2 min-w-fit"
           >
             {isSaving ? (
               <>
@@ -206,7 +210,7 @@ export default function CycleDateEditor({
           <button
             onClick={() => setIsEditing(false)}
             disabled={isSaving}
-            className="px-8 py-4 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-lg font-semibold
+            className="px-6 py-3 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-base font-semibold
                      hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors
                      disabled:opacity-50 min-w-fit"
           >
