@@ -103,6 +103,7 @@ interface SortableCardColumnProps {
     cardName: string;
   }) => void;
   olderCyclesLoadingIds?: string[];
+  fullCyclesLoading?: boolean;
   colorIndex: number;
   billingCycleGradient: string;
 }
@@ -119,6 +120,7 @@ function SortableCardColumn({
   onRequestDelete, 
   onCreditLimitUpdated,
   olderCyclesLoadingIds,
+  fullCyclesLoading,
   colorIndex,
   billingCycleGradient
 }: SortableCardColumnProps) {
@@ -219,7 +221,7 @@ function SortableCardColumn({
                   cards={[card]}
                   cardOrder={[card.id]}
                   olderCyclesLoadingIds={olderCyclesLoadingIds}
-                  fullCyclesLoading={Boolean(props.fullCyclesLoading)}
+                  fullCyclesLoading={Boolean(fullCyclesLoading)}
                   compactMode={true}
                 />
               </div>
@@ -535,6 +537,8 @@ export function HorizontalCardColumns(props: HorizontalCardColumnsProps) {
                       onRemove={onRemove}
                       onRequestDelete={onRequestDelete}
                       onCreditLimitUpdated={onCreditLimitUpdated}
+                      olderCyclesLoadingIds={olderCyclesLoadingIds}
+                      fullCyclesLoading={fullCyclesLoading}
                       // Visual spinner for background historical load
                       forceRefreshing={visualRefreshingIds?.includes(card.id)}
                       colorIndex={colorIndex}
