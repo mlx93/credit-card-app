@@ -96,35 +96,35 @@ export default function CycleDateEditor({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full">
-        <div className="flex justify-between items-start mb-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 sm:p-6 md:p-8">
+      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 sm:p-8 w-full max-w-2xl lg:max-w-4xl xl:max-w-5xl h-auto max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-start mb-6 sm:mb-8">
           <div>
-            <h3 className="text-lg font-semibold">Set Billing Cycle Dates</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{cardName}</p>
+            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Set Billing Cycle Dates</h3>
+            <p className="text-lg text-gray-600 dark:text-gray-400 mt-2">{cardName}</p>
           </div>
           <button
             onClick={() => setIsEditing(false)}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
         {isRobinhood && (
-          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
-            <p className="text-blue-700 dark:text-blue-300">
+          <div className="mb-6 sm:mb-8 p-4 sm:p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+            <p className="text-blue-700 dark:text-blue-300 text-base sm:text-lg">
               Robinhood doesn't provide statement dates through their API. 
               Please check your Robinhood app or recent statements to find these dates.
             </p>
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Statement Close Day
-              <span className="text-gray-500 font-normal ml-2">(Day of month: 1-31)</span>
+              <span className="text-gray-500 font-normal ml-2 text-base">(Day of month: 1-31)</span>
             </label>
             <input
               type="number"
@@ -132,19 +132,20 @@ export default function CycleDateEditor({
               max="31"
               value={cycleDay}
               onChange={(e) => setCycleDay(parseInt(e.target.value) || 1)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg 
-                       bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-4 text-lg border border-gray-300 dark:border-gray-700 rounded-xl 
+                       bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                       transition-all duration-200"
               placeholder="e.g., 15"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 mt-3">
               The day your statement period ends each month
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Payment Due Day
-              <span className="text-gray-500 font-normal ml-2">(Day of month: 1-31)</span>
+              <span className="text-gray-500 font-normal ml-2 text-base">(Day of month: 1-31)</span>
             </label>
             <input
               type="number"
@@ -152,56 +153,60 @@ export default function CycleDateEditor({
               max="31"
               value={dueDay}
               onChange={(e) => setDueDay(parseInt(e.target.value) || 1)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg 
-                       bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-4 text-lg border border-gray-300 dark:border-gray-700 rounded-xl 
+                       bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                       transition-all duration-200"
               placeholder="e.g., 10"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 mt-3">
               The day your payment is due each month
             </p>
           </div>
 
-          {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-600 dark:text-red-400">
-              {error}
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg 
-                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors
-                       flex items-center justify-center gap-2"
-            >
-              {isSaving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  Save Dates
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setIsEditing(false)}
-              disabled={isSaving}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg 
-                       hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors
-                       disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-500">
-            <strong>Tip:</strong> Your statement close date is usually the same day each month when your 
+        {error && (
+          <div className="mt-6 p-4 sm:p-6 bg-red-50 dark:bg-red-900/20 rounded-xl">
+            <p className="text-red-600 dark:text-red-400 text-base sm:text-lg font-medium">
+              {error}
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-4 mt-8 sm:mt-12">
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-xl text-lg font-semibold
+                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors
+                     flex items-center justify-center gap-3"
+          >
+            {isSaving ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Check className="w-5 h-5" />
+                Save Billing Dates
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setIsEditing(false)}
+            disabled={isSaving}
+            className="px-6 py-4 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-lg font-semibold
+                     hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors
+                     disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+            <strong className="text-gray-900 dark:text-white">Tip:</strong> Your statement close date is usually the same day each month when your 
             billing period ends. The payment due date is typically 21-25 days after the statement close.
           </p>
         </div>
