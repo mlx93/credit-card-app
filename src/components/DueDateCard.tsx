@@ -695,7 +695,7 @@ export function DueDateCard({
 
       {/* Balance Information - Show statement balance only when unpaid */}
       {(() => {
-        // Move all statement balance calculation inside this IIFE so it's accessible
+        // Calculate statement balance and determine whether to show it
         const plaidStatementBalance = Math.abs(card.lastStatementBalance || 0);
         const plaidMinimumPayment = card.minimumPaymentAmount || 0;
         
@@ -853,11 +853,16 @@ export function DueDateCard({
         
         // Don't show statement section if there's no statement balance or it's been paid
         if (!statementBalance || minimumPayment <= 0) {
-          return false;
+          return null; // Return null instead of false
         }
         
         // Fallback to transaction-based detection when no cycle data available
         if (card.recentTransactions) {
+          const statementIssueDate = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
+          const sixtyDaysAgo = new Date();
+          sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+          const searchFromDate = statementIssueDate || sixtyDaysAgo;
+          
           const recentPayments = (card.recentTransactions || []).filter(t => {
             const transactionDate = new Date(t.date);
             return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
@@ -870,38 +875,41 @@ export function DueDateCard({
           });
           
           console.log(`📊 Fallback transaction check for ${card.name}: ${statementMatchingPayment ? 'HIDE' : 'SHOW'}`);
-          return !statementMatchingPayment;
+          if (statementMatchingPayment) {
+            return null; // Hide if payment found
+          }
         }
         
-        // Final fallback: show statement balance if we can't determine payment status
-        console.log(`📊 SHOWING statement balance for ${card.name} - no payment detection data available`);
-        return true;
-      })() ? (
-        <div className="grid grid-cols-3 gap-4 mb-auto min-h-[48px] -mt-1">
-          <div>
-            <p className="text-xs text-gray-600">Statement Balance</p>
-            <p className="font-bold text-lg text-blue-600">
-              {/* Use the statementBalance we already calculated above */}
-              {formatCurrency(statementBalance)}
-            </p>
-            <p className="text-xs text-blue-500">Due Soon</p>
-          </div>
-          <div className="text-center pl-2">
-            <p className="text-xs text-gray-600">Current Balance</p>
-            <p className="font-bold text-lg text-gray-900">
-              {formatCurrency(Math.abs(card.balanceCurrent))}
-            </p>
-          </div>
-          {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
-            <div className="text-right">
-              <p className="text-xs text-gray-600">Minimum Payment</p>
+        // Show statement balance if we get here
+        console.log(`📊 SHOWING statement balance for ${card.name} - displaying statement`);
+        
+        // Return the JSX for statement balance display
+        return (
+          <div className="grid grid-cols-3 gap-4 mb-auto min-h-[48px] -mt-1">
+            <div>
+              <p className="text-xs text-gray-600">Statement Balance</p>
+              <p className="font-bold text-lg text-blue-600">
+                {formatCurrency(statementBalance)}
+              </p>
+              <p className="text-xs text-blue-500">Due Soon</p>
+            </div>
+            <div className="text-center pl-2">
+              <p className="text-xs text-gray-600">Current Balance</p>
               <p className="font-bold text-lg text-gray-900">
-                {formatCurrency(card.minimumPaymentAmount)}
+                {formatCurrency(Math.abs(card.balanceCurrent))}
               </p>
             </div>
-          )}
-        </div>
-      ) : (
+            {!!(minimumPayment && minimumPayment > 0) && (
+              <div className="text-right">
+                <p className="text-xs text-gray-600">Minimum Payment</p>
+                <p className="font-bold text-lg text-gray-900">
+                  {formatCurrency(minimumPayment)}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })() || (
         <div className="grid grid-cols-2 gap-2 mb-4 min-h-[48px] items-center -mt-1">
           <div>
             <p className="text-xs text-gray-600 mb-1">Balance</p>
