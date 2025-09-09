@@ -732,17 +732,17 @@ export function DueDateCard({
           });
         };
         
-        // Check if current balance matches any recent cycle's totalSpend or statementBalance
-        // This indicates the old statement was paid and this cycle is now the balance
+        // Check if current balance is less than or equal to a recent cycle's totalSpend
+        // If current balance <= recent cycle amount, old statements must be paid
         const mostRecentCycle = closedCycles[0];
         const secondMostRecentCycle = closedCycles[1];
         
-        // Check if current balance matches the most recent cycle's totalSpend
-        const currentBalanceMatchesRecentCycle = mostRecentCycle && (
+        // Current balance being <= recent cycle amount indicates old statements are paid
+        const currentBalanceIndicatesOldStatementPaid = mostRecentCycle && (
           // Check against totalSpend first (more reliable)
-          (mostRecentCycle.totalSpend && Math.abs(currentBalance - Math.abs(mostRecentCycle.totalSpend)) <= 5) ||
+          (mostRecentCycle.totalSpend && currentBalance <= Math.abs(mostRecentCycle.totalSpend) + 5) ||
           // Fallback to statementBalance if no totalSpend
-          (mostRecentCycle.statementBalance && Math.abs(currentBalance - Math.abs(mostRecentCycle.statementBalance)) <= 5)
+          (mostRecentCycle.statementBalance && currentBalance <= Math.abs(mostRecentCycle.statementBalance) + 5)
         );
         
         // Determine if Plaid's statement has been paid in full
@@ -764,13 +764,17 @@ export function DueDateCard({
         });
         
         if (matchingCycle) {
-          // If current balance matches a more recent cycle's totalSpend AND
-          // Plaid's balance matches an older cycle, the old statement must be paid
-          if (currentBalanceMatchesRecentCycle && matchingCycle !== mostRecentCycle) {
+          // If current balance <= recent cycle amount AND Plaid matches an older cycle, old statement is paid
+          if (currentBalanceIndicatesOldStatementPaid && matchingCycle !== mostRecentCycle) {
             plaidStatementIsPaid = true;
-            console.log(`💳 ${card.name}: Old statement paid - current balance matches recent cycle`);
+            console.log(`💳 ${card.name}: Old statement paid - current balance <= recent cycle amount`);
           }
-          // Also check if we have direct evidence of payment
+          // Check if the matching cycle itself shows as paid (has checkmark in UI)
+          else if (matchingCycle.minimumPayment === 0 && matchingCycle.statementBalance && matchingCycle.statementBalance > 0) {
+            plaidStatementIsPaid = true;
+            console.log(`💳 ${card.name}: Statement paid - cycle marked as paid (minimumPayment=0)`);
+          }
+          // Also check if we have direct evidence of payment transaction
           else if (hasPaymentForAmount(plaidStatementBalance)) {
             plaidStatementIsPaid = true;
             console.log(`💳 ${card.name}: Statement paid - found matching payment transaction`);
@@ -834,7 +838,7 @@ export function DueDateCard({
           minimumPayment,
           usingCycleData,
           currentBalance,
-          currentBalanceMatchesRecentCycle,
+          currentBalanceIndicatesOldStatementPaid,
           closedCyclesCount: closedCycles.length,
           mostRecentUnpaidCycle: mostRecentUnpaidCycle ? {
             endDate: mostRecentUnpaidCycle.endDate,
