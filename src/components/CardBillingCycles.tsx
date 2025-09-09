@@ -43,7 +43,8 @@ interface CreditCardInfo {
   mask: string;
   balanceCurrent: number;
   balanceLimit: number;
-  nextPaymentDueDate?: Date;
+  lastStatementIssueDate?: string | null;
+  nextPaymentDueDate?: string | null;
   minimumPaymentAmount?: number;
   manual_cycle_day?: number | null;
   manual_due_day?: number | null;
@@ -966,8 +967,9 @@ function CardContent({
                 <div className={`flex items-center justify-center w-4 h-4 rounded-full mr-1.5 transition-all duration-300 bg-gradient-to-br from-gray-200 to-gray-300 group-hover:from-gray-300 group-hover:to-gray-400 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>
                   <ChevronRight className="h-2.5 w-2.5 text-gray-600 group-hover:text-gray-700" />
                 </div>
-                <span className="font-medium text-xs whitespace-nowrap">
-                  {`${historical.length} older`}
+                <span className="font-medium text-xs text-center leading-tight">
+                  <div>{historical.length} older</div>
+                  <div>cycles</div>
                 </span>
               </button>
             )
