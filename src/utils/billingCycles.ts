@@ -70,7 +70,7 @@ export interface BillingCycleData {
   minimumPayment?: number;
   dueDate?: Date;
   totalSpend: number;
-  transactionCount: number;
+  transactioncount: number;
 }
 
 export async function calculateBillingCycles(
@@ -421,7 +421,7 @@ async function createOrUpdateCycle(
         originalStatementBalance,
         conditionMet: originalStatementBalance > 0 && currentBalance < originalStatementBalance,
         statementDate: lastStatementDate?.toDateString(),
-        transactionCount: transactionsWithDates.filter(t => !isPaymentTransaction(t.name || '')).length
+        transactioncount: transactionsWithDates.filter(t => !isPaymentTransaction(t.name || '')).length
       });
 
       if (originalStatementBalance > 0 && currentBalance < originalStatementBalance) {
@@ -553,7 +553,7 @@ async function createOrUpdateCycle(
       minimumPayment: minimumPayment !== null ? minimumPayment : undefined,
       dueDate: dueDate || undefined,
       totalSpend,
-      transactionCount: cycleTransactions?.filter(t => !isPaymentTransaction(t.name || '')).length || 0,
+      transactioncount: cycleTransactions?.filter(t => !isPaymentTransaction(t.name || '')).length || 0,
     });
   } else {
     console.log(`🔄 Updating existing billing cycle for ${creditCard.name} starting ${cycleStart.toDateString()}`);
@@ -595,7 +595,7 @@ async function createOrUpdateCycle(
       minimumPayment: minimumPayment !== null ? minimumPayment : undefined,
       dueDate: dueDate || undefined,
       totalSpend,
-      transactionCount: cycleTransactions?.filter(t => !isPaymentTransaction(t.name || '')).length || 0,
+      transactioncount: cycleTransactions?.filter(t => !isPaymentTransaction(t.name || '')).length || 0,
     });
   }
 }
@@ -850,7 +850,7 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
         .from('billing_cycles')
         .update({
           totalSpend,
-          transactionCount: nonPaymentTransactions.length,
+          transactioncount: nonPaymentTransactions.length,
           updatedAt: new Date().toISOString(),
         })
         .eq('id', existingCycle.id)
@@ -873,7 +873,7 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
         minimumPayment: updatedCycle.minimumPayment || undefined,
         dueDate: updatedCycle.dueDate ? new Date(updatedCycle.dueDate) : undefined,
         totalSpend,
-        transactionCount: nonPaymentTransactions.length,
+        transactioncount: nonPaymentTransactions.length,
       };
     } else {
       // Create new current cycle
@@ -885,7 +885,7 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
           startDate: currentCycleStart.toISOString().split('T')[0],
           endDate: currentCycleEnd.toISOString().split('T')[0],
           totalSpend,
-          transactionCount: nonPaymentTransactions.length,
+          transactioncount: nonPaymentTransactions.length,
           paymentstatus: 'current', // Current cycle is always in progress
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -906,7 +906,7 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
         startDate: currentCycleStart,
         endDate: currentCycleEnd,
         totalSpend,
-        transactionCount: nonPaymentTransactions.length,
+        transactioncount: nonPaymentTransactions.length,
       };
     }
   } catch (error) {
@@ -1016,7 +1016,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
         .from('billing_cycles')
         .update({
           totalSpend,
-          transactionCount: nonPaymentTransactions.length,
+          transactioncount: nonPaymentTransactions.length,
           // Use the determined statement balance (either Plaid's for matching cycle or totalSpend)
           statementBalance: cycleStatementBalance,
           paymentstatus: 'due', // Closed cycles are typically due
@@ -1043,7 +1043,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
         // nextPaymentDueDate may already be a string; normalize safely
         dueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate as any) : undefined,
         totalSpend,
-        transactionCount: nonPaymentTransactions.length,
+        transactioncount: nonPaymentTransactions.length,
       };
     } else {
       // Create new closed cycle
@@ -1060,7 +1060,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
           startDate: closedCycleStart.toISOString().split('T')[0],
           endDate: closedCycleEnd.toISOString().split('T')[0],
           totalSpend,
-          transactionCount: nonPaymentTransactions.length,
+          transactioncount: nonPaymentTransactions.length,
           statementBalance: cycleStatementBalance, // Use the determined statement balance
           dueDate: dueDateVal,
           paymentstatus: 'due', // Closed cycles are typically due
@@ -1086,7 +1086,7 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
         minimumPayment: newCycle.minimumPayment || undefined,
         dueDate: creditCard.nextPaymentDueDate ? new Date(creditCard.nextPaymentDueDate as any) : undefined,
         totalSpend,
-        transactionCount: nonPaymentTransactions.length,
+        transactioncount: nonPaymentTransactions.length,
       };
     }
   } catch (error) {

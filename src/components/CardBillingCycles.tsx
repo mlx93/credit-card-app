@@ -11,7 +11,7 @@ interface BillingCycle {
   startDate: Date;
   endDate: Date;
   totalSpend: number;
-  transactionCount: number;
+  transactioncount: number;
   dueDate?: Date;
   statementBalance?: number;
   minimumPayment?: number;
@@ -278,7 +278,7 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
               {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
             </p>
             <p className="text-xs text-gray-500">
-              {cycle.transactionCount} transactions • {formatCurrency(cycle.totalSpend)}
+              {cycle.transactioncount} transactions • {formatCurrency(cycle.totalSpend)}
             </p>
           </div>
           <div className="text-right ml-2">
@@ -339,7 +339,7 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span>{cycle.transactionCount} transactions</span>
+            <span>{cycle.transactioncount} transactions</span>
             {(cycle.creditCardMask || card?.mask) && <span className="text-gray-400">•••• {cycle.creditCardMask || card?.mask}</span>}
           </div>
         </div>

@@ -453,9 +453,9 @@ export function HorizontalCardColumns(props: HorizontalCardColumnsProps) {
         byKey.set(key, c);
         continue;
       }
-      // 2) higher transactionCount (more complete)
-      const existingCount = typeof existing.transactionCount === 'number' ? existing.transactionCount : -1;
-      const currentCount = typeof c.transactionCount === 'number' ? c.transactionCount : -1;
+      // 2) higher transactioncount (more complete)
+      const existingCount = typeof existing.transactioncount === 'number' ? existing.transactioncount : -1;
+      const currentCount = typeof c.transactioncount === 'number' ? c.transactioncount : -1;
       if (currentCount > existingCount) {
         byKey.set(key, c);
         continue;
