@@ -190,9 +190,22 @@ export async function calculateBillingCycles(
     return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
   }
 
-  // Fallback: original behavior if no statement periods available
+  // Fallback: if no statement periods are available, avoid inventing historical cycles.
+  // Only create a best-effort current cycle (no backfill) when no statement anchor exists.
   if (!lastStatementDate) {
-    return generateEstimatedCycles(creditCardWithTransactions, cycles);
+    const today = new Date();
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+    await createOrUpdateCycle(
+      creditCardWithTransactions,
+      cycles,
+      sixtyDaysAgo,
+      today,
+      null,
+      false,
+      transactionsWithDates
+    );
+    return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
   }
 
   const cycleLength = estimateCycleLength(creditCardWithTransactions, lastStatementDate, nextDueDate);
@@ -222,41 +235,7 @@ export async function calculateBillingCycles(
   // Create the current cycle (no statement balance yet)
   await createOrUpdateCycle(creditCardWithTransactions, cycles, currentCycleStart, currentCycleEnd, currentDueDate, false, transactionsWithDates);
   
-  // Create historical cycles going back 12 months, but not before card open date
-  let historicalCycleEnd = new Date(closedCycleStart);
-  historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
-  
-  const oneYearAgo = new Date();
-  oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
-  
-  // Don't create cycles before card open date
-  const cardOpenDate = creditCardWithTransactions.openDate ? new Date(creditCardWithTransactions.openDate) : oneYearAgo;
-  const earliestCycleDate = cardOpenDate > oneYearAgo ? cardOpenDate : oneYearAgo;
-  
-  while (historicalCycleEnd >= earliestCycleDate) {
-    const historicalCycleStart = new Date(historicalCycleEnd);
-    // Use the same cycle length for historical cycles
-    historicalCycleStart.setDate(historicalCycleStart.getDate() - cycleLength + 1);
-    
-    // Skip cycles only if they end before the card open date (no meaningful overlap)
-    if (creditCardWithTransactions.openDate && historicalCycleEnd < new Date(creditCardWithTransactions.openDate)) {
-      // Move to the next historical cycle instead of breaking
-      historicalCycleEnd = new Date(historicalCycleStart);
-      historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
-      continue;
-    }
-    
-    const historicalDueDate = new Date(historicalCycleEnd);
-    historicalDueDate.setDate(historicalDueDate.getDate() + 21);
-    
-    // Historical cycles should NOT get Plaid's statement balance (that's only for the matching cycle)
-    // Pass false for hasStatementBalance so they use totalSpend instead
-    await createOrUpdateCycle(creditCardWithTransactions, cycles, historicalCycleStart, historicalCycleEnd, historicalDueDate, false, transactionsWithDates);
-    
-    historicalCycleEnd = new Date(historicalCycleStart);
-    historicalCycleEnd.setDate(historicalCycleEnd.getDate() - 1);
-  }
-
+  // Do not backfill additional historical cycles without statements consent
   return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
 }
 
