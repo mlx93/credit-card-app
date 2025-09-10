@@ -157,18 +157,19 @@ export default function CycleDateEditor({
                   : `Day ${currentDueDay}`;
                 
                 // Check if text is too long and needs wrapping
-                const needsWrap = (closeDisplay.length + dueDisplay.length) > 28;
+                const combinedText = `Close: ${closeDisplay} • Due: ${dueDisplay}`;
+                const needsWrap = combinedText.length > 35;
                 
                 if (needsWrap) {
                   return (
                     <div className="space-y-0.5">
                       <div className="truncate">Close: {closeDisplay}</div>
-                      <div className="truncate">Due: {dueDisplay}</div>
+                      <div className="truncate">• Due: {dueDisplay}</div>
                     </div>
                   );
                 }
                 
-                return <div className="truncate">Close: {closeDisplay} • Due: {dueDisplay}</div>;
+                return <div className="truncate">{combinedText}</div>;
               })()}
             </div>
             <button
