@@ -1841,25 +1841,14 @@ class PlaidServiceImpl implements PlaidService {
 
     const accessToken = decrypt(plaidItem.accessToken);
     
-    // Choose products for the update flow (keep transactions; include liabilities when appropriate)
-    const isRobinhood = plaidItem.institutionId === 'ins_54';
-    const products = isRobinhood
-      ? ['transactions']
-      : ['liabilities', 'transactions'];
-
     const request: LinkTokenCreateRequest = {
       user: {
         client_user_id: userId,
       },
       client_name: "CardCycle",
-      products: products as any,
       country_codes: ['US'],
       language: 'en',
       redirect_uri: 'https://www.cardcycle.app/api/plaid/callback', // Must match Plaid registration exactly
-      webhook: process.env.APP_URL + '/api/webhooks/plaid',
-      transactions: {
-        days_requested: 730, // Request 24 months of transaction history (Capital One may limit)
-      },
       update: {
         account_selection_enabled: true,
       } as LinkTokenCreateRequestUpdate,

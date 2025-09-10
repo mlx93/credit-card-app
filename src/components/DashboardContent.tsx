@@ -94,6 +94,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     }
     return false;
   });
+  // Track if an explicit user reorder happened in this session
+  const [orderDirty, setOrderDirty] = useState<boolean>(false);
   // Track which cards have been explicitly positioned by the user at least once
   const [positionedCardIds, setPositionedCardIds] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
@@ -1850,10 +1852,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     loadInitialData();
   }, [isLoggedIn]);
 
-  // Persist card order to DB only after the user has explicitly reordered at least once
+  // Persist card order only when the user has explicitly dragged AND there is a pending dirty flag
   useEffect(() => {
-    if (!isLoggedIn) return;
-    if (!hasUserOrdered) return; // do not upsert until the user reorders
+    if (!isLoggedIn || !hasUserOrdered || !orderDirty) return;
     if (!Array.isArray(sharedCardOrder) || sharedCardOrder.length === 0) return;
     (async () => {
       try {
@@ -1862,13 +1863,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ order: sharedCardOrder })
         });
-        console.log('💾 Saved card order to DB:', sharedCardOrder);
+        console.log('💾 Saved card order to DB (dirty):', sharedCardOrder);
         try { localStorage.setItem('cached_card_order', JSON.stringify(sharedCardOrder)); } catch {}
       } catch (e) {
         console.warn('Failed to save card order:', e);
+      } finally {
+        setOrderDirty(false);
       }
     })();
-  }, [JSON.stringify(sharedCardOrder), isLoggedIn, hasUserOrdered]);
+  }, [orderDirty, isLoggedIn, hasUserOrdered, JSON.stringify(sharedCardOrder)]);
 
   // Auto-close success popup after 5 seconds
   useEffect(() => {
@@ -2401,6 +2404,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     // User reordered: clear pinned-new set
                     setPinnedNewCardIds(new Set());
                     localStorage.removeItem('pinned_new_card_ids');
+                    // Mark as a user-driven change
+                    setOrderDirty(true);
                     // Persist immediately to DB with small retry/backoff to avoid race with later fetches
                     const saveWithRetry = async (payload: string[], attempts = 3) => {
                       let delay = 200;

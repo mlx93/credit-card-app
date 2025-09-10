@@ -857,11 +857,11 @@ export function DueDateCard({
         <div className="grid grid-cols-2 gap-2 mb-4 min-h-[48px] items-center -mt-1">
           <div>
             <p className="text-xs text-gray-600 mb-1">Balance</p>
-            <p className={`font-bold ${isPaidOff ? 'text-xl' : 'text-lg'} text-gray-900`}>
+            <p className="font-bold text-lg text-gray-900">
               {formatCurrency(Math.abs(card.balanceCurrent))}
             </p>
             {isPaidOff && (
-              <p className="text-xs text-green-600 font-medium mt-0.5">All statements paid</p>
+              <p className="text-xs text-green-600 font-medium">All statements paid</p>
             )}
             {!isPaidOff && card.lastStatementBalance && (() => {
               // Show "Statement paid ✓" if we have transaction data and found a matching payment,
@@ -912,6 +912,7 @@ export function DueDateCard({
               <p className="text-xs text-green-600 font-medium mt-0.5">Statement paid ✓</p>
             )}
           </div>
+          <div></div> {/* Empty second column for consistent grid spacing */}
         </div>
       )}
 
