@@ -327,7 +327,8 @@ export function DueDateCard({
   const connectionStatus = cardConnectionHealth?.status || 'unknown';
   const apiConnectivity = cardConnectionHealth?.apiConnectivity;
   const statementsInfo = cardConnectionHealth?.statements;
-  const needsStatementsConsent = !!(statementsInfo && statementsInfo.available && !statementsInfo.consented);
+  // If statements consent is not present, prompt reconnect to attempt enabling it (availability may be unknown)
+  const needsStatementsConsent = !!(statementsInfo && !statementsInfo.consented);
   
   // Use card's own lastSyncAt as primary source, fallback to connection health
   const primarySyncTime = card.plaidItem?.lastSyncAt || cardConnectionHealth?.lastSuccessfulSync;
@@ -587,7 +588,7 @@ export function DueDateCard({
                 </p>
               )}
               {/* Inline indicator: Statements not enabled */}
-              {card.plaidItem && statementsInfo && statementsInfo.available && !statementsInfo.consented && (
+              {card.plaidItem && statementsInfo && !statementsInfo.consented && (
                 <div className="mt-1">
                   <button
                     onClick={() => onReconnect?.(card.plaidItem!.itemId)}
