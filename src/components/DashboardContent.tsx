@@ -2169,6 +2169,14 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                       // Mark newly added cards (by itemId) as visually refreshing
                       try {
                         if (ctx?.itemId) {
+                          // Kick off comprehensive historical sync for this item in the background
+                          try {
+                            fetch('/api/plaid/comprehensive-sync', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ itemId: ctx.itemId })
+                            }).catch(() => {});
+                          } catch {}
                           const res = await fetch('/api/user/credit-cards', { cache: 'no-store' });
                           if (res.ok) {
                             const { creditCards: latest } = await res.json();

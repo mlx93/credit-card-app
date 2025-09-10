@@ -822,174 +822,42 @@ export function DueDateCard({
 
       {/* Balance Information - Show statement balance only when unpaid */}
       {(() => {
-        // Calculate statement balance and determine whether to show it
-        // Treat null/undefined as 0, but keep track if it was actually null
-        const plaidStatementBalanceIsNull = card.lastStatementBalance === null || card.lastStatementBalance === undefined;
-        const plaidStatementBalance = Math.abs(card.lastStatementBalance || 0);
-        const plaidMinimumPayment = card.minimumPaymentAmount || 0;
+        // FIRST CHECK: If card is paid off, don't show statement balance section at all
+        if (isPaidOff) {
+          return null; // Skip statement balance section entirely
+        }
         
-        // Get the most recent closed cycles
+        // Simple statement balance determination - payment detection is handled by isPaidOff
+        const plaidStatementBalance = Math.abs(card.lastStatementBalance || 0);
         const today = new Date();
+        
+        // Get the most recent unpaid cycle to use for fallback display
         const closedCycles = (card.recentCycles || [])
           .filter(cycle => new Date(cycle.endDate) < today)
           .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
         
-        // Check if Plaid's statement balance has been paid in full
-        // We can be confident a statement is fully paid if:
-        // 1. We find a payment transaction matching the exact statement amount, OR
-        // 2. Current balance matches a more recent cycle's total spend (indicates old statement paid, new cycle is the balance)
-        const currentBalance = Math.abs(card.balanceCurrent || 0);
-        
-        // Helper to find payment matching a specific amount
-        const hasPaymentForAmount = (amount: number): boolean => {
-          if (!card.recentTransactions || amount <= 0) return false;
-          
-          // Look for payments since the statement date or last 60 days
-          const statementIssueDate = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
-          const sixtyDaysAgo = new Date();
-          sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-          const searchFromDate = statementIssueDate || sixtyDaysAgo;
-          
-          return card.recentTransactions.some(t => {
-            const transactionDate = new Date(t.date);
-            if (transactionDate < searchFromDate) return false;
-            if (!isPaymentTransaction(t.name)) return false;
-            
-            const paymentAmount = Math.abs(t.amount);
-            const difference = Math.abs(paymentAmount - amount);
-            return difference <= 5; // Within $5 tolerance
-          });
-        };
-        
-        // Check if current balance is less than or equal to a recent cycle's totalSpend
-        // If current balance <= recent cycle amount, old statements must be paid
-        const mostRecentCycle = closedCycles[0];
-        const secondMostRecentCycle = closedCycles[1];
-        
-        // Current balance being <= recent cycle amount indicates old statements are paid
-        const currentBalanceIndicatesOldStatementPaid = mostRecentCycle && (
-          // Check against totalSpend first (more reliable)
-          (mostRecentCycle.totalSpend && currentBalance <= Math.abs(mostRecentCycle.totalSpend) + 5) ||
-          // Fallback to statementBalance if no totalSpend
-          (mostRecentCycle.statementBalance && currentBalance <= Math.abs(mostRecentCycle.statementBalance) + 5)
-        );
-        
-        // Determine if Plaid's statement has been paid in full
-        let plaidStatementIsPaid = false;
-        
-        // Check if Plaid's statement balance matches any of our cycles' totalSpend or statementBalance
-        const matchingCycle = closedCycles.find(cycle => {
-          // Check against totalSpend first (actual spending amount)
-          if (cycle.totalSpend) {
-            const totalSpendDiff = Math.abs(Math.abs(cycle.totalSpend) - plaidStatementBalance);
-            if (totalSpendDiff <= 5) {
-              console.log(`🎯 Found cycle matching Plaid balance by totalSpend:`, {
-                cycleEndDate: cycle.endDate,
-                cycleTotalSpend: cycle.totalSpend,
-                plaidBalance: plaidStatementBalance,
-                difference: totalSpendDiff
-              });
-              return true;
-            }
-          }
-          // Also check against statementBalance
-          if (cycle.statementBalance) {
-            const statementDiff = Math.abs(Math.abs(cycle.statementBalance) - plaidStatementBalance);
-            if (statementDiff <= 5) {
-              console.log(`🎯 Found cycle matching Plaid balance by statementBalance:`, {
-                cycleEndDate: cycle.endDate,
-                cycleStatementBalance: cycle.statementBalance,
-                plaidBalance: plaidStatementBalance,
-                difference: statementDiff
-              });
-              return true;
-            }
-          }
-          return false;
-        });
-        
-        if (matchingCycle) {
-          // Primary check: If current balance <= recent cycle amount AND Plaid matches an older cycle
-          // This means all old statements must be paid (you can't have old debt and only new charges)
-          if (currentBalanceIndicatesOldStatementPaid && matchingCycle !== mostRecentCycle) {
-            plaidStatementIsPaid = true;
-            console.log(`💳 ${card.name}: Old statement PAID - current balance ($${currentBalance}) <= recent cycle ($${mostRecentCycle?.totalSpend || mostRecentCycle?.statementBalance})`);
-          }
-          // Secondary check: Direct evidence of payment transaction
-          else if (hasPaymentForAmount(plaidStatementBalance)) {
-            plaidStatementIsPaid = true;
-            console.log(`💳 ${card.name}: Statement PAID - found matching payment transaction for $${plaidStatementBalance}`);
-          }
-          // DO NOT use minimumPayment === 0 as indicator - that just means min payment was made, not full payment
-        } else {
-          // If we can't match Plaid's balance to any cycle, just check for payment
-          plaidStatementIsPaid = hasPaymentForAmount(plaidStatementBalance);
-        }
-        
-        // Find the most recent closed cycle to use for statement display
-        // Prefer cycles with totalSpend over those with just statementBalance
-        const mostRecentUnpaidCycle = closedCycles.find(cycle => {
-          // Must have either totalSpend or statementBalance
-          if (!cycle.totalSpend && (!cycle.statementBalance || cycle.statementBalance <= 0)) {
-            return false;
-          }
-          // If this cycle matches the current balance, it's the current statement
-          const cycleAmount = cycle.totalSpend || cycle.statementBalance || 0;
-          if (Math.abs(currentBalance - Math.abs(cycleAmount)) <= 5) {
-            return true;
-          }
-          // Otherwise, only include if it hasn't been matched as paid
-          return true;
-        });
-        
-        // Determine which statement balance to show
+        // Determine which statement balance to show (payment detection already handled by isPaidOff)
         let statementBalance = 0;
-        let usingCycleData = false;
         
-        // Check if Plaid's statement balance corresponds to the most recent closed cycle
-        const plaidMatchesMostRecent = mostRecentCycle && (
-          (mostRecentCycle.totalSpend && Math.abs(plaidStatementBalance - Math.abs(mostRecentCycle.totalSpend)) <= 5) ||
-          (mostRecentCycle.statementBalance && Math.abs(plaidStatementBalance - Math.abs(mostRecentCycle.statementBalance)) <= 5)
-        );
-        
-        if (plaidStatementBalance > 0 && !plaidStatementIsPaid) {
-          // Plaid has a statement balance that's not paid - always use it
+        // First preference: Use Plaid's statement balance if available
+        if (plaidStatementBalance > 0) {
           statementBalance = plaidStatementBalance;
-        } else if (plaidStatementIsPaid && mostRecentUnpaidCycle) {
-          // Plaid's data is for an old paid cycle, use most recent cycle's totalSpend as fallback
-          // totalSpend is only a substitute when we don't have the real statement balance
-          statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
-          usingCycleData = true;
-        } else if ((!plaidStatementBalance || plaidStatementBalanceIsNull) && mostRecentUnpaidCycle) {
-          // No Plaid data at all (null or 0), use cycle data as fallback
-          statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
-          usingCycleData = true;
+        } else {
+          // Fallback: Use most recent cycle data
+          const mostRecentCycle = closedCycles.find(cycle => 
+            cycle.totalSpend > 0 || cycle.statementBalance > 0
+          );
+          
+          if (mostRecentCycle) {
+            statementBalance = Math.abs(mostRecentCycle.totalSpend || mostRecentCycle.statementBalance || 0);
+          }
         }
         // Otherwise, no statement to show (all paid or no data)
         
-        console.log(`🔍 Statement balance check for ${card.name}:`, {
+        console.log(`🔍 Statement balance for ${card.name}:`, {
           plaidStatementBalance,
-          plaidMinimumPayment,
-          plaidStatementIsPaid,
-          plaidMatchesMostRecent,
           statementBalance,
-          usingCycleData,
-          currentBalance,
-          currentBalanceIndicatesOldStatementPaid,
-          closedCyclesCount: closedCycles.length,
-          mostRecentUnpaidCycle: mostRecentUnpaidCycle ? {
-            endDate: mostRecentUnpaidCycle.endDate,
-            statementBalance: mostRecentUnpaidCycle.statementBalance,
-            totalSpend: mostRecentUnpaidCycle.totalSpend,
-            minimumPayment: mostRecentUnpaidCycle.minimumPayment
-          } : null,
-          recentCycles: closedCycles.slice(0, 3).map(c => ({
-            endDate: c.endDate,
-            minimumPayment: c.minimumPayment,
-            statementBalance: c.statementBalance,
-            totalSpend: c.totalSpend,
-            isPaid: false // Remove flawed minimumPayment logic, let payment detection logic handle this
-          }))
+          source: plaidStatementBalance > 0 ? 'plaid' : 'cycle_data'
         });
         
         // Don't show statement section if there's no statement balance
@@ -997,49 +865,7 @@ export function DueDateCard({
           return null; // Return null instead of false
         }
         
-        // Fallback to transaction-based detection when no cycle data available
-        if (card.recentTransactions) {
-          const statementIssueDate = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
-          const sixtyDaysAgo = new Date();
-          sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-          const searchFromDate = statementIssueDate || sixtyDaysAgo;
-          
-          const recentPayments = (card.recentTransactions || []).filter(t => {
-            const transactionDate = new Date(t.date);
-            return transactionDate >= searchFromDate && isPaymentTransaction(t.name);
-          });
-          
-          const statementMatchingPayment = recentPayments.find(t => {
-            const paymentAmount = Math.abs(t.amount);
-            const difference = Math.abs(paymentAmount - statementBalance);
-            return difference <= 5;
-          });
-          
-          // Also check if current balance matches open cycle spend (indicates statement was paid)
-          const openCycle = (card.recentCycles || []).find(cycle => {
-            const cycleEnd = new Date(cycle.endDate);
-            return cycleEnd >= today; // Open/current cycle
-          });
-          
-          const currentBalanceMatchesOpenCycle = openCycle && openCycle.totalSpend && 
-            Math.abs(currentBalance - Math.abs(openCycle.totalSpend)) <= 5;
-          
-          const shouldHideStatement = statementMatchingPayment || currentBalanceMatchesOpenCycle;
-          
-          console.log(`📊 Fallback transaction check for ${card.name}:`, {
-            statementBalance,
-            currentBalance,
-            hasMatchingPayment: !!statementMatchingPayment,
-            paymentAmount: statementMatchingPayment?.amount,
-            openCycleSpend: openCycle?.totalSpend,
-            currentBalanceMatchesOpenCycle,
-            decision: shouldHideStatement ? 'HIDE' : 'SHOW'
-          });
-          
-          if (shouldHideStatement) {
-            return null; // Hide if payment found OR current balance matches open cycle
-          }
-        }
+        // Payment detection is now handled by isPaidOff - no need for duplicate logic here
         
         // Show statement balance if we get here
         console.log(`📊 SHOWING statement balance for ${card.name} - displaying statement`);

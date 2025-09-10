@@ -208,34 +208,72 @@ export async function calculateBillingCycles(
     return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
   }
 
-  const cycleLength = estimateCycleLength(creditCardWithTransactions, lastStatementDate, nextDueDate);
-  
-  const now = new Date();
-  
-  // Calculate the closed cycle that ends on the statement date (contains the statement balance)
-  const closedCycleEnd = new Date(lastStatementDate);
-  const closedCycleStart = new Date(closedCycleEnd);
-  
-  // Use the estimated cycle length from Plaid data for accurate cycle boundaries
-  // This respects actual cycle lengths (28-31 days) rather than forcing calendar months
-  closedCycleStart.setDate(closedCycleStart.getDate() - cycleLength + 1);
-  
-  // Create the closed cycle with statement balance
-  await createOrUpdateCycle(creditCardWithTransactions, cycles, closedCycleStart, closedCycleEnd, nextDueDate, true, transactionsWithDates);
-  
-  // Calculate the current ongoing cycle that starts after the statement date
-  const currentCycleStart = new Date(lastStatementDate);
-  currentCycleStart.setDate(currentCycleStart.getDate() + 1);
-  const currentCycleEnd = new Date(currentCycleStart);
-  // Use the same cycle length for consistency
-  currentCycleEnd.setDate(currentCycleEnd.getDate() + cycleLength - 1);
-  const currentDueDate = new Date(currentCycleEnd);
-  currentDueDate.setDate(currentDueDate.getDate() + 21);
-  
-  // Create the current cycle (no statement balance yet)
-  await createOrUpdateCycle(creditCardWithTransactions, cycles, currentCycleStart, currentCycleEnd, currentDueDate, false, transactionsWithDates);
-  
-  // Do not backfill additional historical cycles without statements consent
+  // Build cycles based on the anchor's day-of-month (or manual config if present)
+  const baselineDue = nextDueDate || null;
+  const baselineDay = baselineDue ? new Date(baselineDue).getDate() : null;
+  const anchorEnd = new Date(lastStatementDate);
+  const manualDay = creditCardWithTransactions.manual_dates_configured && creditCardWithTransactions.manual_cycle_day
+    ? Number(creditCardWithTransactions.manual_cycle_day)
+    : null;
+  const closingDay = manualDay && manualDay > 0 && manualDay <= 31 ? manualDay : anchorEnd.getDate();
+
+  // Generate 13 boundaries for 12 historical cycles
+  const endBoundaries: Date[] = [];
+  for (let m = 0; m <= 12; m++) {
+    const d = new Date(anchorEnd);
+    d.setMonth(d.getMonth() - m);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const day = Math.min(closingDay, daysInMonth);
+    endBoundaries.push(new Date(year, month, day));
+  }
+
+  // helper for due date estimation (same day-of-month as current due date)
+  const estimateHistoricalDue = (cycleEnd: Date): Date | null => {
+    if (!baselineDay) return null;
+    const y = cycleEnd.getFullYear();
+    const m = cycleEnd.getMonth() + 1; // next month
+    const y2 = y + (m > 11 ? 1 : 0);
+    const m2 = (m % 12);
+    const daysInMonth2 = new Date(y2, m2 + 1, 0).getDate();
+    const day2 = Math.min(baselineDay, daysInMonth2);
+    return new Date(y2, m2, day2);
+  };
+
+  // Create 12 historical closed cycles using consecutive boundaries
+  for (let i = 0; i < 12; i++) {
+    const end = endBoundaries[i];
+    const prevEnd = endBoundaries[i + 1];
+    const start = new Date(prevEnd);
+    start.setDate(start.getDate() + 1);
+    const isAnchor = end.getTime() === anchorEnd.getTime();
+    const due = isAnchor ? (nextDueDate || null) : estimateHistoricalDue(end);
+    await createOrUpdateCycle(
+      creditCardWithTransactions,
+      cycles,
+      start,
+      end,
+      due,
+      isAnchor,
+      transactionsWithDates
+    );
+  }
+
+  // Add current open cycle (from last anchor end + 1 to today)
+  const openStart = new Date(anchorEnd);
+  openStart.setDate(openStart.getDate() + 1);
+  const openEnd = new Date();
+  await createOrUpdateCycle(
+    creditCardWithTransactions,
+    cycles,
+    openStart,
+    openEnd,
+    null,
+    false,
+    transactionsWithDates
+  );
+
   return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
 }
 

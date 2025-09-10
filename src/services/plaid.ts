@@ -1841,11 +1841,11 @@ class PlaidServiceImpl implements PlaidService {
 
     const accessToken = decrypt(plaidItem.accessToken);
     
-    // Check if this is Robinhood to request appropriate products
+    // Choose products for the update flow (keep transactions; include liabilities when appropriate)
     const isRobinhood = plaidItem.institutionId === 'ins_54';
-    const products = isRobinhood 
-      ? ['transactions'] // Robinhood: transactions only (investments filters out credit cards)
-      : ['liabilities', 'transactions']; // Standard institutions
+    const products = isRobinhood
+      ? ['transactions']
+      : ['liabilities', 'transactions'];
 
     const request: LinkTokenCreateRequest = {
       user: {
@@ -1858,7 +1858,7 @@ class PlaidServiceImpl implements PlaidService {
       redirect_uri: 'https://www.cardcycle.app/api/plaid/callback', // Must match Plaid registration exactly
       webhook: process.env.APP_URL + '/api/webhooks/plaid',
       transactions: {
-        days_requested: 730, // Request 24 months of transaction history (Capital One will limit to 90 days)
+        days_requested: 730, // Request 24 months of transaction history (Capital One may limit)
       },
       update: {
         account_selection_enabled: true,
