@@ -628,7 +628,7 @@ export function DueDateCard({
   };
   
   return (
-    <div className={`p-2 rounded-lg shadow-sm border-2 border-l-4 min-h-[200px] max-h-[250px] flex flex-col justify-between ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
+    <div className={`p-2 rounded-lg shadow-sm border-2 border-l-4 min-h-[280px] max-h-[320px] flex flex-col justify-between ${cardColorClass} ${hasConnectionIssue ? 'ring-2 ring-red-200' : ''}`}>
       <div className="mb-2">
         {/* Header Row with Due Date Box */}
         <div className="flex items-start justify-between mb-1">
