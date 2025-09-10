@@ -587,22 +587,7 @@ export function DueDateCard({
                   )}
                 </p>
               )}
-              {/* Inline indicator: Statements not enabled */}
-              {card.plaidItem && statementsInfo && !statementsInfo.consented && (
-                <div className="mt-1">
-                  <button
-                    onClick={() => onReconnect?.(card.plaidItem!.itemId)}
-                    className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
-                    title="Reconnect to enable Statements for accurate billing cycles"
-                  >
-                    <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 12a9 9 0 1 0 9-9" />
-                      <path d="M3 3v6h6" />
-                    </svg>
-                    Enable Statements
-                  </button>
-                </div>
-              )}
+              {/* Removed inline "Enable Statements" chip for cleaner UI. Reconnect is available via the action button. */}
             </div>
           </div>
           
