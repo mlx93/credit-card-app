@@ -155,11 +155,29 @@ export async function POST(request: NextRequest) {
       // Continue - card should still be visible with basic data
     }
 
-    // Phase 2: Schedule comprehensive background sync for full transaction history
-    console.log('⚡ Scheduling comprehensive background sync for full history...');
-    
-    // Note: Comprehensive sync will be handled by Dashboard after card appears
-    // This ensures the card appears immediately with Recent Billing Cycles, then full history loads in background
+    // Phase 2: Kick off comprehensive background sync for this item (server-side)
+    console.log('⚡ Kicking off comprehensive background sync for full history (server-side)...');
+    (async () => {
+      try {
+        // Full 12-month transaction sync per item
+        await plaidService.syncTransactions(plaidItem, accessToken);
+        // Recalculate full billing history for just these cards
+        const { calculateBillingCycles } = await import('@/utils/billingCycles');
+        const { data: itemCards } = await supabaseAdmin
+          .from('credit_cards')
+          .select('id, name')
+          .eq('plaidItemId', plaidItem.id);
+        let total = 0;
+        for (const c of itemCards || []) {
+          const cycles = await calculateBillingCycles(c.id);
+          total += cycles.length;
+          console.log(`✅ Background full history built for ${c.name}: ${cycles.length} cycles`);
+        }
+        console.log(`✅ Background comprehensive sync complete for item ${itemId}: ${total} cycles total`);
+      } catch (e) {
+        console.warn('⚠️ Background comprehensive sync failed:', e);
+      }
+    })();
 
     // Update plaid item to mark it as synced (so it doesn't show as "never synced")
     await supabaseAdmin
