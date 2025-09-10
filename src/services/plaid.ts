@@ -1857,6 +1857,13 @@ class PlaidServiceImpl implements PlaidService {
       access_token: accessToken,
     };
 
+    // Request optional statements consent during update to enable historical statements
+    (request as any).optional_products = ['statements'];
+    (request as any).statements = {
+      start_date: new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      end_date: new Date().toISOString().split('T')[0],
+    };
+
     // OAuth configuration is handled by redirect_uri - no additional setup needed for updates
 
     console.log('Creating update link token for itemId:', itemId);
