@@ -1650,11 +1650,31 @@ class PlaidServiceImpl implements PlaidService {
       });
       
       // Batch fetch existing transactions to avoid N queries
+      // Use chunked queries to avoid Supabase .in() array size limits
       const transactionIds = transactions.map(t => t.transaction_id);
-      const { data: existingTransactions, error: existingTransError } = await supabaseAdmin
-        .from('transactions')
-        .select('*')
-        .in('transactionId', transactionIds);
+      const chunkSize = 100; // Supabase safe limit for .in() queries
+      const existingTransactions = [];
+      let existingTransError = null;
+      
+      console.log(`Fetching existing transactions in ${Math.ceil(transactionIds.length / chunkSize)} chunks of ${chunkSize}`);
+      
+      for (let i = 0; i < transactionIds.length; i += chunkSize) {
+        const chunk = transactionIds.slice(i, i + chunkSize);
+        const { data: chunkData, error: chunkError } = await supabaseAdmin
+          .from('transactions')
+          .select('*')
+          .in('transactionId', chunk);
+        
+        if (chunkError) {
+          console.error(`Error fetching existing transactions chunk ${Math.floor(i/chunkSize) + 1}:`, chunkError);
+          existingTransError = chunkError;
+          break;
+        }
+        
+        if (chunkData) {
+          existingTransactions.push(...chunkData);
+        }
+      }
       
       if (existingTransError) {
         console.error('Error fetching existing transactions:', existingTransError);
