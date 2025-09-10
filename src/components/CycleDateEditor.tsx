@@ -148,17 +148,17 @@ export default function CycleDateEditor({
               {(() => {
                 // Format statement close display based on date type
                 const closeDisplay = currentCycleDateType === 'days_before_end' && currentCycleDaysBeforeEnd
-                  ? `${currentCycleDaysBeforeEnd}d before month end`
+                  ? `${currentCycleDaysBeforeEnd} days before last day of month`
                   : `Day ${currentCycleDay}`;
                 
                 // Format due date display based on date type
                 const dueDisplay = currentDueDateType === 'days_before_end' && currentDueDaysBeforeEnd
-                  ? `${currentDueDaysBeforeEnd}d before month end`
+                  ? `${currentDueDaysBeforeEnd} days before last day of month`
                   : `Day ${currentDueDay}`;
                 
                 // Check if text is too long and needs wrapping
                 const combinedText = `Close: ${closeDisplay} • Due: ${dueDisplay}`;
-                const needsWrap = combinedText.length > 35;
+                const needsWrap = combinedText.length > 42;
                 
                 if (needsWrap) {
                   return (
