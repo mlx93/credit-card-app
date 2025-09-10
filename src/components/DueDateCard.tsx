@@ -485,44 +485,9 @@ export function DueDateCard({
       }
     }
     
-    // Check if we have any recent unpaid cycles from billing data
-    const closedCycles = (card.recentCycles || [])
-      .filter(cycle => new Date(cycle.endDate) < today)
-      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-    
-    // Find most recent unpaid cycle
-    const mostRecentUnpaidCycle = closedCycles.find(cycle => {
-      const cycleAmount = Math.abs(cycle.totalSpend || cycle.statementBalance || 0);
-      return cycleAmount > 0; // Any cycle with spending/balance
-    });
-    
-    // If we have cycle data and there's an unpaid cycle, check if it's actually paid
-    if (mostRecentUnpaidCycle) {
-      const cycleAmount = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
-      
-      // If current balance is significantly less than the cycle amount, old statement might be paid
-      if (currentBalance <= cycleAmount * 0.1) {
-        return true;
-      }
-      
-      // Additional check: if current balance approximately equals open cycle spend, 
-      // then the closed cycle was likely paid
-      if (openCycle && openCycle.totalSpend && 
-          Math.abs(currentBalance - Math.abs(openCycle.totalSpend)) <= 10) {
-        return true;
-      }
-      
-      return false; // There's an unpaid cycle
-    }
-    
-    // Fallback: check Plaid's statement balance
-    if (card.lastStatementBalance && Math.abs(card.lastStatementBalance) > 0) {
-      // If there's a statement balance but current balance is much lower, might be paid
-      return currentBalance <= Math.abs(card.lastStatementBalance) * 0.1;
-    }
-    
-    // If no data available and current balance is low, assume paid off
-    return currentBalance < 50;
+    // If we reach here, no definitive evidence of payment was found
+    // Only return true for definitive cases, not guesses
+    return false;
   };
   
   const isPaidOff = calculateIsPaidOff();
