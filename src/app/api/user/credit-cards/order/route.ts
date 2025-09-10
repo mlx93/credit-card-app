@@ -38,13 +38,21 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid order payload' }, { status: 400 });
     }
 
-    // Direct upsert into table (no RPC dependency)
-    const { error: upsertErr } = await supabaseAdmin
-      .from('user_card_orders')
-      .upsert({ user_id: session.user.id, order_ids: order, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-    if (upsertErr) {
-      console.error('Fallback upsert failed:', upsertErr.message);
-      return NextResponse.json({ success: false, error: upsertErr.message }, { status: 500 });
+    // Try safe upsert function first
+    const { data: rpcResult, error: rpcErr } = await supabaseAdmin
+      .rpc('safe_upsert_card_order', { p_user_id: session.user.id, p_order: order });
+    
+    if (rpcErr || !rpcResult) {
+      console.error('Safe upsert failed, trying direct upsert:', rpcErr?.message);
+      
+      // Fallback to direct upsert
+      const { error: upsertErr } = await supabaseAdmin
+        .from('user_card_orders')
+        .upsert({ user_id: session.user.id, order_ids: order, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (upsertErr) {
+        console.error('Fallback upsert failed:', upsertErr.message);
+        return NextResponse.json({ success: false, error: upsertErr.message }, { status: 500 });
+      }
     }
     return NextResponse.json({ success: true });
   } catch (error) {
