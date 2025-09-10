@@ -20,7 +20,7 @@ export interface PlaidService {
   exchangePublicToken(publicToken: string, userId: string): Promise<{ accessToken: string; itemId: string }>;
   removeItem(accessToken: string): Promise<void>;
   getAccounts(accessToken: string): Promise<any>;
-  getTransactions(accessToken: string, startDate: Date, endDate: Date, isCapitalOne?: boolean): Promise<any[]>;
+  getTransactions(accessToken: string, startDate: Date, endDate: Date, isCapitalOne?: boolean, isRobinhood?: boolean): Promise<any[]>;
   getLiabilities(accessToken: string): Promise<any>;
   getBalances(accessToken: string): Promise<any>;
   getStatements(accessToken: string, accountId: string): Promise<any[]>;
@@ -35,6 +35,16 @@ class PlaidServiceImpl implements PlaidService {
     const capitalOneIndicators = ['capital one', 'quicksilver', 'venture', 'savor', 'spark'];
     const institutionMatch = institutionName?.toLowerCase().includes('capital one') || false;
     const accountMatch = capitalOneIndicators.some(indicator => 
+      accountName?.toLowerCase().includes(indicator)
+    ) || false;
+    
+    return institutionMatch || accountMatch;
+  }
+
+  private isRobinhood(institutionName?: string, accountName?: string): boolean {
+    const robinhoodIndicators = ['robinhood', 'rh'];
+    const institutionMatch = institutionName?.toLowerCase().includes('robinhood') || false;
+    const accountMatch = robinhoodIndicators.some(indicator => 
       accountName?.toLowerCase().includes(indicator)
     ) || false;
     
@@ -232,11 +242,11 @@ class PlaidServiceImpl implements PlaidService {
     throw new Error('Max retries exceeded');
   }
 
-  async getTransactions(accessToken: string, startDate: Date, endDate: Date, isCapitalOne: boolean = false): Promise<any[]> {
+  async getTransactions(accessToken: string, startDate: Date, endDate: Date, isCapitalOne: boolean = false, isRobinhood: boolean = false): Promise<any[]> {
     try {
       console.log(`=== GET TRANSACTIONS DEBUG ===`);
       console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
-      console.log('Institution type passed:', isCapitalOne ? 'Capital One' : 'Standard');
+      console.log('Institution type passed:', isCapitalOne ? 'Capital One' : isRobinhood ? 'Robinhood' : 'Standard');
 
       // Capital One-specific handling: limit to 90 days max
       if (isCapitalOne) {
@@ -253,7 +263,7 @@ class PlaidServiceImpl implements PlaidService {
       
       // Use optimized chunking strategy with progressive fetching
       const allTransactions: any[] = [];
-      const chunkSize = isCapitalOne ? 60 : 90; // Use 60-day chunks for Capital One, 90-day for others to reduce API calls
+      const chunkSize = isCapitalOne ? 60 : isRobinhood ? 14 : 90; // Use smaller chunks for high-volume institutions
       
       let currentStart = new Date(startDate);
       
@@ -266,35 +276,49 @@ class PlaidServiceImpl implements PlaidService {
           currentEnd.setTime(endDate.getTime());
         }
         
-        console.log(`Fetching ${isCapitalOne ? 'Capital One' : 'standard'} chunk: ${currentStart.toISOString().split('T')[0]} to ${currentEnd.toISOString().split('T')[0]}`);
+        console.log(`Fetching ${isCapitalOne ? 'Capital One' : isRobinhood ? 'Robinhood' : 'standard'} chunk: ${currentStart.toISOString().split('T')[0]} to ${currentEnd.toISOString().split('T')[0]}`);
         
-        const request: TransactionsGetRequest = {
-          access_token: accessToken,
-          start_date: currentStart.toISOString().split('T')[0],
-          end_date: currentEnd.toISOString().split('T')[0],
-          options: {
-            include_personal_finance_category: true
-          }
-        };
+        // Implement pagination within each date chunk to get all transactions
+        const chunkTransactions: any[] = [];
+        let offset = 0;
+        let totalTransactionsInChunk = 0;
+        
+        do {
+          const request: TransactionsGetRequest = {
+            access_token: accessToken,
+            start_date: currentStart.toISOString().split('T')[0],
+            end_date: currentEnd.toISOString().split('T')[0],
+            options: {
+              include_personal_finance_category: true,
+              count: 500, // Maximum transactions per request
+              offset: offset
+            }
+          };
 
-        // Use retry logic for rate limit handling
-        const response = await this.retryWithBackoff(() => 
-          plaidClient.transactionsGet(request)
-        );
-        
-        // Add small delay between requests to prevent rate limiting
-        await this.delay(300); // 300ms between transaction requests
-        const chunkTransactions = response.data.transactions;
-        
-        console.log(`Chunk result: ${chunkTransactions.length} transactions (total available in period: ${response.data.total_transactions})`);
-        
-        // For Capital One, if we get fewer transactions than expected, that's normal due to 90-day limit
-        if (chunkTransactions.length < response.data.total_transactions) {
-          if (isCapitalOne) {
-            console.log(`ℹ️ Capital One returned ${chunkTransactions.length} of ${response.data.total_transactions} transactions (normal due to 90-day limit)`);
-          } else {
-            console.warn(`⚠️ Only got ${chunkTransactions.length} of ${response.data.total_transactions} transactions in this chunk. Some data may be missing.`);
+          // Use retry logic for rate limit handling
+          const response = await this.retryWithBackoff(() => 
+            plaidClient.transactionsGet(request)
+          );
+          
+          const pageTransactions = response.data.transactions;
+          totalTransactionsInChunk = response.data.total_transactions;
+          
+          console.log(`Page result: ${pageTransactions.length} transactions (offset: ${offset}, total in chunk: ${totalTransactionsInChunk})`);
+          
+          chunkTransactions.push(...pageTransactions);
+          offset += pageTransactions.length;
+          
+          // Add delay between paginated requests
+          if (pageTransactions.length > 0 && offset < totalTransactionsInChunk) {
+            await this.delay(300); // 300ms between pagination requests
           }
+          
+        } while (offset < totalTransactionsInChunk && chunkTransactions.length < totalTransactionsInChunk);
+        
+        console.log(`✅ Chunk complete: Retrieved ${chunkTransactions.length} of ${totalTransactionsInChunk} transactions`);
+        
+        if (chunkTransactions.length < totalTransactionsInChunk) {
+          console.warn(`⚠️ Still missing ${totalTransactionsInChunk - chunkTransactions.length} transactions in this chunk after pagination`);
         }
         
         allTransactions.push(...chunkTransactions);
@@ -1295,6 +1319,7 @@ class PlaidServiceImpl implements PlaidService {
       await this.delay(200);
       
       const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
+      const isRobinhoodItem = this.isRobinhood(plaidItemRecord.institutionName);
       const endDate = new Date();
       const startDate = new Date();
       
@@ -1315,7 +1340,8 @@ class PlaidServiceImpl implements PlaidService {
         accessToken,
         startDate,
         endDate,
-        isCapitalOneItem
+        isCapitalOneItem,
+        isRobinhoodItem
       );
 
       console.log(`⚡ Got ${transactions.length} recent transactions for instant setup`);
@@ -1417,6 +1443,7 @@ class PlaidServiceImpl implements PlaidService {
       await this.delay(500);
       
       const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
+      const isRobinhoodItem = this.isRobinhood(plaidItemRecord.institutionName);
       
       // Set end date to cutoff date (don't fetch recent data that already exists)
       const endDate = new Date(cutoffDate);
@@ -1447,7 +1474,8 @@ class PlaidServiceImpl implements PlaidService {
         accessToken,
         startDate,
         endDate,
-        isCapitalOneItem
+        isCapitalOneItem,
+        isRobinhoodItem
       );
 
       console.log(`📜 Got ${transactions.length} historical transactions (avoiding recent duplicates)`);
@@ -1520,7 +1548,8 @@ class PlaidServiceImpl implements PlaidService {
       
       // Determine if this is Capital One using institution name (no API call needed)
       const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
-      console.log(`Institution type determined: ${isCapitalOneItem ? 'Capital One' : 'Standard'} (from institution name: ${plaidItemRecord.institutionName})`);
+      const isRobinhoodItem = this.isRobinhood(plaidItemRecord.institutionName);
+      console.log(`Institution type determined: ${isCapitalOneItem ? 'Capital One' : isRobinhoodItem ? 'Robinhood' : 'Standard'} (from institution name: ${plaidItemRecord.institutionName})`);
 
       const endDate = new Date();
       const startDate = new Date();
@@ -1567,7 +1596,8 @@ class PlaidServiceImpl implements PlaidService {
         accessToken,
         startDate,
         endDate,
-        isCapitalOneItem
+        isCapitalOneItem,
+        isRobinhoodItem
       );
 
       console.log(`=== TRANSACTION SYNC DEBUG ===`);

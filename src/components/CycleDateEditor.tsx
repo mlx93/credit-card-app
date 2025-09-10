@@ -128,7 +128,7 @@ export default function CycleDateEditor({
     }
   };
 
-  const needsConfiguration = !currentCycleDay || !currentDueDay;
+  const needsConfiguration = !currentCycleDay && !currentCycleDaysBeforeEnd || !currentDueDay && !currentDueDaysBeforeEnd;
 
   if (!isEditing) {
     return (
@@ -145,7 +145,19 @@ export default function CycleDateEditor({
         ) : (
           <>
             <div className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-              Close: Day {currentCycleDay} • Due: Day {currentDueDay}
+              {(() => {
+                // Format statement close display
+                const closeDisplay = currentCycleDateType === 'days_before_end' && currentCycleDaysBeforeEnd
+                  ? `${currentCycleDaysBeforeEnd} days before month end`
+                  : `Day ${currentCycleDay}`;
+                
+                // Format due date display
+                const dueDisplay = currentDueDateType === 'days_before_end' && currentDueDaysBeforeEnd
+                  ? `${currentDueDaysBeforeEnd} days before month end`
+                  : `Day ${currentDueDay}`;
+                
+                return `Close: ${closeDisplay} • Due: ${dueDisplay}`;
+              })()}
             </div>
             <button
               onClick={() => setIsEditing(true)}
