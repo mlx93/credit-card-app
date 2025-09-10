@@ -1060,7 +1060,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           if (full.ok) {
             const { billingCycles: all } = await full.json();
             if (Array.isArray(all)) {
-              setBillingCycles(dedupeCycles(all));
+              setBillingCycles(prevCycles => {
+                // Merge new data with existing to prevent flickering
+                const merged = [...prevCycles, ...all];
+                return dedupeCycles(merged);
+              });
             }
           }
         } catch (e) {
@@ -1225,13 +1229,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                     }
                                     if (doneIds.length > 0) {
                                       setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
-                                      // Fetch full history and overwrite cycles for a unified view
+                                      // Fetch full history and merge with existing cycles to prevent flickering
                                       try {
                                         const full = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
                                         if (full.ok) {
                                           const { billingCycles: all } = await full.json();
                                           if (Array.isArray(all)) {
-                                            setBillingCycles(dedupeCycles(all));
+                                            setBillingCycles(prevCycles => {
+                                              // Merge new data with existing to prevent flickering
+                                              const merged = [...prevCycles, ...all];
+                                              return dedupeCycles(merged);
+                                            });
                                           }
                                         }
                                       } catch {}
@@ -2215,13 +2223,17 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                     }
                                     if (doneIds.length > 0) {
                                       setHistoryRefreshingIds(prev => prev.filter(id => !doneIds.includes(id)));
-                                      // Fetch full history and fully overwrite cycles once some cards are ready
+                                      // Fetch full history and merge with existing cycles to prevent flickering
                                       try {
                                         const full = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
                                         if (full.ok) {
                                           const { billingCycles: all } = await full.json();
                                           if (Array.isArray(all)) {
-                                            setBillingCycles(dedupeCycles(all));
+                                            setBillingCycles(prevCycles => {
+                                              // Merge new data with existing to prevent flickering
+                                              const merged = [...prevCycles, ...all];
+                                              return dedupeCycles(merged);
+                                            });
                                           }
                                         }
                                       } catch {}
