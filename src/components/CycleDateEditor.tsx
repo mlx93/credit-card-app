@@ -146,12 +146,12 @@ export default function CycleDateEditor({
           <>
             <div className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
               {(() => {
-                // Format statement close display
+                // Format statement close display based on date type
                 const closeDisplay = currentCycleDateType === 'days_before_end' && currentCycleDaysBeforeEnd
                   ? `${currentCycleDaysBeforeEnd} days before month end`
                   : `Day ${currentCycleDay}`;
                 
-                // Format due date display
+                // Format due date display based on date type
                 const dueDisplay = currentDueDateType === 'days_before_end' && currentDueDaysBeforeEnd
                   ? `${currentDueDaysBeforeEnd} days before month end`
                   : `Day ${currentDueDay}`;
