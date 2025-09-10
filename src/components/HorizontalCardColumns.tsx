@@ -90,26 +90,23 @@ interface HorizontalCardColumnsProps {
   fullCyclesLoading?: boolean;
 }
 
-// Helper function to determine if cycles will render meaningful content
-// This mirrors the logic inside CardBillingCycles to prevent showing empty widgets
-function hasValidCycleData(cycles: BillingCycle[], card: CreditCardInfo): boolean {
-  if (!cycles || cycles.length === 0) return false;
-  
-  // Check for Robinhood cards without proper data sources
+// Helper function to determine if CardBillingCycles component should be shown
+// This prevents duplicate widgets by checking if CardBillingCycles will show meaningful content
+function shouldShowCardBillingCycles(cycles: BillingCycle[], card: CreditCardInfo): boolean {
+  // Check for Robinhood cards
   const isRobinhoodCard = card.plaidItem?.institutionId === 'ins_54' || 
     /robinhood/i.test(card.plaidItem?.institutionName || '');
   
-  // For Robinhood: only show cycles if we have manual config OR liabilities data (lastStatementIssueDate)
-  if (isRobinhoodCard && !card.manual_dates_configured && !card.lastStatementIssueDate) {
-    return false;
+  // For Robinhood cards: ALWAYS show CardBillingCycles component
+  // It will either show cycles (if configured) or the CycleDateEditor configuration UI
+  if (isRobinhoodCard) {
+    return true;
   }
   
-  // For any card without liabilities data AND no manual configuration
-  if (!card.lastStatementIssueDate && !card.manual_dates_configured) {
-    return false;
-  }
+  // For non-Robinhood cards: only show if we have meaningful cycle data
+  if (!cycles || cycles.length === 0) return false;
   
-  // Apply the same filtering logic as CardBillingCycles
+  // Apply the same filtering logic as CardBillingCycles to check if cycles are meaningful
   const sortedCycles = cycles.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
   const today = new Date();
   
@@ -256,7 +253,7 @@ function SortableCardColumn({
             isExpanded ? 'max-h-[2000px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-4'
           }`}
         >
-          {hasValidCycleData(cycles, card) ? (
+          {shouldShowCardBillingCycles(cycles, card) ? (
             <div className="glass-morphism rounded-xl ios-shadow">
               <div className="p-4">
                 {/* Section Header */}
