@@ -1,27 +1,8 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency, formatDate, getDaysUntil } from '@/utils/format';
 import { normalizeCardDisplayName } from '@/utils/cardName';
-import { Calendar, CreditCard, ChevronDown, ChevronRight, History, GripVertical } from 'lucide-react';
+import { Calendar, CreditCard, ChevronDown, ChevronRight, History } from 'lucide-react';
 import CycleDateEditor from './CycleDateEditor';
-
-// truncateCardName now imported from shared utility
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 interface BillingCycle {
   id: string;
@@ -70,8 +51,7 @@ function isCapitalOneCard(cardName?: string): boolean {
 interface CardBillingCyclesProps {
   cycles: BillingCycle[];
   cards: CreditCardInfo[];
-  cardOrder?: string[]; // Optional card order from parent (card IDs)
-  onOrderChange?: (order: string[]) => void; // Callback to sync order changes with parent
+  cardOrder?: string[]; // Card order from parent (card IDs or names)
   compactMode?: boolean; // For horizontal card columns display
   olderCyclesLoadingIds?: string[]; // Card IDs whose historical cycles are still loading
   fullCyclesLoading?: boolean; // Global loading state for when full cycles are being fetched
@@ -478,64 +458,9 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
   );
 };
 
-// Sortable Card Component
-function SortableCard({ 
-  cardName, 
-  cardCycles, 
-  card, 
-  colorIndex, 
-  isExpanded, 
-  onToggleExpand,
-  allCycles,
-  compactMode = false,
-  olderLoading = false
-}: {
-  cardName: string;
-  cardCycles: BillingCycle[];
-  card?: CreditCardInfo;
-  colorIndex: number;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
-  allCycles: BillingCycle[];
-  compactMode?: boolean;
-  olderLoading?: boolean;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: cardName });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style}>
-      <CardContent 
-        cardName={cardName}
-        cardCycles={cardCycles}
-        card={card}
-        colorIndex={colorIndex}
-        isExpanded={isExpanded}
-        onToggleExpand={onToggleExpand}
-        allCycles={allCycles}
-        dragHandleProps={{ ...attributes, ...listeners }}
-        compactMode={compactMode}
-        olderLoading={olderLoading}
-      />
-    </div>
-  );
-}
-
-export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onOrderChange, compactMode = false, olderCyclesLoadingIds = [], fullCyclesLoading = false }: CardBillingCyclesProps) {
+export function CardBillingCycles({ cycles, cards, cardOrder, compactMode = false, olderCyclesLoadingIds = [], fullCyclesLoading = false }: CardBillingCyclesProps) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
-  const [cardOrder, setCardOrder] = useState<string[]>([]);
 
   // Group cycles by card and separate current/recent vs historical
   const cyclesByCard = cycles.reduce((acc, cycle) => {
@@ -582,36 +507,6 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
     return colorIndex;
   };
 
-  // Initialize card order only once when component mounts or when cards first become available
-  useEffect(() => {
-    const cardNames = Object.keys(cyclesByCard);
-    
-    // Only initialize if we don't have an order set yet and we have cards
-    if (cardOrder.length === 0 && cardNames.length > 0) {
-      if (propCardOrder && propCardOrder.length > 0) {
-        // Use the initial order from parent - convert card IDs to card names
-        const orderedCardNames = propCardOrder
-          .map(cardId => {
-            const card = cards.find(c => c.id === cardId);
-            return card ? card.name : null;
-          })
-          .filter((name): name is string => name !== null && cardNames.includes(name));
-        
-        // Add any remaining cards not in the provided order
-        const remainingCards = cardNames.filter(name => !orderedCardNames.includes(name));
-        setCardOrder([...orderedCardNames, ...remainingCards]);
-      } else {
-        setCardOrder(cardNames);
-      }
-    }
-    // Handle new cards being added (but don't re-sync existing order)
-    else if (cardOrder.length > 0) {
-      const newCards = cardNames.filter(name => !cardOrder.includes(name));
-      if (newCards.length > 0) {
-        setCardOrder(prev => [...prev, ...newCards]);
-      }
-    }
-  }, [cyclesByCard, cards]); // Removed propCardOrder dependency to prevent re-syncing
 
   // Initialize expandedCards to be empty (historical cycles default to closed)
   // Only run this once on mount, not on every cyclesByCard change
@@ -620,76 +515,64 @@ export function CardBillingCycles({ cycles, cards, cardOrder: propCardOrder, onO
     setExpandedCards(new Set());
   }, []); // Empty dependency array - only run once on mount
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      setCardOrder((items) => {
-        const oldIndex = items.indexOf(active.id as string);
-        const newIndex = items.indexOf(over.id as string);
-        const newOrder = arrayMove(items, oldIndex, newIndex);
-        
-        // Independent drag and drop - no longer sync with other components
-        
-        return newOrder;
-      });
+  // Get card names in order from parent, or fallback to alphabetical
+  const getOrderedCardNames = () => {
+    const allCardNames = Object.keys(cyclesByCard);
+    
+    if (cardOrder && cardOrder.length > 0) {
+      // Convert card IDs to names if necessary
+      const orderedNames = cardOrder
+        .map(cardIdOrName => {
+          // First try to find by ID
+          const cardById = cards.find(c => c.id === cardIdOrName);
+          if (cardById && allCardNames.includes(cardById.name)) {
+            return cardById.name;
+          }
+          // Then try to find by name
+          if (allCardNames.includes(cardIdOrName)) {
+            return cardIdOrName;
+          }
+          return null;
+        })
+        .filter((name): name is string => name !== null);
+      
+      // Add any cards not in the provided order
+      const remainingCards = allCardNames.filter(name => !orderedNames.includes(name));
+      return [...orderedNames, ...remainingCards];
     }
+    
+    // Fallback to alphabetical
+    return allCardNames.sort();
   };
-
-  // Filter and sort cards based on cardOrder
-  const orderedCards = cardOrder
-    .filter(cardName => cyclesByCard[cardName])
-    .map(cardName => ({
-      cardName,
-      cardCycles: cyclesByCard[cardName]
-    }));
+  
+  const cardNames = getOrderedCardNames();
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={cardOrder}
-        strategy={verticalListSortingStrategy}
-      >
-        <div className="space-y-6">
-          {orderedCards.map(({ cardName, cardCycles }) => {
-            const card = (cards && cards.length === 1) ? cards[0] : cards.find(c => c.name === cardName);
-            const colorIndex = getCardColorIndex(cardName, card?.id);
-            const isExpanded = expandedCards.has(cardName);
-            const olderLoading = (card ? olderCyclesLoadingIds.includes(card.id) : false) || fullCyclesLoading;
+    <div className="space-y-6">
+      {cardNames.map((cardName) => {
+        const cardCycles = cyclesByCard[cardName];
+        const card = (cards && cards.length === 1) ? cards[0] : cards.find(c => c.name === cardName);
+        const colorIndex = getCardColorIndex(cardName, card?.id);
+        const isExpanded = expandedCards.has(cardName);
+        const olderLoading = (card ? olderCyclesLoadingIds.includes(card.id) : false) || fullCyclesLoading;
 
-            return (
-              <SortableCard
-                key={cardName}
-                cardName={cardName}
-                cardCycles={cardCycles}
-                card={card}
-                colorIndex={colorIndex}
-                isExpanded={isExpanded}
-                onToggleExpand={() => toggleCardExpansion(cardName)}
-                allCycles={cycles}
-                compactMode={compactMode}
-                olderLoading={olderLoading}
-              />
-            );
-          })}
-        </div>
-      </SortableContext>
-    </DndContext>
+        return (
+          <CardContent
+            key={cardName}
+            cardName={cardName}
+            cardCycles={cardCycles}
+            card={card}
+            colorIndex={colorIndex}
+            isExpanded={isExpanded}
+            onToggleExpand={() => toggleCardExpansion(cardName)}
+            allCycles={cycles}
+            compactMode={compactMode}
+            olderLoading={olderLoading}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -702,7 +585,6 @@ function CardContent({
   isExpanded,
   onToggleExpand,
   allCycles,
-  dragHandleProps,
   compactMode = false,
   olderLoading = false
 }: {
@@ -713,7 +595,6 @@ function CardContent({
   isExpanded: boolean;
   onToggleExpand: () => void;
   allCycles: BillingCycle[];
-  dragHandleProps?: any;
   compactMode?: boolean;
   olderLoading?: boolean;
 }) {
@@ -904,9 +785,6 @@ function CardContent({
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
-            <div {...dragHandleProps} className="cursor-move mr-2">
-              <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-            </div>
             <CreditCard className="h-5 w-5 text-gray-600 mr-2" />
             <div>
               {(() => {
@@ -969,8 +847,12 @@ function CardContent({
                 const hasPlaidDates = card.lastStatementIssueDate || card.nextPaymentDueDate;
                 const hasManualDates = card.manual_dates_configured;
                 const today = new Date();
-                const hasHistoricalStatements = (cardCycles || []).some(c => (c.statementBalance && new Date(c.endDate) < today));
-                const needsManualConfig = hasManualDates || (!hasHistoricalStatements);
+                const closedWithStatements = (cardCycles || [])
+                  .filter(c => (c.statementBalance && new Date(c.endDate) < today))
+                  .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                // Consider "rich" historical statements only if there are statements beyond the most recent closed
+                const hasRichHistoricalStatements = closedWithStatements.length > 1;
+                const needsManualConfig = hasManualDates || (!hasRichHistoricalStatements);
 
                 return needsManualConfig ? (
                   <div className="mb-4 -mt-2">
