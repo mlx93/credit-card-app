@@ -132,7 +132,7 @@ export default function CycleDateEditor({
 
   if (!isEditing) {
     return (
-      <div className="flex items-center gap-2 mt-1">
+      <div className="flex items-start gap-2 mt-1">
         {needsConfiguration ? (
           <button
             onClick={() => setIsEditing(true)}
@@ -144,36 +144,36 @@ export default function CycleDateEditor({
           </button>
         ) : (
           <>
-            <div className="text-xs text-gray-600 dark:text-gray-400">
+            <div className="text-xs text-gray-600 dark:text-gray-400 flex-1 min-w-0">
               {(() => {
                 // Format statement close display based on date type
                 const closeDisplay = currentCycleDateType === 'days_before_end' && currentCycleDaysBeforeEnd
-                  ? `${currentCycleDaysBeforeEnd} days before month end`
+                  ? `${currentCycleDaysBeforeEnd}d before month end`
                   : `Day ${currentCycleDay}`;
                 
                 // Format due date display based on date type
                 const dueDisplay = currentDueDateType === 'days_before_end' && currentDueDaysBeforeEnd
-                  ? `${currentDueDaysBeforeEnd} days before month end`
+                  ? `${currentDueDaysBeforeEnd}d before month end`
                   : `Day ${currentDueDay}`;
                 
                 // Check if text is too long and needs wrapping
-                const needsWrap = (closeDisplay.length + dueDisplay.length) > 30;
+                const needsWrap = (closeDisplay.length + dueDisplay.length) > 28;
                 
                 if (needsWrap) {
                   return (
-                    <>
-                      <div>Close: {closeDisplay}</div>
-                      <div>Due: {dueDisplay}</div>
-                    </>
+                    <div className="space-y-0.5">
+                      <div className="truncate">Close: {closeDisplay}</div>
+                      <div className="truncate">Due: {dueDisplay}</div>
+                    </div>
                   );
                 }
                 
-                return `Close: ${closeDisplay} • Due: ${dueDisplay}`;
+                return <div className="truncate">Close: {closeDisplay} • Due: {dueDisplay}</div>;
               })()}
             </div>
             <button
               onClick={() => setIsEditing(true)}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors opacity-50 hover:opacity-100"
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors opacity-50 hover:opacity-100 flex-shrink-0"
               title="Edit billing cycle dates"
             >
               <Pencil className="w-3 h-3 text-gray-400" />
