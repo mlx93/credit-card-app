@@ -370,7 +370,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
     try {
       setLoading(true);
       setLoadingMessage('Initializing secure connection');
-      setLoadingSubMessage(type === 'investment' ? 'Preparing Robinhood connection...' : 'Preparing Plaid Link...');
+      setLoadingSubMessage(type === 'investment' ? 'Preparing investment platform connection...' : 'Preparing Plaid Link...');
       
       // Capture initial card count before starting
       console.log('📊 Capturing initial card count...');
@@ -404,7 +404,7 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
       
       if (data.link_token) {
         console.log(`Link token received for ${type} institution`);
-        setLoadingMessage(type === 'investment' ? 'Opening Robinhood' : 'Opening Plaid');
+        setLoadingMessage(type === 'investment' ? 'Opening investment platform' : 'Opening Plaid');
         setLoadingSubMessage('Redirecting to secure banking portal...');
         // Brief delay to show the loading animation before opening
         setTimeout(() => {
