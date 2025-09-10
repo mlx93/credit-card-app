@@ -499,14 +499,22 @@ export function CardBillingCycles({ cycles, cards, cardOrder, compactMode = fals
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   // Group cycles by card and separate current/recent vs historical
-  const cyclesByCard = cycles.reduce((acc, cycle) => {
-    const cardName = cycle.creditCardName;
-    if (!acc[cardName]) {
-      acc[cardName] = [];
+  const cyclesByCard: Record<string, BillingCycle[]> = (() => {
+    // When a single card prop is supplied (usage in HorizontalCardColumns),
+    // group all incoming cycles under that single card name to avoid duplicates
+    if (cards && cards.length === 1) {
+      const singleName = cards[0]?.name ?? 'Card';
+      return { [singleName]: cycles };
     }
-    acc[cardName].push(cycle);
-    return acc;
-  }, {} as Record<string, BillingCycle[]>);
+    // Otherwise, fallback to grouping by creditCardId if present; else by creditCardName
+    return (cycles as any[]).reduce((acc, cycle: any) => {
+      const key = cycle.creditCardId || cycle.creditCardName;
+      const group = String(key);
+      if (!acc[group]) acc[group] = [] as any;
+      (acc[group] as any).push(cycle as any);
+      return acc;
+    }, {} as Record<string, BillingCycle[]>);
+  })();
 
   // Sort cycles by date (newest first) and categorize them
   Object.keys(cyclesByCard).forEach(cardName => {

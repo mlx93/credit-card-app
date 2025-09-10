@@ -223,7 +223,7 @@ function SortableCardColumn({
             isExpanded ? 'max-h-[2000px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-4'
           }`}
         >
-          {shouldShowCardBillingCycles(cycles, card) ? (
+          {shouldShowCardBillingCycles(cycles, card) && !(olderCyclesLoadingIds && olderCyclesLoadingIds.includes(card.id)) ? (
             <div className="glass-morphism rounded-xl ios-shadow">
               <div className="p-4">
                 {/* Section Header */}
@@ -247,7 +247,7 @@ function SortableCardColumn({
           ) : (
             <div className="glass-morphism-dark rounded-xl p-6 text-center">
               <div className="w-8 h-8 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full mx-auto mb-2 opacity-40"></div>
-              <p className="text-gray-600 text-sm font-medium">No billing cycles available</p>
+              <p className="text-gray-600 text-sm font-medium">Loading billing cycles…</p>
             </div>
           )}
         </div>
