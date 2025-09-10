@@ -1850,18 +1850,11 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     loadInitialData();
   }, [isLoggedIn]);
 
-  // Persist card order to DB when it changes
+  // Persist card order to DB only after the user has explicitly reordered at least once
   useEffect(() => {
-    if (!isLoggedIn || !Array.isArray(sharedCardOrder) || sharedCardOrder.length === 0) return;
-    if (!orderInitializedRef.current) {
-      // If we have cards and an order, mark as initialized
-      if (creditCards.length > 0 && sharedCardOrder.length > 0) {
-        orderInitializedRef.current = true;
-        console.log('📝 Order initialized due to manual change');
-      } else {
-        return; // don't save until initial order decided
-      }
-    }
+    if (!isLoggedIn) return;
+    if (!hasUserOrdered) return; // do not upsert until the user reorders
+    if (!Array.isArray(sharedCardOrder) || sharedCardOrder.length === 0) return;
     (async () => {
       try {
         await fetch('/api/user/credit-cards/order', {
@@ -1875,7 +1868,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         console.warn('Failed to save card order:', e);
       }
     })();
-  }, [JSON.stringify(sharedCardOrder), isLoggedIn]);
+  }, [JSON.stringify(sharedCardOrder), isLoggedIn, hasUserOrdered]);
 
   // Auto-close success popup after 5 seconds
   useEffect(() => {
