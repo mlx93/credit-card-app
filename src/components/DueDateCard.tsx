@@ -403,10 +403,47 @@ export function DueDateCard({
     });
   }
 
-  // Check if card is paid off
+  // Check if card is paid off - should only be true if there are genuinely no outstanding balances
   const currentBalance = Math.abs(card.balanceCurrent || 0);
-  const minPayment = card.minimumPaymentAmount;
-  const isPaidOff = (currentBalance === 0) || (minPayment === null || minPayment === undefined || minPayment === 0);
+  
+  // Calculate if there are any unpaid statement balances
+  const calculateIsPaidOff = (): boolean => {
+    // If current balance is 0, definitely paid off
+    if (currentBalance === 0) return true;
+    
+    // Check if we have any recent unpaid cycles from billing data
+    const today = new Date();
+    const closedCycles = (card.recentCycles || [])
+      .filter(cycle => new Date(cycle.endDate) < today)
+      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+    
+    // Find most recent unpaid cycle
+    const mostRecentUnpaidCycle = closedCycles.find(cycle => {
+      const cycleAmount = Math.abs(cycle.totalSpend || cycle.statementBalance || 0);
+      return cycleAmount > 0; // Any cycle with spending/balance
+    });
+    
+    // If we have cycle data and there's an unpaid cycle, not paid off
+    if (mostRecentUnpaidCycle) {
+      const cycleAmount = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
+      // If current balance is significantly less than the cycle amount, old statement might be paid
+      if (currentBalance <= cycleAmount * 0.1) { // Within 10% suggests mostly paid
+        return true;
+      }
+      return false; // There's an unpaid cycle
+    }
+    
+    // Fallback: check Plaid's statement balance
+    if (card.lastStatementBalance && Math.abs(card.lastStatementBalance) > 0) {
+      // If there's a statement balance but current balance is much lower, might be paid
+      return currentBalance <= Math.abs(card.lastStatementBalance) * 0.1;
+    }
+    
+    // If no data available and current balance is low, assume paid off
+    return currentBalance < 50;
+  };
+  
+  const isPaidOff = calculateIsPaidOff();
 
   const cardColorClass = cardColors[colorIndex % cardColors.length];
   
@@ -901,9 +938,29 @@ export function DueDateCard({
             return difference <= 5;
           });
           
-          console.log(`📊 Fallback transaction check for ${card.name}: ${statementMatchingPayment ? 'HIDE' : 'SHOW'}`);
-          if (statementMatchingPayment) {
-            return null; // Hide if payment found
+          // Also check if current balance matches open cycle spend (indicates statement was paid)
+          const openCycle = (card.recentCycles || []).find(cycle => {
+            const cycleEnd = new Date(cycle.endDate);
+            return cycleEnd >= today; // Open/current cycle
+          });
+          
+          const currentBalanceMatchesOpenCycle = openCycle && openCycle.totalSpend && 
+            Math.abs(currentBalance - Math.abs(openCycle.totalSpend)) <= 5;
+          
+          const shouldHideStatement = statementMatchingPayment || currentBalanceMatchesOpenCycle;
+          
+          console.log(`📊 Fallback transaction check for ${card.name}:`, {
+            statementBalance,
+            currentBalance,
+            hasMatchingPayment: !!statementMatchingPayment,
+            paymentAmount: statementMatchingPayment?.amount,
+            openCycleSpend: openCycle?.totalSpend,
+            currentBalanceMatchesOpenCycle,
+            decision: shouldHideStatement ? 'HIDE' : 'SHOW'
+          });
+          
+          if (shouldHideStatement) {
+            return null; // Hide if payment found OR current balance matches open cycle
           }
         }
         
