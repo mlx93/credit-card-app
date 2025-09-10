@@ -388,9 +388,9 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
       
       console.log(`Fetching link token for ${type} institution...`);
       
-      // For investment type (Robinhood), pass the institution ID
+      // For investment type, pass a flag to indicate it's for investment platforms
       const requestBody = type === 'investment' 
-        ? { institutionId: 'ins_54' }
+        ? { institutionType: 'investment' }
         : {};
       
       const response = await fetch('/api/plaid/link-token', {

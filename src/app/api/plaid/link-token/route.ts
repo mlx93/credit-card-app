@@ -11,13 +11,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse request body for oauth_state_id and institutionId if provided
+    // Parse request body for oauth_state_id, institutionId, and institutionType if provided
     let oauth_state_id: string | undefined;
     let institutionId: string | undefined;
+    let institutionType: string | undefined;
     try {
       const body = await request.json();
       oauth_state_id = body?.oauth_state_id;
       institutionId = body?.institutionId;
+      institutionType = body?.institutionType;
       
       if (oauth_state_id) {
         console.log('📋 Link token request with oauth_state_id:', oauth_state_id);
@@ -26,11 +28,21 @@ export async function POST(request: NextRequest) {
       if (institutionId) {
         console.log(`📍 Creating link token for specific institution: ${institutionId}`);
         if (institutionId === 'ins_54') {
-          console.log('🎯 Robinhood institution detected - will use investments product');
+          console.log('🎯 Robinhood institution detected - will use investment platform logic');
+        }
+      }
+      
+      if (institutionType) {
+        console.log(`🏢 Creating link token for institution type: ${institutionType}`);
+        if (institutionType === 'investment') {
+          // For investment type, we'll pass the first investment institution ID
+          // This will trigger the investment platform filtering
+          institutionId = 'ins_54'; // Default to Robinhood for investment platform flow
+          console.log('🎯 Investment platform type selected - using Robinhood as default institution for filtering');
         }
       }
     } catch {
-      // No body or invalid JSON - that's fine, continue without oauth_state_id or institutionId
+      // No body or invalid JSON - that's fine, continue without parameters
     }
 
     const linkToken = await plaidService.createLinkToken(session.user.id, oauth_state_id, institutionId);

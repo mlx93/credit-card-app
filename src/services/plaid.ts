@@ -54,16 +54,20 @@ class PlaidServiceImpl implements PlaidService {
   async createLinkToken(userId: string, oauth_state_id?: string, institutionId?: string): Promise<string> {
     const isSandbox = process.env.PLAID_ENV === 'sandbox';
     
-    // For Robinhood, we can't use liabilities product
+    // Investment institutions (like Robinhood) that don't support liabilities product
+    const investmentInstitutions = ['ins_54']; // Robinhood
+    const isInvestmentInstitution = institutionId && investmentInstitutions.includes(institutionId);
+    
+    // For investment institutions, we can't use liabilities product
     // We only use transactions to ensure credit card accounts are visible
     // Investments product filters out credit cards in Plaid Link UI
-    const products = institutionId === 'ins_54'
-      ? ['transactions'] // Robinhood: transactions only to see credit card accounts
-      : ['liabilities', 'transactions']; // Standard: liabilities includes balance
+    const products = isInvestmentInstitution
+      ? ['transactions'] // Investment platforms: transactions only to see credit card accounts
+      : ['liabilities', 'transactions']; // Standard banks: liabilities includes balance
     
     console.log(`Creating link token with products:`, products);
-    if (institutionId === 'ins_54') {
-      console.log('🎯 Robinhood institution detected - using transactions only (credit cards not visible with investments product)');
+    if (isInvestmentInstitution) {
+      console.log('🎯 Investment institution detected - using transactions only (credit cards not visible with investments product)');
     }
     
     const request: LinkTokenCreateRequest = {
@@ -81,6 +85,14 @@ class PlaidServiceImpl implements PlaidService {
       },
     };
     
+    // For investment platforms, filter to only show institutions without liabilities product
+    if (isInvestmentInstitution) {
+      console.log('🔒 Applying institution filters for investment platforms (institutions without liabilities support)');
+      (request as any).institution_filters = {
+        institution_ids: investmentInstitutions
+      };
+    }
+    
     // Add statements as an optional product with required configuration
     // This won't block connection if not supported
     (request as any).optional_products = ['statements'];
@@ -89,8 +101,8 @@ class PlaidServiceImpl implements PlaidService {
       end_date: new Date().toISOString().split('T')[0] // Today
     };
     
-    if (institutionId === 'ins_54') {
-      console.log('📄 Requesting optional statements product for Robinhood with 24 months of history');
+    if (isInvestmentInstitution) {
+      console.log('📄 Requesting optional statements product for investment platform with 24 months of history');
     }
 
     // For OAuth resumption, oauth_state_id should be passed when creating the link token

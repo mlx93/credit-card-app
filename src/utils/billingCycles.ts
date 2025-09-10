@@ -12,6 +12,25 @@ function isCapitalOneCard(institutionName?: string, cardName?: string): boolean 
   return institutionMatch || cardMatch;
 }
 
+// Helper function to detect Robinhood cards
+function isRobinhoodCard(institutionId?: string, institutionName?: string): boolean {
+  return institutionId === 'ins_54' || /robinhood/i.test(institutionName || '');
+}
+
+// Helper function to get the effective transaction date based on institution
+function getEffectiveTransactionDate(transaction: any, institutionId?: string, institutionName?: string): Date {
+  const isRobinhood = isRobinhoodCard(institutionId, institutionName);
+  
+  if (isRobinhood) {
+    // For Robinhood, always use posted date (transaction.date) to align with billing cycles
+    return transaction.date;
+  } else {
+    // For other institutions, use posted date as well (transaction.date is the standard)
+    // Could potentially use authorized_date for different behavior if needed in the future
+    return transaction.date;
+  }
+}
+
 // Helper function to identify payment transactions based on transaction name
 export function isPaymentTransaction(transactionName: string): boolean {
   if (!transactionName) return false;
@@ -321,9 +340,25 @@ async function createOrUpdateCycle(
   const today = new Date();
   const effectiveEndDate = cycleEnd > today ? today : cycleEnd;
   
-  const cycleTransactions = creditCard.transactions.filter((t: any) => 
-    t.date >= cycleStart && t.date <= effectiveEndDate
-  );
+  // For Robinhood with manual dates, use authorized date (posted date) for cycle boundaries
+  // For all other institutions, continue using transaction date
+  const isRobinhoodWithManualDates = creditCard.manual_dates_configured && 
+    (creditCard.plaidItem?.institutionId === 'ins_54' || 
+     /robinhood/i.test(creditCard.plaidItem?.institutionName || ''));
+  
+  const cycleTransactions = creditCard.transactions.filter((t: any) => {
+    if (isRobinhoodWithManualDates && t.authorizedDate) {
+      // For Robinhood with manual dates: use authorized date (posted date)
+      return t.authorizedDate >= cycleStart && t.authorizedDate <= effectiveEndDate;
+    } else {
+      // For all other institutions: use transaction date (existing behavior)
+      return t.date >= cycleStart && t.date <= effectiveEndDate;
+    }
+  });
+  
+  if (isRobinhoodWithManualDates) {
+    console.log(`🏦 Robinhood manual cycle: Using authorized dates for ${cycleTransactions.length} transactions between ${cycleStart.toDateString()} - ${effectiveEndDate.toDateString()}`);
+  }
 
   // Properly calculate spend: include charges and refunds, but exclude payments
   let totalSpend = cycleTransactions.reduce((sum: number, t: any) => {
@@ -851,9 +886,28 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
     }
 
     // Get transactions for this cycle
-    const cycleTransactions = transactionsWithDates.filter(t => 
-      t.date >= currentCycleStart && t.date <= currentCycleEnd
-    );
+    // For Robinhood with manual dates, use authorized date (posted date) for cycle boundaries
+    // For all other institutions, continue using transaction date
+    const isRobinhoodWithManualDates = creditCard.manual_dates_configured && 
+      (creditCard.plaidItemId && 
+       (await supabaseAdmin.from('plaid_items').select('institutionId, institutionName').eq('id', creditCard.plaidItemId).single())
+        .data?.institutionId === 'ins_54' || 
+       /robinhood/i.test((await supabaseAdmin.from('plaid_items').select('institutionId, institutionName').eq('id', creditCard.plaidItemId).single())
+        .data?.institutionName || ''));
+    
+    const cycleTransactions = transactionsWithDates.filter(t => {
+      if (isRobinhoodWithManualDates && t.authorizedDate) {
+        // For Robinhood with manual dates: use authorized date (posted date)
+        return t.authorizedDate >= currentCycleStart && t.authorizedDate <= currentCycleEnd;
+      } else {
+        // For all other institutions: use transaction date (existing behavior)
+        return t.date >= currentCycleStart && t.date <= currentCycleEnd;
+      }
+    });
+    
+    if (isRobinhoodWithManualDates) {
+      console.log(`🏦 Robinhood current cycle: Using authorized dates for ${cycleTransactions.length} transactions between ${currentCycleStart.toDateString()} - ${currentCycleEnd.toDateString()}`);
+    }
 
     // Calculate spending for this cycle (exclude payments but include refunds)
     const nonPaymentTransactions = cycleTransactions.filter(t => !isPaymentTransaction(t.name || ''));
@@ -1002,9 +1056,28 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
     }
 
     // Get transactions for this closed cycle
-    const cycleTransactions = transactionsWithDates.filter(t => 
-      t.date >= closedCycleStart && t.date <= closedCycleEnd
-    );
+    // For Robinhood with manual dates, use authorized date (posted date) for cycle boundaries
+    // For all other institutions, continue using transaction date
+    const isRobinhoodWithManualDates = creditCard.manual_dates_configured && 
+      (creditCard.plaidItemId && 
+       (await supabaseAdmin.from('plaid_items').select('institutionId, institutionName').eq('id', creditCard.plaidItemId).single())
+        .data?.institutionId === 'ins_54' || 
+       /robinhood/i.test((await supabaseAdmin.from('plaid_items').select('institutionId, institutionName').eq('id', creditCard.plaidItemId).single())
+        .data?.institutionName || ''));
+    
+    const cycleTransactions = transactionsWithDates.filter(t => {
+      if (isRobinhoodWithManualDates && t.authorizedDate) {
+        // For Robinhood with manual dates: use authorized date (posted date)
+        return t.authorizedDate >= closedCycleStart && t.authorizedDate <= closedCycleEnd;
+      } else {
+        // For all other institutions: use transaction date (existing behavior)
+        return t.date >= closedCycleStart && t.date <= closedCycleEnd;
+      }
+    });
+    
+    if (isRobinhoodWithManualDates) {
+      console.log(`🏦 Robinhood closed cycle: Using authorized dates for ${cycleTransactions.length} transactions between ${closedCycleStart.toDateString()} - ${closedCycleEnd.toDateString()}`);
+    }
 
     // Skip if no transactions found for this period
     if (cycleTransactions.length === 0) {
