@@ -164,7 +164,7 @@ export default function CycleDateEditor({
                   return (
                     <div className="space-y-0.5">
                       <div className="truncate">Close: {closeDisplay}</div>
-                      <div className="truncate">• Due: {dueDisplay}</div>
+                      <div className="truncate">Due: {dueDisplay}</div>
                     </div>
                   );
                 }
