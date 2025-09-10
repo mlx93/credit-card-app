@@ -90,6 +90,49 @@ interface HorizontalCardColumnsProps {
   fullCyclesLoading?: boolean;
 }
 
+// Helper function to determine if cycles will render meaningful content
+// This mirrors the logic inside CardBillingCycles to prevent showing empty widgets
+function hasValidCycleData(cycles: BillingCycle[], card: CreditCardInfo): boolean {
+  if (!cycles || cycles.length === 0) return false;
+  
+  // Check for Robinhood cards without proper data sources
+  const isRobinhoodCard = card.plaidItem?.institutionId === 'ins_54' || 
+    /robinhood/i.test(card.plaidItem?.institutionName || '');
+  
+  // For Robinhood: only show cycles if we have manual config OR liabilities data (lastStatementIssueDate)
+  if (isRobinhoodCard && !card.manual_dates_configured && !card.lastStatementIssueDate) {
+    return false;
+  }
+  
+  // For any card without liabilities data AND no manual configuration
+  if (!card.lastStatementIssueDate && !card.manual_dates_configured) {
+    return false;
+  }
+  
+  // Apply the same filtering logic as CardBillingCycles
+  const sortedCycles = cycles.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+  const today = new Date();
+  
+  // Find current cycle (ends in the future) and most recent closed cycle
+  const currentCycle = sortedCycles.find(c => new Date(c.endDate) >= today);
+  const closedCycles = sortedCycles.filter(c => new Date(c.endDate) < today);
+  const mostRecentClosedCycle = closedCycles.length > 0 ? closedCycles[0] : null;
+  
+  // Build recent cycles array (current + most recent closed)
+  const recentCycles = [];
+  if (currentCycle) recentCycles.push(currentCycle);
+  if (mostRecentClosedCycle && (!currentCycle || mostRecentClosedCycle.id !== currentCycle.id)) {
+    recentCycles.push(mostRecentClosedCycle);
+  }
+  
+  // Build historical cycles (all others)
+  const shownCycleIds = new Set(recentCycles.map(c => c.id));
+  const historicalCycles = sortedCycles.filter(c => !shownCycleIds.has(c.id));
+  
+  // Return true if we have either recent cycles or historical cycles
+  return recentCycles.length > 0 || historicalCycles.length > 0;
+}
+
 interface SortableCardColumnProps {
   card: CreditCardInfo;
   cycles: BillingCycle[];
@@ -213,7 +256,7 @@ function SortableCardColumn({
             isExpanded ? 'max-h-[2000px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-4'
           }`}
         >
-          {cycles.length > 0 ? (
+          {hasValidCycleData(cycles, card) ? (
             <div className="glass-morphism rounded-xl ios-shadow">
               <div className="p-4">
                 {/* Section Header */}
