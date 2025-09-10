@@ -718,6 +718,8 @@ export function DueDateCard({
       {/* Balance Information - Show statement balance only when unpaid */}
       {(() => {
         // Calculate statement balance and determine whether to show it
+        // Treat null/undefined as 0, but keep track if it was actually null
+        const plaidStatementBalanceIsNull = card.lastStatementBalance === null || card.lastStatementBalance === undefined;
         const plaidStatementBalance = Math.abs(card.lastStatementBalance || 0);
         const plaidMinimumPayment = card.minimumPaymentAmount || 0;
         
@@ -856,8 +858,8 @@ export function DueDateCard({
           statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
           minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
           usingCycleData = true;
-        } else if (!plaidStatementBalance && mostRecentUnpaidCycle) {
-          // No Plaid data at all, use cycle data as fallback
+        } else if ((!plaidStatementBalance || plaidStatementBalanceIsNull) && mostRecentUnpaidCycle) {
+          // No Plaid data at all (null or 0), use cycle data as fallback
           statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
           minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
           usingCycleData = true;
