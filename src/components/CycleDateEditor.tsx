@@ -79,8 +79,8 @@ export default function CycleDateEditor({
         setError('Days before month end must be a valid number');
         return;
       }
-      if (cycleDaysBeforeEndNum < 0 || cycleDaysBeforeEndNum > 15) {
-        setError('Days before month end must be between 0 and 15');
+      if (cycleDaysBeforeEndNum < 1 || cycleDaysBeforeEndNum > 31) {
+        setError('Days before month end must be between 1 and 31');
         return;
       }
     }
@@ -102,8 +102,8 @@ export default function CycleDateEditor({
         setError('Days before month end must be a valid number');
         return;
       }
-      if (dueDaysBeforeEndNum < 0 || dueDaysBeforeEndNum > 15) {
-        setError('Days before month end must be between 0 and 15');
+      if (dueDaysBeforeEndNum < 1 || dueDaysBeforeEndNum > 31) {
+        setError('Days before month end must be between 1 and 31');
         return;
       }
     }
@@ -244,7 +244,7 @@ export default function CycleDateEditor({
                            transition-all duration-200"
                   placeholder="3"
                 />
-                <span className="text-gray-600 dark:text-gray-400">days before month end (0-15)</span>
+                <span className="text-gray-600 dark:text-gray-400">days before month end (1-31)</span>
               </div>
             )}
             
@@ -314,7 +314,7 @@ export default function CycleDateEditor({
                            transition-all duration-200"
                   placeholder="0"
                 />
-                <span className="text-gray-600 dark:text-gray-400">days before month end (0-15)</span>
+                <span className="text-gray-600 dark:text-gray-400">days before month end (1-31)</span>
               </div>
             )}
             

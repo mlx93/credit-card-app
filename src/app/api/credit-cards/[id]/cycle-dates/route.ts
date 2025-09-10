@@ -31,9 +31,9 @@ export async function PATCH(
         );
       }
     } else if (cycleDateType === 'days_before_end') {
-      if (cycleDaysBeforeEnd === undefined || cycleDaysBeforeEnd < 0 || cycleDaysBeforeEnd > 15) {
+      if (cycleDaysBeforeEnd === undefined || cycleDaysBeforeEnd < 1 || cycleDaysBeforeEnd > 31) {
         return NextResponse.json(
-          { error: 'Cycle days before end must be between 0 and 15' },
+          { error: 'Cycle days before end must be between 1 and 31' },
           { status: 400 }
         );
       }
@@ -47,9 +47,9 @@ export async function PATCH(
         );
       }
     } else if (dueDateType === 'days_before_end') {
-      if (dueDaysBeforeEnd === undefined || dueDaysBeforeEnd < 0 || dueDaysBeforeEnd > 15) {
+      if (dueDaysBeforeEnd === undefined || dueDaysBeforeEnd < 1 || dueDaysBeforeEnd > 31) {
         return NextResponse.json(
-          { error: 'Due days before end must be between 0 and 15' },
+          { error: 'Due days before end must be between 1 and 31' },
           { status: 400 }
         );
       }
