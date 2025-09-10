@@ -446,9 +446,9 @@ export function HorizontalCardColumns(props: HorizontalCardColumnsProps) {
         continue;
       }
       // Prefer the richer record:
-      // 1) one that has a statementBalance/minimumPayment/dueDate defined
-      const existingHasStatement = !!(existing.statementBalance || existing.minimumPayment || existing.dueDate);
-      const currentHasStatement = !!(c.statementBalance || c.minimumPayment || c.dueDate);
+      // 1) one that has a statementBalance/dueDate defined
+      const existingHasStatement = !!(existing.statementBalance || existing.dueDate);
+      const currentHasStatement = !!(c.statementBalance || c.dueDate);
       if (currentHasStatement && !existingHasStatement) {
         byKey.set(key, c);
         continue;

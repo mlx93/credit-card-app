@@ -129,8 +129,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         byKey.set(key, c);
         continue;
       }
-      const existingHasStatement = !!(existing.statementBalance || existing.minimumPayment || existing.dueDate);
-      const currentHasStatement = !!(c.statementBalance || c.minimumPayment || c.dueDate);
+      const existingHasStatement = !!(existing.statementBalance || existing.dueDate);
+      const currentHasStatement = !!(c.statementBalance || c.dueDate);
       if (currentHasStatement && !existingHasStatement) {
         byKey.set(key, c);
         continue;

@@ -944,7 +944,6 @@ export function DueDateCard({
         
         // Determine which statement balance to show
         let statementBalance = 0;
-        let minimumPayment = 0;
         let usingCycleData = false;
         
         // Check if Plaid's statement balance corresponds to the most recent closed cycle
@@ -956,17 +955,14 @@ export function DueDateCard({
         if (plaidStatementBalance > 0 && !plaidStatementIsPaid) {
           // Plaid has a statement balance that's not paid - always use it
           statementBalance = plaidStatementBalance;
-          minimumPayment = plaidMinimumPayment;
         } else if (plaidStatementIsPaid && mostRecentUnpaidCycle) {
           // Plaid's data is for an old paid cycle, use most recent cycle's totalSpend as fallback
           // totalSpend is only a substitute when we don't have the real statement balance
           statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
-          minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
           usingCycleData = true;
         } else if ((!plaidStatementBalance || plaidStatementBalanceIsNull) && mostRecentUnpaidCycle) {
           // No Plaid data at all (null or 0), use cycle data as fallback
           statementBalance = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
-          minimumPayment = mostRecentUnpaidCycle.minimumPayment || 0;
           usingCycleData = true;
         }
         // Otherwise, no statement to show (all paid or no data)
@@ -977,7 +973,6 @@ export function DueDateCard({
           plaidStatementIsPaid,
           plaidMatchesMostRecent,
           statementBalance,
-          minimumPayment,
           usingCycleData,
           currentBalance,
           currentBalanceIndicatesOldStatementPaid,
@@ -993,7 +988,7 @@ export function DueDateCard({
             minimumPayment: c.minimumPayment,
             statementBalance: c.statementBalance,
             totalSpend: c.totalSpend,
-            isPaid: c.minimumPayment === 0 && c.statementBalance && c.statementBalance > 0
+            isPaid: false // Remove flawed minimumPayment logic, let payment detection logic handle this
           }))
         });
         
@@ -1051,7 +1046,7 @@ export function DueDateCard({
         
         // Return the JSX for statement balance display
         return (
-          <div className="grid grid-cols-3 gap-4 mb-auto min-h-[48px] -mt-1">
+          <div className="grid grid-cols-2 gap-6 mb-auto min-h-[48px] -mt-1">
             <div>
               <p className="text-xs text-gray-600">Statement Balance</p>
               <p className="font-bold text-lg text-blue-600">
@@ -1059,20 +1054,12 @@ export function DueDateCard({
               </p>
               <p className="text-xs text-blue-500">Due Soon</p>
             </div>
-            <div className="text-center pl-2">
+            <div className="text-right">
               <p className="text-xs text-gray-600">Current Balance</p>
               <p className="font-bold text-lg text-gray-900">
                 {formatCurrency(Math.abs(card.balanceCurrent))}
               </p>
             </div>
-            {!!(minimumPayment && minimumPayment > 0) && (
-              <div className="text-right">
-                <p className="text-xs text-gray-600">Minimum Payment</p>
-                <p className="font-bold text-lg text-gray-900">
-                  {formatCurrency(minimumPayment)}
-                </p>
-              </div>
-            )}
           </div>
         );
       })() || (
@@ -1096,7 +1083,8 @@ export function DueDateCard({
                 const cycleEnd = new Date(cycle.endDate);
                 const today = new Date();
                 const cycleEnded = cycleEnd < today;
-                const wasStatementPaidOff = cycle.minimumPayment === 0 && cycle.statementBalance && cycle.statementBalance > 0;
+                // Remove flawed minimumPayment logic - payment status should be determined by actual payment detection
+                const wasStatementPaidOff = false;
                 
                 return cycleEnded && wasStatementPaidOff;
               });
@@ -1133,14 +1121,6 @@ export function DueDateCard({
               <p className="text-xs text-green-600 font-medium mt-0.5">Statement paid ✓</p>
             )}
           </div>
-          {!!(card.minimumPaymentAmount && card.minimumPaymentAmount > 0) && (
-            <div className="text-right">
-              <p className="text-xs text-gray-600">Minimum Payment</p>
-              <p className="font-bold text-lg text-gray-900">
-                {formatCurrency(card.minimumPaymentAmount)}
-              </p>
-            </div>
-          )}
         </div>
       )}
 
