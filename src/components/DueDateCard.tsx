@@ -327,8 +327,9 @@ export function DueDateCard({
   const connectionStatus = cardConnectionHealth?.status || 'unknown';
   const apiConnectivity = cardConnectionHealth?.apiConnectivity;
   const statementsInfo = cardConnectionHealth?.statements;
-  // If statements consent is not present, prompt reconnect to attempt enabling it (availability may be unknown)
-  const needsStatementsConsent = !!(statementsInfo && !statementsInfo.consented);
+  // Prefer explicit consent flag; otherwise infer need from missing statement anchor and no manual dates
+  const needsStatementsConsent = (statementsInfo && !statementsInfo.consented) 
+    || (!card.lastStatementIssueDate && !card.manual_dates_configured);
   
   // Use card's own lastSyncAt as primary source, fallback to connection health
   const primarySyncTime = card.plaidItem?.lastSyncAt || cardConnectionHealth?.lastSuccessfulSync;

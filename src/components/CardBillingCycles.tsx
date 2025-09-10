@@ -959,11 +959,15 @@ function CardContent({
 
               {/* Manual cycle date configuration - positioned below header to not interfere with button */}
               {card && (() => {
-                // Only show editor if card needs manual configuration
+                // Show manual configuration when:
+                // - User has already configured manual dates, or
+                // - No reliable historical statement data exists (no closed cycles with statementBalance)
                 const hasPlaidDates = card.lastStatementIssueDate || card.nextPaymentDueDate;
                 const hasManualDates = card.manual_dates_configured;
-                const needsManualConfig = !hasPlaidDates || hasManualDates;
-                
+                const today = new Date();
+                const hasHistoricalStatements = (cardCycles || []).some(c => (c.statementBalance && new Date(c.endDate) < today));
+                const needsManualConfig = hasManualDates || (!hasHistoricalStatements);
+
                 return needsManualConfig ? (
                   <div className="mb-4 -mt-2">
                     <CycleDateEditor
