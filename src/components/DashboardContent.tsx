@@ -1060,11 +1060,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           if (full.ok) {
             const { billingCycles: all } = await full.json();
             if (Array.isArray(all)) {
-              setBillingCycles(prevCycles => {
-                // Merge new data with existing to prevent flickering
-                const merged = [...prevCycles, ...all];
-                return dedupeCycles(merged);
-              });
+              // Replace with fresh data to prevent duplicates 
+              setBillingCycles(dedupeCycles(all));
             }
           }
         } catch (e) {
@@ -1235,11 +1232,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                         if (full.ok) {
                                           const { billingCycles: all } = await full.json();
                                           if (Array.isArray(all)) {
-                                            setBillingCycles(prevCycles => {
-                                              // Merge new data with existing to prevent flickering
-                                              const merged = [...prevCycles, ...all];
-                                              return dedupeCycles(merged);
-                                            });
+                                            // Replace with fresh data to prevent duplicates during background loading
+                                            setBillingCycles(dedupeCycles(all));
                                           }
                                         }
                                       } catch {}
@@ -2229,11 +2223,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
                                         if (full.ok) {
                                           const { billingCycles: all } = await full.json();
                                           if (Array.isArray(all)) {
-                                            setBillingCycles(prevCycles => {
-                                              // Merge new data with existing to prevent flickering
-                                              const merged = [...prevCycles, ...all];
-                                              return dedupeCycles(merged);
-                                            });
+                                            // Replace with fresh data to prevent duplicates during background loading
+                                            setBillingCycles(dedupeCycles(all));
                                           }
                                         }
                                       } catch {}
