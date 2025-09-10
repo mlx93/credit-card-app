@@ -18,6 +18,10 @@ interface ConnectionHealth {
     transactions: boolean;
     liabilities: boolean;
   };
+  statements: {
+    available: boolean; // institution supports statements or optional product
+    consented: boolean; // user granted statements consent on this item
+  };
   recommendedAction: string;
 }
 
@@ -30,6 +34,7 @@ async function testPlaidConnection(accessToken: string, itemId: string): Promise
     transactions: boolean;
     liabilities: boolean;
   };
+  statements: { available: boolean; consented: boolean };
 }> {
   const connectivity = {
     accounts: false,
@@ -40,6 +45,18 @@ async function testPlaidConnection(accessToken: string, itemId: string): Promise
   
   let overallStatus: 'healthy' | 'requires_auth' | 'error' = 'healthy';
   let errorDetails: any = null;
+
+  // Check item metadata for statements availability/consent
+  let statementsAvailable = false;
+  let statementsConsented = false;
+  try {
+    const itemRes = await plaidClient.itemGet({ access_token: accessToken });
+    const item = itemRes.data.item as any;
+    const products: string[] = item?.products || [];
+    const consented: string[] = item?.consented_products || [];
+    statementsAvailable = products.includes('statements') || consented.includes('statements');
+    statementsConsented = consented.includes('statements');
+  } catch {}
 
   // Test accounts endpoint
   try {
@@ -114,7 +131,8 @@ async function testPlaidConnection(accessToken: string, itemId: string): Promise
   return {
     status: overallStatus,
     errorDetails,
-    apiConnectivity: connectivity
+    apiConnectivity: connectivity,
+    statements: { available: statementsAvailable, consented: statementsConsented }
   };
 }
 
@@ -168,6 +186,7 @@ export async function GET(request: NextRequest) {
           lastSuccessfulSync: plaidItem.lastSyncAt,
           errorDetails: healthTest.errorDetails,
           apiConnectivity: healthTest.apiConnectivity,
+          statements: healthTest.statements,
           recommendedAction
         });
 

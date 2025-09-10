@@ -177,11 +177,31 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     // Avoid duplicate fetches
     if (hasLoadedFullCyclesRef.current || fullCyclesTimerRef.current) return;
     
-    // Set loading state immediately when scheduling (don't wait for timeout)
-    const allCardIds = creditCards.map(c => c.id);
-    setHistoryRefreshingIds(allCardIds);
+    // Only set loading state for cards that don't have full history yet
+    // Don't affect cards that are already loaded or being individually synced
+    const cardsNeedingHistory = creditCards.filter(card => {
+      // Check if this card already has enough cycles
+      const cardCycles = billingCycles.filter(c => c.creditCardId === card.id);
+      // If card has more than 2 cycles, it likely has its history
+      return cardCycles.length <= 2;
+    }).map(c => c.id);
+    
+    // Track which cards this background fetch is responsible for
+    const backgroundFetchCardIds = [...cardsNeedingHistory];
+    
+    if (cardsNeedingHistory.length > 0) {
+      setHistoryRefreshingIds(prev => {
+        // Only add new cards that aren't already loading
+        const newIds = cardsNeedingHistory.filter(id => !prev.includes(id));
+        if (newIds.length > 0) {
+          console.log(`📅 Setting Older Cycles loading state for ${newIds.length} cards that need history${logLabel}`);
+          return [...prev, ...newIds];
+        }
+        return prev;
+      });
+    }
+    
     setFullCyclesLoading(true);
-    console.log(`📅 Setting Older Cycles loading state for ${allCardIds.length} cards${logLabel}`);
     
     fullCyclesTimerRef.current = setTimeout(async () => {
       fullCyclesTimerRef.current = null;
@@ -210,8 +230,12 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         console.warn('Background full cycles fetch failed:', e);
       } finally {
         setFullCyclesLoading(false);
-        // Clear all loading states
-        setHistoryRefreshingIds([]);
+        // Only clear loading states for cards that were part of this background fetch
+        // Don't clear states for cards being individually synced
+        setHistoryRefreshingIds(prev => {
+          // Remove only the cards that this background fetch was responsible for
+          return prev.filter(id => !backgroundFetchCardIds.includes(id));
+        });
       }
     }, 2500); // defer a few seconds post-paint
   }
@@ -1020,6 +1044,27 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       
       console.log('Fetching user data after sync...');
       await fetchAllUserData(' (refresh all)');
+
+      // Background: trigger statements-driven regeneration, then load full cycles
+      (async () => {
+        try {
+          await fetch('/api/user/billing-cycles/regenerate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          // After regeneration completes server-side, fetch full history
+          const full = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
+          if (full.ok) {
+            const { billingCycles: all } = await full.json();
+            if (Array.isArray(all)) {
+              setBillingCycles(dedupeCycles(all));
+            }
+          }
+        } catch (e) {
+          console.warn('Background regeneration fetch failed:', e);
+        }
+      })();
       
       setRefreshStep('Complete!');
       setRefreshProgress(100);
