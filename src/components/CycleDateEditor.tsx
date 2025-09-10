@@ -144,7 +144,7 @@ export default function CycleDateEditor({
           </button>
         ) : (
           <>
-            <div className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+            <div className="text-xs text-gray-600 dark:text-gray-400">
               {(() => {
                 // Format statement close display based on date type
                 const closeDisplay = currentCycleDateType === 'days_before_end' && currentCycleDaysBeforeEnd
@@ -155,6 +155,18 @@ export default function CycleDateEditor({
                 const dueDisplay = currentDueDateType === 'days_before_end' && currentDueDaysBeforeEnd
                   ? `${currentDueDaysBeforeEnd} days before month end`
                   : `Day ${currentDueDay}`;
+                
+                // Check if text is too long and needs wrapping
+                const needsWrap = (closeDisplay.length + dueDisplay.length) > 30;
+                
+                if (needsWrap) {
+                  return (
+                    <>
+                      <div>Close: {closeDisplay}</div>
+                      <div>Due: {dueDisplay}</div>
+                    </>
+                  );
+                }
                 
                 return `Close: ${closeDisplay} • Due: ${dueDisplay}`;
               })()}

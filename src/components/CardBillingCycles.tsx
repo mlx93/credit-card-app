@@ -4,6 +4,33 @@ import { normalizeCardDisplayName } from '@/utils/cardName';
 import { Calendar, CreditCard, ChevronDown, ChevronRight, History } from 'lucide-react';
 import CycleDateEditor from './CycleDateEditor';
 
+// Helper function to format date ranges smartly
+function formatDateRange(startDate: Date | string, endDate: Date | string): string {
+  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
+  const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+  
+  const startYear = start.getUTCFullYear();
+  const endYear = end.getUTCFullYear();
+  
+  // Format start date without year if same year as end date
+  const startFormatted = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(startYear !== endYear ? { year: 'numeric' } : {}),
+    timeZone: 'UTC'
+  }).format(start);
+  
+  // Always include year in end date
+  const endFormatted = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(end);
+  
+  return `${startFormatted} - ${endFormatted}`;
+}
+
 interface BillingCycle {
   id: string;
   creditCardName: string;
@@ -274,11 +301,11 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
       <div className="p-3 rounded-lg bg-white/60 backdrop-blur-sm border border-white/40 mb-2">
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-700 truncate">
-              {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
+            <p className="text-xs font-medium text-gray-700">
+              {formatDateRange(cycle.startDate, cycle.endDate)}
             </p>
             <p className="text-xs text-gray-500">
-              {cycle.transactioncount} transactions • {formatCurrency(cycle.totalSpend)}
+              {cycle.transactioncount} transactions
             </p>
           </div>
           <div className="text-right ml-2">
@@ -335,7 +362,7 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
           <div className="flex items-center gap-2 mb-1">
             {isHistorical && <History className="h-3.5 w-3.5 text-gray-400" />}
             <p className="text-sm font-medium text-gray-700">
-              {formatDate(cycle.startDate)} - {formatDate(cycle.endDate)}
+              {formatDateRange(cycle.startDate, cycle.endDate)}
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
