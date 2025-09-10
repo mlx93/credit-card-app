@@ -92,7 +92,7 @@ class PlaidServiceImpl implements PlaidService {
       console.log('🔒 Applying account filters for investment platforms - credit accounts only');
       (request as any).account_filters = {
         credit: {
-          account_subtypes: ['credit card', 'paypal', 'reward', 'premier_reward']
+          account_subtypes: ['credit card', 'paypal']
         }
       };
     }
