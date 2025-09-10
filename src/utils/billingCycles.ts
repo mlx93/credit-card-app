@@ -867,15 +867,40 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
       return null;
     }
 
-    // Check if this is a Robinhood card without manual configuration
-    // Don't generate estimated cycles for Robinhood cards that haven't been configured
-    const isRobinhoodCard = creditCard.plaidItemId && (
-      await supabaseAdmin.from('plaid_items').select('institutionId, institutionName').eq('id', creditCard.plaidItemId).single()
-    ).data?.institutionId === 'ins_54';
+    // Check if this is a Robinhood card without proper data sources
+    // Only skip cycle generation if we have NEITHER liabilities data NOR manual configuration
+    let isRobinhoodCard = false;
+    
+    if (creditCard.plaidItemId) {
+      try {
+        const { data: plaidItem, error: plaidItemError } = await supabaseAdmin
+          .from('plaid_items')
+          .select('institutionId, institutionName')
+          .eq('id', creditCard.plaidItemId)
+          .single();
+        
+        if (plaidItemError) {
+          console.warn(`⚠️  Orphaned Plaid item reference detected for card ${creditCard.name}: ${creditCard.plaidItemId}`, plaidItemError);
+          // Continue processing but treat as non-Robinhood card
+        } else {
+          isRobinhoodCard = plaidItem?.institutionId === 'ins_54';
+        }
+      } catch (error) {
+        console.error('Error checking Plaid item for Robinhood detection:', error);
+        // Continue processing but treat as non-Robinhood card
+      }
+    }
     
     if (isRobinhoodCard && !creditCard.manual_dates_configured && !creditCard.lastStatementIssueDate) {
-      console.log('🔒 Skipping cycle calculation for unconfigured Robinhood card');
+      console.log('🔒 Skipping cycle calculation for Robinhood card - no reliable data source (needs manual config or liabilities data)');
       return null;
+    }
+    
+    if (isRobinhoodCard) {
+      console.log('✅ Robinhood card has reliable data source:', {
+        hasManualConfig: !!creditCard.manual_dates_configured,
+        hasLiabilitiesData: !!creditCard.lastStatementIssueDate
+      });
     }
 
     // Get only recent transactions (last 60 days) for current cycle
@@ -1047,15 +1072,40 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
       return null;
     }
 
-    // Check if this is a Robinhood card without manual configuration
-    // Don't generate estimated cycles for Robinhood cards that haven't been configured
-    const isRobinhoodCard = creditCard.plaidItemId && (
-      await supabaseAdmin.from('plaid_items').select('institutionId, institutionName').eq('id', creditCard.plaidItemId).single()
-    ).data?.institutionId === 'ins_54';
+    // Check if this is a Robinhood card without proper data sources
+    // Only skip cycle generation if we have NEITHER liabilities data NOR manual configuration
+    let isRobinhoodCard = false;
+    
+    if (creditCard.plaidItemId) {
+      try {
+        const { data: plaidItem, error: plaidItemError } = await supabaseAdmin
+          .from('plaid_items')
+          .select('institutionId, institutionName')
+          .eq('id', creditCard.plaidItemId)
+          .single();
+        
+        if (plaidItemError) {
+          console.warn(`⚠️  Orphaned Plaid item reference detected for card ${creditCard.name}: ${creditCard.plaidItemId}`, plaidItemError);
+          // Continue processing but treat as non-Robinhood card
+        } else {
+          isRobinhoodCard = plaidItem?.institutionId === 'ins_54';
+        }
+      } catch (error) {
+        console.error('Error checking Plaid item for Robinhood detection:', error);
+        // Continue processing but treat as non-Robinhood card
+      }
+    }
     
     if (isRobinhoodCard && !creditCard.manual_dates_configured && !creditCard.lastStatementIssueDate) {
-      console.log('🔒 Skipping recent closed cycle calculation for unconfigured Robinhood card');
+      console.log('🔒 Skipping recent closed cycle calculation for Robinhood card - no reliable data source (needs manual config or liabilities data)');
       return null;
+    }
+    
+    if (isRobinhoodCard) {
+      console.log('✅ Robinhood recent closed cycle has reliable data source:', {
+        hasManualConfig: !!creditCard.manual_dates_configured,
+        hasLiabilitiesData: !!creditCard.lastStatementIssueDate
+      });
     }
 
     // Get recent transactions (last 90 days) to capture the closed cycle
