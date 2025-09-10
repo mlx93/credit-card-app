@@ -85,7 +85,7 @@ export function InstitutionSelectModal({ isOpen, onClose, onSelectType }: Instit
                     Credit Cards from Investment Platforms
                   </h3>
                   <p className="text-xs text-gray-600 mb-2">
-                    For specialized platforms like Robinhood Gold Card that require manual setup
+                    Only use this if your card is from Robinhood or similar investment platforms. Most credit cards should use the main option above.
                   </p>
                   <div className="flex flex-wrap gap-1">
                     <span className="text-xs px-2 py-0.5 bg-white/70 rounded text-gray-700">Robinhood</span>
