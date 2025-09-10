@@ -13,21 +13,46 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { cycleDay, dueDay } = await request.json();
+    const { 
+      cycleDay, 
+      dueDay,
+      cycleDateType = 'same_day',
+      cycleDaysBeforeEnd,
+      dueDateType = 'same_day', 
+      dueDaysBeforeEnd
+    } = await request.json();
 
-    // Validate input
-    if (!cycleDay || !dueDay) {
-      return NextResponse.json(
-        { error: 'Both cycle day and due day are required' },
-        { status: 400 }
-      );
+    // Validate input based on date type
+    if (cycleDateType === 'same_day') {
+      if (!cycleDay || cycleDay < 1 || cycleDay > 31) {
+        return NextResponse.json(
+          { error: 'Cycle day must be between 1 and 31' },
+          { status: 400 }
+        );
+      }
+    } else if (cycleDateType === 'days_before_end') {
+      if (cycleDaysBeforeEnd === undefined || cycleDaysBeforeEnd < 0 || cycleDaysBeforeEnd > 15) {
+        return NextResponse.json(
+          { error: 'Cycle days before end must be between 0 and 15' },
+          { status: 400 }
+        );
+      }
     }
 
-    if (cycleDay < 1 || cycleDay > 31 || dueDay < 1 || dueDay > 31) {
-      return NextResponse.json(
-        { error: 'Days must be between 1 and 31' },
-        { status: 400 }
-      );
+    if (dueDateType === 'same_day') {
+      if (!dueDay || dueDay < 1 || dueDay > 31) {
+        return NextResponse.json(
+          { error: 'Due day must be between 1 and 31' },
+          { status: 400 }
+        );
+      }
+    } else if (dueDateType === 'days_before_end') {
+      if (dueDaysBeforeEnd === undefined || dueDaysBeforeEnd < 0 || dueDaysBeforeEnd > 15) {
+        return NextResponse.json(
+          { error: 'Due days before end must be between 0 and 15' },
+          { status: 400 }
+        );
+      }
     }
 
     // Verify the card belongs to the user
@@ -52,42 +77,99 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Calculate the next statement and due dates based on the manual days
+    // Helper function to calculate date based on type
+    const calculateDate = (
+      year: number, 
+      month: number, 
+      dateType: 'same_day' | 'days_before_end', 
+      dayOfMonth?: number, 
+      daysBeforeEnd?: number
+    ): Date => {
+      if (dateType === 'same_day' && dayOfMonth) {
+        return new Date(year, month, dayOfMonth);
+      } else if (dateType === 'days_before_end' && daysBeforeEnd !== undefined) {
+        // Get last day of the month
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const calculatedDay = lastDay - daysBeforeEnd;
+        return new Date(year, month, Math.max(1, calculatedDay));
+      }
+      throw new Error('Invalid date calculation parameters');
+    };
+
+    // Calculate the next statement and due dates based on the manual configuration
     const today = new Date();
-    const currentDay = today.getDate();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
     // Calculate last statement date
-    let lastStatementDate = new Date(currentYear, currentMonth, cycleDay);
-    if (cycleDay > currentDay) {
+    let lastStatementDate = calculateDate(currentYear, currentMonth, cycleDateType, cycleDay, cycleDaysBeforeEnd);
+    if (lastStatementDate > today) {
       // Statement day hasn't occurred this month, use last month
-      lastStatementDate.setMonth(lastStatementDate.getMonth() - 1);
+      lastStatementDate = calculateDate(currentYear, currentMonth - 1, cycleDateType, cycleDay, cycleDaysBeforeEnd);
     }
 
-    // Calculate next due date
-    let nextDueDate = new Date(lastStatementDate);
-    if (dueDay > cycleDay) {
-      // Due date is in the same month as statement
-      nextDueDate.setDate(dueDay);
-    } else {
-      // Due date is in the following month
-      nextDueDate.setMonth(nextDueDate.getMonth() + 1);
-      nextDueDate.setDate(dueDay);
+    // Calculate next due date (typically 25 days after statement, but use user's preference)
+    let nextDueDate: Date;
+    
+    // Start with the same month as statement
+    try {
+      nextDueDate = calculateDate(
+        lastStatementDate.getFullYear(), 
+        lastStatementDate.getMonth(), 
+        dueDateType, 
+        dueDay, 
+        dueDaysBeforeEnd
+      );
+      
+      // If due date is before or same as statement date, move to next month
+      if (nextDueDate <= lastStatementDate) {
+        nextDueDate = calculateDate(
+          lastStatementDate.getFullYear(), 
+          lastStatementDate.getMonth() + 1, 
+          dueDateType, 
+          dueDay, 
+          dueDaysBeforeEnd
+        );
+      }
+    } catch (error) {
+      // Fallback: due date in next month
+      nextDueDate = calculateDate(
+        lastStatementDate.getFullYear(), 
+        lastStatementDate.getMonth() + 1, 
+        dueDateType, 
+        dueDay, 
+        dueDaysBeforeEnd
+      );
     }
 
     // If the due date has already passed, move to next cycle
     if (nextDueDate < today) {
-      lastStatementDate.setMonth(lastStatementDate.getMonth() + 1);
-      nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+      lastStatementDate = calculateDate(
+        lastStatementDate.getFullYear(), 
+        lastStatementDate.getMonth() + 1, 
+        cycleDateType, 
+        cycleDay, 
+        cycleDaysBeforeEnd
+      );
+      nextDueDate = calculateDate(
+        nextDueDate.getFullYear(), 
+        nextDueDate.getMonth() + 1, 
+        dueDateType, 
+        dueDay, 
+        dueDaysBeforeEnd
+      );
     }
 
     // Update the credit card with manual dates
     const { data: updatedCard, error: updateError } = await supabaseAdmin
       .from('credit_cards')
       .update({
-        manual_cycle_day: cycleDay,
-        manual_due_day: dueDay,
+        manual_cycle_day: cycleDateType === 'same_day' ? cycleDay : null,
+        manual_due_day: dueDateType === 'same_day' ? dueDay : null,
+        cycle_date_type: cycleDateType,
+        cycle_days_before_end: cycleDateType === 'days_before_end' ? cycleDaysBeforeEnd : null,
+        due_date_type: dueDateType,
+        due_days_before_end: dueDateType === 'days_before_end' ? dueDaysBeforeEnd : null,
         manual_dates_configured: true,
         lastStatementIssueDate: lastStatementDate.toISOString(),
         nextPaymentDueDate: nextDueDate.toISOString(),

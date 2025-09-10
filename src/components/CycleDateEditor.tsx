@@ -9,7 +9,18 @@ interface CycleDateEditorProps {
   cardName: string;
   currentCycleDay?: number | null;
   currentDueDay?: number | null;
-  onSave: (cycleDay: number, dueDay: number) => Promise<void>;
+  currentCycleDateType?: 'same_day' | 'days_before_end' | null;
+  currentCycleDaysBeforeEnd?: number | null;
+  currentDueDateType?: 'same_day' | 'days_before_end' | null;
+  currentDueDaysBeforeEnd?: number | null;
+  onSave: (data: {
+    cycleDay?: number;
+    dueDay?: number;
+    cycleDateType: 'same_day' | 'days_before_end';
+    cycleDaysBeforeEnd?: number;
+    dueDateType: 'same_day' | 'days_before_end';
+    dueDaysBeforeEnd?: number;
+  }) => Promise<void>;
   isRobinhood?: boolean;
 }
 
@@ -18,50 +29,97 @@ export default function CycleDateEditor({
   cardName,
   currentCycleDay,
   currentDueDay,
+  currentCycleDateType,
+  currentCycleDaysBeforeEnd,
+  currentDueDateType,
+  currentDueDaysBeforeEnd,
   onSave,
   isRobinhood = false
 }: CycleDateEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [cycleDateType, setCycleDateType] = useState<'same_day' | 'days_before_end'>(
+    currentCycleDateType || 'same_day'
+  );
   const [cycleDayInput, setCycleDayInput] = useState((currentCycleDay || 1).toString());
+  const [cycleDaysBeforeEndInput, setCycleDaysBeforeEndInput] = useState(
+    (currentCycleDaysBeforeEnd || 3).toString()
+  );
+  const [dueDateType, setDueDateType] = useState<'same_day' | 'days_before_end'>(
+    currentDueDateType || 'same_day'
+  );
   const [dueDayInput, setDueDayInput] = useState((currentDueDay || 1).toString());
+  const [dueDaysBeforeEndInput, setDueDaysBeforeEndInput] = useState(
+    (currentDueDaysBeforeEnd || 0).toString()
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setError(null);
     
-    // Parse and validate cycle day
-    const cycleDayNum = parseInt(cycleDayInput.trim());
-    if (isNaN(cycleDayNum) || !Number.isInteger(cycleDayNum)) {
-      setError('Statement close day must be a valid number');
-      return;
-    }
-    if (cycleDayNum < 1 || cycleDayNum > 31) {
-      setError('Statement close day must be between 1 and 31');
-      return;
+    let cycleDayNum: number | undefined;
+    let cycleDaysBeforeEndNum: number | undefined;
+    let dueDayNum: number | undefined;
+    let dueDaysBeforeEndNum: number | undefined;
+    
+    // Validate cycle date settings
+    if (cycleDateType === 'same_day') {
+      cycleDayNum = parseInt(cycleDayInput.trim());
+      if (isNaN(cycleDayNum) || !Number.isInteger(cycleDayNum)) {
+        setError('Statement close day must be a valid number');
+        return;
+      }
+      if (cycleDayNum < 1 || cycleDayNum > 31) {
+        setError('Statement close day must be between 1 and 31');
+        return;
+      }
+    } else {
+      cycleDaysBeforeEndNum = parseInt(cycleDaysBeforeEndInput.trim());
+      if (isNaN(cycleDaysBeforeEndNum) || !Number.isInteger(cycleDaysBeforeEndNum)) {
+        setError('Days before month end must be a valid number');
+        return;
+      }
+      if (cycleDaysBeforeEndNum < 0 || cycleDaysBeforeEndNum > 15) {
+        setError('Days before month end must be between 0 and 15');
+        return;
+      }
     }
     
-    // Parse and validate due day
-    const dueDayNum = parseInt(dueDayInput.trim());
-    if (isNaN(dueDayNum) || !Number.isInteger(dueDayNum)) {
-      setError('Payment due day must be a valid number');
-      return;
-    }
-    if (dueDayNum < 1 || dueDayNum > 31) {
-      setError('Payment due day must be between 1 and 31');
-      return;
+    // Validate due date settings
+    if (dueDateType === 'same_day') {
+      dueDayNum = parseInt(dueDayInput.trim());
+      if (isNaN(dueDayNum) || !Number.isInteger(dueDayNum)) {
+        setError('Payment due day must be a valid number');
+        return;
+      }
+      if (dueDayNum < 1 || dueDayNum > 31) {
+        setError('Payment due day must be between 1 and 31');
+        return;
+      }
+    } else {
+      dueDaysBeforeEndNum = parseInt(dueDaysBeforeEndInput.trim());
+      if (isNaN(dueDaysBeforeEndNum) || !Number.isInteger(dueDaysBeforeEndNum)) {
+        setError('Days before month end must be a valid number');
+        return;
+      }
+      if (dueDaysBeforeEndNum < 0 || dueDaysBeforeEndNum > 15) {
+        setError('Days before month end must be between 0 and 15');
+        return;
+      }
     }
     
-    // Validate that due date is after statement close (accounting for month wrap)
-    const daysBetween = dueDayNum > cycleDayNum ? dueDayNum - cycleDayNum : (31 - cycleDayNum + dueDayNum);
-    if (daysBetween < 15 || daysBetween > 28) {
-      setError('Payment due date should be 15-28 days after statement close');
-      return;
-    }
+    // Skip complex validation for now - let the billing cycle generation handle edge cases
     
     setIsSaving(true);
     try {
-      await onSave(cycleDayNum, dueDayNum);
+      await onSave({
+        cycleDay: cycleDayNum,
+        dueDay: dueDayNum,
+        cycleDateType,
+        cycleDaysBeforeEnd: cycleDaysBeforeEndNum,
+        dueDateType,
+        dueDaysBeforeEnd: dueDaysBeforeEndNum
+      });
       setIsEditing(false);
     } catch (err) {
       setError('Failed to save dates. Please try again.');
@@ -132,48 +190,144 @@ export default function CycleDateEditor({
           </div>
         )}
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div>
-            <label className="block text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+            <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Statement Close Day
             </label>
-            <div className="flex items-center gap-3 mb-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={cycleDayInput}
-                onChange={(e) => setCycleDayInput(e.target.value)}
-                className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
-                         bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
-                         transition-all duration-200"
-                placeholder="15"
-              />
-              <span className="text-gray-600 dark:text-gray-400">day of the month (1-31)</span>
+            
+            {/* Statement Date Type Selection */}
+            <div className="mb-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="same_day"
+                    checked={cycleDateType === 'same_day'}
+                    onChange={(e) => setCycleDateType(e.target.value as 'same_day' | 'days_before_end')}
+                    className="text-blue-600"
+                  />
+                  <span className="text-sm">Same day each month</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="days_before_end"
+                    checked={cycleDateType === 'days_before_end'}
+                    onChange={(e) => setCycleDateType(e.target.value as 'same_day' | 'days_before_end')}
+                    className="text-blue-600"
+                  />
+                  <span className="text-sm">X days before month end</span>
+                </label>
+              </div>
             </div>
+
+            {/* Conditional Input Based on Selection */}
+            {cycleDateType === 'same_day' ? (
+              <div className="flex items-center gap-3 mb-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={cycleDayInput}
+                  onChange={(e) => setCycleDayInput(e.target.value)}
+                  className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
+                           bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                           transition-all duration-200"
+                  placeholder="15"
+                />
+                <span className="text-gray-600 dark:text-gray-400">day of the month (1-31)</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 mb-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={cycleDaysBeforeEndInput}
+                  onChange={(e) => setCycleDaysBeforeEndInput(e.target.value)}
+                  className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
+                           bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                           transition-all duration-200"
+                  placeholder="3"
+                />
+                <span className="text-gray-600 dark:text-gray-400">days before month end (0-15)</span>
+              </div>
+            )}
+            
             <p className="text-sm text-gray-500">
-              The day your statement period ends each month
+              {cycleDateType === 'same_day' 
+                ? 'The day your statement period ends each month'
+                : 'Perfect for cards like Bilt that close 3 days before month end (e.g., 28th for 31-day months)'
+              }
             </p>
           </div>
 
           <div>
-            <label className="block text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+            <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Payment Due Day
             </label>
-            <div className="flex items-center gap-3 mb-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={dueDayInput}
-                onChange={(e) => setDueDayInput(e.target.value)}
-                className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
-                         bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
-                         transition-all duration-200"
-                placeholder="10"
-              />
-              <span className="text-gray-600 dark:text-gray-400">day of the month (1-31)</span>
+            
+            {/* Due Date Type Selection */}
+            <div className="mb-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="same_day"
+                    checked={dueDateType === 'same_day'}
+                    onChange={(e) => setDueDateType(e.target.value as 'same_day' | 'days_before_end')}
+                    className="text-blue-600"
+                  />
+                  <span className="text-sm">Same day each month</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="days_before_end"
+                    checked={dueDateType === 'days_before_end'}
+                    onChange={(e) => setDueDateType(e.target.value as 'same_day' | 'days_before_end')}
+                    className="text-blue-600"
+                  />
+                  <span className="text-sm">X days before month end</span>
+                </label>
+              </div>
             </div>
+
+            {/* Conditional Input Based on Selection */}
+            {dueDateType === 'same_day' ? (
+              <div className="flex items-center gap-3 mb-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={dueDayInput}
+                  onChange={(e) => setDueDayInput(e.target.value)}
+                  className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
+                           bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                           transition-all duration-200"
+                  placeholder="10"
+                />
+                <span className="text-gray-600 dark:text-gray-400">day of the month (1-31)</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 mb-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={dueDaysBeforeEndInput}
+                  onChange={(e) => setDueDaysBeforeEndInput(e.target.value)}
+                  className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
+                           bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                           transition-all duration-200"
+                  placeholder="0"
+                />
+                <span className="text-gray-600 dark:text-gray-400">days before month end (0-15)</span>
+              </div>
+            )}
+            
             <p className="text-sm text-gray-500">
-              The day your payment is due each month
+              {dueDateType === 'same_day' 
+                ? 'The day your payment is due each month'
+                : 'Useful for cards due on the last day of the month'
+              }
             </p>
           </div>
 

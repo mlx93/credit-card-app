@@ -49,6 +49,10 @@ interface CreditCardInfo {
   manual_cycle_day?: number | null;
   manual_due_day?: number | null;
   manual_dates_configured?: boolean;
+  cycle_date_type?: 'same_day' | 'days_before_end' | null;
+  cycle_days_before_end?: number | null;
+  due_date_type?: 'same_day' | 'days_before_end' | null;
+  due_days_before_end?: number | null;
   plaidItem?: {
     institutionName?: string;
     institutionId?: string;
@@ -975,15 +979,19 @@ function CardContent({
                       cardName={normalizeCardDisplayName(card?.name ?? cardName, card?.mask)}
                       currentCycleDay={card.manual_cycle_day}
                       currentDueDay={card.manual_due_day}
+                      currentCycleDateType={card.cycle_date_type}
+                      currentCycleDaysBeforeEnd={card.cycle_days_before_end}
+                      currentDueDateType={card.due_date_type}
+                      currentDueDaysBeforeEnd={card.due_days_before_end}
                       isRobinhood={card.plaidItem?.institutionId === 'ins_54'}
-                      onSave={async (cycleDay: number, dueDay: number) => {
+                      onSave={async (data) => {
                         try {
                           const response = await fetch(`/api/credit-cards/${card.id}/cycle-dates`, {
                             method: 'PATCH',
                             headers: {
                               'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({ cycleDay, dueDay }),
+                            body: JSON.stringify(data),
                           });
                           
                           if (!response.ok) {
