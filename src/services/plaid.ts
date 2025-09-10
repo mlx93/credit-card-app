@@ -88,9 +88,7 @@ class PlaidServiceImpl implements PlaidService {
     // For investment platforms, filter to only show institutions without liabilities product
     if (isInvestmentInstitution) {
       console.log('🔒 Applying institution filters for investment platforms (institutions without liabilities support)');
-      (request as any).institution_filters = {
-        institution_ids: investmentInstitutions
-      };
+      (request as any).institution_ids = investmentInstitutions;
     }
     
     // Add statements as an optional product with required configuration
