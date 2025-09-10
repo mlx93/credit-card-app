@@ -25,12 +25,13 @@ export interface StatementPeriod {
 }
 
 /**
- * Fetches statement metadata for credit card accounts
+ * Fetches statement metadata for credit card accounts with database caching
  * This is the primary method for getting accurate billing dates from Robinhood
  */
 export async function getStatementDates(
   accessToken: string,
-  accountId: string
+  accountId: string,
+  plaidItemId?: string
 ): Promise<StatementDates | null> {
   try {
     console.log('📄 Fetching statement metadata from Plaid Statements API...');
@@ -48,15 +49,75 @@ export async function getStatementDates(
       return null;
     }
     
-    // Fetch statement list
-    const request: StatementsListRequest = {
-      access_token: accessToken,
-      // Note: start_date and end_date are not valid fields for statementsList
-      // The API returns all available statements and we filter on the client side
-    };
+    // Get plaid item data from database
+    let plaidItem: any = null;
     
-    const response = await plaidClient.statementsList(request);
-    const statements = response.data.statements;
+    if (plaidItemId) {
+      // Use provided plaid item ID (more efficient)
+      const { data } = await supabaseAdmin
+        .from('plaid_items')
+        .select('id, statements_data, statements_data_updated')
+        .eq('id', plaidItemId)
+        .single();
+      plaidItem = data;
+    } else {
+      // Fallback: find by matching decrypted access token
+      const { data: allPlaidItems } = await supabaseAdmin
+        .from('plaid_items')
+        .select('id, access_token, statements_data, statements_data_updated');
+      
+      if (allPlaidItems) {
+        const { decrypt } = await import('@/lib/encryption');
+        for (const item of allPlaidItems) {
+          try {
+            const decryptedToken = decrypt(item.access_token);
+            if (decryptedToken === accessToken) {
+              plaidItem = item;
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+    }
+    
+    if (!plaidItem) {
+      console.error('Could not find plaid item for access token');
+      return null;
+    }
+    
+    let statements: Statement[];
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    // Check if we have cached statements data that's less than 24 hours old
+    if (plaidItem.statements_data && plaidItem.statements_data_updated && 
+        new Date(plaidItem.statements_data_updated) > twentyFourHoursAgo) {
+      console.log('📋 Using cached statements data from database');
+      statements = plaidItem.statements_data as Statement[];
+    } else {
+      // Fetch fresh statement list from API
+      console.log('🔄 Fetching fresh statements list from Plaid API and caching to database');
+      const request: StatementsListRequest = {
+        access_token: accessToken,
+        // Note: start_date and end_date are not valid fields for statementsList
+        // The API returns all available statements and we filter on the client side
+      };
+      
+      const response = await plaidClient.statementsList(request);
+      statements = response.data.statements;
+      
+      // Cache the result in database
+      await supabaseAdmin
+        .from('plaid_items')
+        .update({
+          statements_data: statements,
+          statements_data_updated: new Date().toISOString()
+        })
+        .eq('id', plaidItem.id);
+      
+      console.log(`📄 Cached ${statements.length} statements to database`);
+    }
     
     console.log(`Found ${statements.length} statements`);
     

@@ -867,6 +867,17 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
       return null;
     }
 
+    // Check if this is a Robinhood card without manual configuration
+    // Don't generate estimated cycles for Robinhood cards that haven't been configured
+    const isRobinhoodCard = creditCard.plaidItemId && (
+      await supabaseAdmin.from('plaid_items').select('institutionId, institutionName').eq('id', creditCard.plaidItemId).single()
+    ).data?.institutionId === 'ins_54';
+    
+    if (isRobinhoodCard && !creditCard.manual_dates_configured && !creditCard.lastStatementIssueDate) {
+      console.log('🔒 Skipping cycle calculation for unconfigured Robinhood card');
+      return null;
+    }
+
     // Get only recent transactions (last 60 days) for current cycle
     const sixtyDaysAgo = new Date();
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
@@ -1033,6 +1044,17 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
 
     if (cardError || !creditCard) {
       console.warn('Credit card not found for recent closed cycle calculation');
+      return null;
+    }
+
+    // Check if this is a Robinhood card without manual configuration
+    // Don't generate estimated cycles for Robinhood cards that haven't been configured
+    const isRobinhoodCard = creditCard.plaidItemId && (
+      await supabaseAdmin.from('plaid_items').select('institutionId, institutionName').eq('id', creditCard.plaidItemId).single()
+    ).data?.institutionId === 'ins_54';
+    
+    if (isRobinhoodCard && !creditCard.manual_dates_configured && !creditCard.lastStatementIssueDate) {
+      console.log('🔒 Skipping recent closed cycle calculation for unconfigured Robinhood card');
       return null;
     }
 

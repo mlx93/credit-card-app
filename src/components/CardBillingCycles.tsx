@@ -537,8 +537,9 @@ export function CardBillingCycles({ cycles, cards, cardOrder, compactMode = fals
 
   const getCardColorIndex = (cardName: string, cardId?: string) => {
     // Simple index-based assignment to guarantee different colors
-    const cardNames = Object.keys(cyclesByCard).sort(); // Sort for consistency
-    const cardIndex = cardNames.indexOf(cardName);
+    // Use all card names (including those without cycles) for consistent coloring
+    const allCardNames = cards ? [...new Set([...Object.keys(cyclesByCard), ...cards.map(c => c.name)])].sort() : Object.keys(cyclesByCard).sort();
+    const cardIndex = allCardNames.indexOf(cardName);
     const colorIndex = cardIndex >= 0 ? cardIndex % cardColors.length : 0;
     return colorIndex;
   };
@@ -554,7 +555,10 @@ export function CardBillingCycles({ cycles, cards, cardOrder, compactMode = fals
 
   // Get card names in order from parent, or fallback to alphabetical
   const getOrderedCardNames = () => {
-    const allCardNames = Object.keys(cyclesByCard);
+    // Include ALL cards (both those with cycles and those without)
+    // This ensures Robinhood cards without manual configuration still appear
+    const cardsWithCycles = Object.keys(cyclesByCard);
+    const allCardNames = cards ? [...new Set([...cardsWithCycles, ...cards.map(c => c.name)])] : cardsWithCycles;
     
     if (cardOrder && cardOrder.length > 0) {
       // Convert card IDs to names if necessary
@@ -635,9 +639,10 @@ function CardContent({
   olderLoading?: boolean;
 }) {
   // Sort cycles by end date (newest first) to properly identify recent cycles
-  let sortedCycles = [...cardCycles].sort((a, b) => 
+  // Handle case where card has no cycles (e.g., Robinhood without manual configuration)
+  let sortedCycles = cardCycles ? [...cardCycles].sort((a, b) => 
     new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
-  );
+  ) : [];
   
   const today = new Date();
   
@@ -929,6 +934,17 @@ function CardContent({
               })()}
 
               <div className="space-y-3">
+                {/* Show message when no cycles are available (e.g., Robinhood without manual config) */}
+                {allRecentCycles.length === 0 && historical.length === 0 && (
+                  <div className="text-center py-6">
+                    <div className="w-12 h-12 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full mx-auto mb-3 opacity-60 flex items-center justify-center">
+                      <Calendar className="w-6 h-6 text-white" />
+                    </div>
+                    <p className="text-gray-600 text-sm font-medium mb-2">No billing cycles available</p>
+                    <p className="text-gray-500 text-xs">Configure billing dates above to generate cycles</p>
+                  </div>
+                )}
+                
                 {/* Show recent current cycle first */}
                 {recentCurrentCycle.map(cycle => (
                   <BillingCycleItem 

@@ -577,7 +577,7 @@ class PlaidServiceImpl implements PlaidService {
           try {
             // Method 1: Try Statements API first (most accurate)
             const { getStatementDates } = await import('@/services/plaidStatements');
-            const statementDates = await getStatementDates(accessToken, account.account_id);
+            const statementDates = await getStatementDates(accessToken, account.account_id, plaidItem.id);
             
             if (statementDates && statementDates.confidence >= 0.9) {
               console.log(`✅ Robinhood statement dates extracted from Statements API (${(statementDates.confidence * 100).toFixed(0)}% confidence)`);
@@ -1658,6 +1658,9 @@ class PlaidServiceImpl implements PlaidService {
       
       if (existingTransError) {
         console.error('Error fetching existing transactions:', existingTransError);
+        // For Robinhood or other investment platforms, don't fail the entire sync due to transaction fetch errors
+        // Continue with empty existing transactions map to allow card creation/update to proceed
+        console.warn('⚠️  Continuing sync with empty existing transactions map due to fetch error');
       }
       
       // Create a map for quick lookup
