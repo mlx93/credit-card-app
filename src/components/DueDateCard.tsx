@@ -893,8 +893,8 @@ export function DueDateCard({
           }))
         });
         
-        // Don't show statement section if there's no statement balance or it's been paid
-        if (!statementBalance || minimumPayment <= 0) {
+        // Don't show statement section if there's no statement balance
+        if (!statementBalance || statementBalance <= 0) {
           return null; // Return null instead of false
         }
         
