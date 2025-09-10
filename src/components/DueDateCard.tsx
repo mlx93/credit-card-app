@@ -412,8 +412,80 @@ export function DueDateCard({
     // If current balance is 0, definitely paid off
     if (currentBalance === 0) return true;
     
-    // Check if we have any recent unpaid cycles from billing data
     const today = new Date();
+    
+    // CRITICAL: Check if current balance matches open cycle spending
+    // If so, all previous statements are paid and current balance is just new spending
+    const openCycle = (card.recentCycles || []).find(cycle => {
+      const cycleEnd = new Date(cycle.endDate);
+      return cycleEnd >= today; // Open/current cycle
+    });
+    
+    if (openCycle && openCycle.totalSpend && 
+        Math.abs(currentBalance - Math.abs(openCycle.totalSpend)) <= 5) {
+      // Current balance matches open cycle spending = all statements paid
+      return true;
+    }
+    
+    // CRITICAL: Check for payment transactions that match statement balances
+    // Look for payments in the past 30 days that occurred after a cycle end date
+    if (card.recentTransactions) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      // Get closed cycles (statements that could have been paid)
+      const closedCycles = (card.recentCycles || [])
+        .filter(cycle => new Date(cycle.endDate) < today)
+        .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+      
+      // Look for payment transactions
+      const recentPayments = card.recentTransactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate >= thirtyDaysAgo && isPaymentTransaction(t.name);
+      });
+      
+      // Check if any payment matches a statement balance from a closed cycle
+      for (const cycle of closedCycles) {
+        const cycleEnd = new Date(cycle.endDate);
+        const statementAmount = Math.abs(cycle.statementBalance || cycle.totalSpend || 0);
+        
+        if (statementAmount <= 0) continue; // Skip cycles with no balance
+        
+        // Find payment that matches this statement amount and occurred after cycle end
+        const matchingPayment = recentPayments.find(t => {
+          const transactionDate = new Date(t.date);
+          const paymentAmount = Math.abs(t.amount);
+          const amountDiff = Math.abs(paymentAmount - statementAmount);
+          
+          return transactionDate > cycleEnd && amountDiff <= 5; // Payment after cycle end, within $5
+        });
+        
+        if (matchingPayment) {
+          // Found a payment that matches a statement balance and occurred after the cycle
+          return true;
+        }
+      }
+      
+      // Also check Plaid's lastStatementBalance if we have it
+      if (card.lastStatementBalance && card.lastStatementIssueDate) {
+        const statementIssueDate = new Date(card.lastStatementIssueDate);
+        const plaidStatementAmount = Math.abs(card.lastStatementBalance);
+        
+        const matchingPlaidPayment = recentPayments.find(t => {
+          const transactionDate = new Date(t.date);
+          const paymentAmount = Math.abs(t.amount);
+          const amountDiff = Math.abs(paymentAmount - plaidStatementAmount);
+          
+          return transactionDate > statementIssueDate && amountDiff <= 5;
+        });
+        
+        if (matchingPlaidPayment) {
+          return true;
+        }
+      }
+    }
+    
+    // Check if we have any recent unpaid cycles from billing data
     const closedCycles = (card.recentCycles || [])
       .filter(cycle => new Date(cycle.endDate) < today)
       .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
@@ -424,13 +496,22 @@ export function DueDateCard({
       return cycleAmount > 0; // Any cycle with spending/balance
     });
     
-    // If we have cycle data and there's an unpaid cycle, not paid off
+    // If we have cycle data and there's an unpaid cycle, check if it's actually paid
     if (mostRecentUnpaidCycle) {
       const cycleAmount = Math.abs(mostRecentUnpaidCycle.totalSpend || mostRecentUnpaidCycle.statementBalance || 0);
+      
       // If current balance is significantly less than the cycle amount, old statement might be paid
-      if (currentBalance <= cycleAmount * 0.1) { // Within 10% suggests mostly paid
+      if (currentBalance <= cycleAmount * 0.1) {
         return true;
       }
+      
+      // Additional check: if current balance approximately equals open cycle spend, 
+      // then the closed cycle was likely paid
+      if (openCycle && openCycle.totalSpend && 
+          Math.abs(currentBalance - Math.abs(openCycle.totalSpend)) <= 10) {
+        return true;
+      }
+      
       return false; // There's an unpaid cycle
     }
     
