@@ -134,19 +134,14 @@ export default function CycleDateEditor({
     return (
       <div className="flex items-center gap-2 mt-1">
         {needsConfiguration ? (
-          <>
-            <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="text-xs font-medium whitespace-nowrap">Setup billing dates</span>
-            </div>
-            <button
-              onClick={() => setIsEditing(true)}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-              title="Set billing cycle dates"
-            >
-              <Pencil className="w-3.5 h-3.5 text-gray-500" />
-            </button>
-          </>
+          <button
+            onClick={() => setIsEditing(true)}
+            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs text-gray-700"
+            title="Set billing cycle dates"
+          >
+            <Pencil className="w-3.5 h-3.5 text-gray-600" />
+            <span>Billing</span>
+          </button>
         ) : (
           <>
             <div className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">

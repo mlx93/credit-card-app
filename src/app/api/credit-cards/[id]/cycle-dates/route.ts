@@ -187,10 +187,35 @@ export async function PATCH(
       );
     }
 
-    // Trigger billing cycle recalculation
+    // Trigger billing cycle recalculation and background transaction refresh for this card's item
     try {
       const { calculateBillingCycles } = await import('@/utils/billingCycles');
       await calculateBillingCycles(params.id);
+
+      // Fire-and-forget full transactions refresh for this card's item
+      (async () => {
+        try {
+          const { data: fullCard } = await supabaseAdmin
+            .from('credit_cards')
+            .select('plaidItemId, plaid_items!inner(id, itemId, institutionName, accessToken)')
+            .eq('id', params.id)
+            .single();
+          const item = (fullCard as any)?.plaid_items;
+          if (item?.accessToken) {
+            const { decrypt } = await import('@/lib/encryption');
+            const { plaidService } = await import('@/services/plaid');
+            const accessToken = decrypt(item.accessToken);
+            await plaidService.syncTransactions({
+              id: item.id,
+              itemId: item.itemId,
+              institutionName: item.institutionName,
+            } as any, accessToken);
+            await calculateBillingCycles(params.id);
+          }
+        } catch (e) {
+          console.warn('Background full refresh after manual dates failed:', e);
+        }
+      })();
     } catch (cycleError) {
       console.error('Failed to recalculate cycles:', cycleError);
       // Don't fail the request if cycle calculation fails
