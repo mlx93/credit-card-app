@@ -1095,9 +1095,48 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         
         // Add small delay to ensure database updates are complete before refreshing
         await new Promise(resolve => setTimeout(resolve, 1000));
-        // Just refresh Dashboard data from database - no additional API calls needed
-        console.log('🔄 Refreshing Dashboard data from database after individual card sync...');
-        await fetchUserDataForNewCard(' (after individual card sync - database only)');
+        // Only refresh the specific card's data, not all cards
+        console.log('🔄 Refreshing synced card data from database...');
+        
+        // Fetch only the updated billing cycles for this specific card
+        try {
+          const res = await fetch('/api/user/credit-cards', { cache: 'no-store' });
+          if (res.ok) {
+            const { creditCards: latest } = await res.json();
+            const syncedCards = (latest || []).filter((c: any) => c.plaidItem?.itemId === itemId);
+            
+            if (syncedCards.length > 0) {
+              // Update only the synced cards in state
+              setCreditCards(prev => {
+                const updated = [...prev];
+                for (const syncedCard of syncedCards) {
+                  const index = updated.findIndex(c => c.id === syncedCard.id);
+                  if (index >= 0) {
+                    updated[index] = syncedCard;
+                  }
+                }
+                return updated;
+              });
+              
+              // Fetch billing cycles for just the synced cards
+              const syncedCardIds = syncedCards.map((c: any) => c.id);
+              const cyclesRes = await fetch('/api/user/billing-cycles', { cache: 'no-store' });
+              if (cyclesRes.ok) {
+                const { billingCycles: allCycles } = await cyclesRes.json();
+                const syncedCycles = (allCycles || []).filter((c: any) => syncedCardIds.includes(c.creditCardId));
+                
+                // Update only the cycles for synced cards
+                setBillingCycles(prev => {
+                  // Remove old cycles for synced cards and add new ones
+                  const otherCycles = prev.filter(c => !syncedCardIds.includes(c.creditCardId));
+                  return dedupeCycles([...otherCycles, ...syncedCycles]);
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error refreshing synced card data:', error);
+        }
         
         // Mark only the synced item's cards as loading historical cycles (spinner, disabled button)
         try {
