@@ -845,7 +845,7 @@ export function DueDateCard({
               </p>
               <p className="text-xs text-blue-500">Due Soon</p>
             </div>
-            <div className="text-right">
+            <div className="text-center pl-4">
               <p className="text-xs text-gray-600">Current Balance</p>
               <p className="font-bold text-lg text-gray-900">
                 {formatCurrency(Math.abs(card.balanceCurrent))}
