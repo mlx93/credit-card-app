@@ -148,6 +148,13 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
       return today >= cycleStart && today <= cycleEnd;
     });
     
+    // CRITICAL: If this cycle IS the current open cycle, it should always be marked as "current"
+    if (openCycle && cycle.id === openCycle.id) {
+      paymentStatus = 'current';
+      paymentAnalysis = 'Current open cycle - ongoing spending';
+      console.log(`✅ Marking cycle ${cycle.id} as CURRENT (open cycle)`);
+    } else {
+    
     // Use the same balance-based calculation as billingCycles.ts for current cycle spend
     // This ensures we get the same $383 value that's displayed in the UI
     let openCycleSpend = 0;
@@ -278,6 +285,8 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
         }
       }
     }
+    
+    } // Close the else block for open cycle check
     
   } else {
     
