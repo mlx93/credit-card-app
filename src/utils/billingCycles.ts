@@ -219,10 +219,15 @@ export async function calculateBillingCycles(
   const baselineDue = nextDueDate || null;
   const baselineDay = baselineDue ? new Date(baselineDue).getDate() : null;
   const anchorEnd = new Date(lastStatementDate);
-  const manualDay = creditCardWithTransactions.manual_dates_configured && creditCardWithTransactions.manual_cycle_day
-    ? Number(creditCardWithTransactions.manual_cycle_day)
-    : null;
-  const closingDay = manualDay && manualDay > 0 && manualDay <= 31 ? manualDay : anchorEnd.getDate();
+  // Get baseline closing day for same_day type (days_before_end is calculated per month)
+  let baselineClosingDay = anchorEnd.getDate();
+  if (creditCardWithTransactions.manual_dates_configured) {
+    const cycleDateType = (creditCardWithTransactions as any).cycle_date_type;
+    if (cycleDateType === 'same_day' && creditCardWithTransactions.manual_cycle_day) {
+      baselineClosingDay = Number(creditCardWithTransactions.manual_cycle_day);
+    }
+  }
+  const closingDay = baselineClosingDay;
 
   // Generate 13 boundaries for 12 historical cycles
   const endBoundaries: Date[] = [];
@@ -231,8 +236,21 @@ export async function calculateBillingCycles(
     d.setMonth(d.getMonth() - m);
     const year = d.getFullYear();
     const month = d.getMonth();
+    
+    // Calculate closing day for this specific month (for days_before_end)
+    let monthClosingDay = closingDay;
+    if (creditCardWithTransactions.manual_dates_configured) {
+      const cycleDateType = (creditCardWithTransactions as any).cycle_date_type;
+      if (cycleDateType === 'days_before_end') {
+        const daysBeforeEnd = Number((creditCardWithTransactions as any).cycle_days_before_end);
+        if (daysBeforeEnd >= 1 && daysBeforeEnd <= 31) {
+          const lastDayOfThisMonth = new Date(year, month + 1, 0).getDate();
+          monthClosingDay = Math.max(1, lastDayOfThisMonth - daysBeforeEnd);
+        }
+      }
+    }
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const day = Math.min(closingDay, daysInMonth);
+    const day = Math.min(monthClosingDay, daysInMonth);
     endBoundaries.push(new Date(year, month, day));
   }
 
@@ -685,10 +703,12 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
   });
   
   for (const card of creditCards || []) {
+    // Get the associated plaid item (used multiple times in this loop)
+    const plaidItem = plaidItemMap.get(card.plaidItemId);
+    
     // Attempt statements-based periods when possible
     let statementPeriods: { startDate: Date | null; endDate: Date }[] | null = null;
     try {
-      const plaidItem = plaidItemMap.get(card.plaidItemId);
       const isRobinhood = plaidItem?.institutionId === 'ins_54' || /robinhood/i.test(plaidItem?.institutionName || '');
       if (!isRobinhood && plaidItem?.accessToken && card.accountId) {
         // Dynamic import to avoid bundling server-only modules into client
@@ -709,7 +729,6 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
     }
 
     // For Robinhood without manual configuration, do not generate/display cycles yet
-    const plaidItem = plaidItemMap.get(card.plaidItemId);
     const isRobinhood = plaidItem?.institutionId === 'ins_54' || /robinhood/i.test(plaidItem?.institutionName || '');
     const manualConfigured = !!(card as any).manual_dates_configured;
     if (isRobinhood && !manualConfigured) {
@@ -721,9 +740,6 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
       statementPeriods: statementPeriods || undefined,
       baselineDueDate: card.nextPaymentDueDate ? new Date(card.nextPaymentDueDate) : null,
     });
-    
-    // Get the associated plaid item
-    const plaidItem = plaidItemMap.get(card.plaidItemId);
     
     // Filter cycles to only include those that end after card open date (overlaps with card opening)
     let filteredCycles = cycles;
