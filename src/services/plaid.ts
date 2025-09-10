@@ -263,7 +263,7 @@ class PlaidServiceImpl implements PlaidService {
       
       // Use optimized chunking strategy with progressive fetching
       const allTransactions: any[] = [];
-      const chunkSize = isCapitalOne ? 60 : isRobinhood ? 14 : 90; // Use smaller chunks for high-volume institutions
+      const chunkSize = isCapitalOne ? 60 : isRobinhood ? 30 : 90; // Use 30-day chunks for Robinhood to ensure complete monthly cycles
       
       let currentStart = new Date(startDate);
       
