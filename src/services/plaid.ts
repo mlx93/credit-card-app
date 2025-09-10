@@ -85,11 +85,16 @@ class PlaidServiceImpl implements PlaidService {
       },
     };
     
-    // Note: Investment institutions are handled by product filtering above
-    // We use 'transactions' only for investment platforms, which limits available institutions
-    // to those that support transactions but may not support liabilities
+    // For investment institutions, add account filters to focus on credit accounts only
+    // This helps prevent overlap with standard banks by filtering to institutions 
+    // that primarily offer credit products rather than traditional banking
     if (isInvestmentInstitution) {
-      console.log('🔒 Investment institution filtering handled by product selection (transactions only)');
+      console.log('🔒 Applying account filters for investment platforms - credit accounts only');
+      (request as any).account_filters = {
+        credit: {
+          account_subtypes: ['credit card', 'paypal', 'reward', 'premier_reward']
+        }
+      };
     }
     
     // Add statements as an optional product with required configuration
