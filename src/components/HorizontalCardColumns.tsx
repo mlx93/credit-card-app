@@ -91,43 +91,13 @@ interface HorizontalCardColumnsProps {
 }
 
 // Helper function to determine if CardBillingCycles component should be shown
-// This prevents duplicate widgets by checking if CardBillingCycles will show meaningful content
+// Always show CardBillingCycles - it will either display cycles or show configuration UI
 function shouldShowCardBillingCycles(cycles: BillingCycle[], card: CreditCardInfo): boolean {
-  // Check for Robinhood cards
-  const isRobinhoodCard = card.plaidItem?.institutionId === 'ins_54' || 
-    /robinhood/i.test(card.plaidItem?.institutionName || '');
-  
-  // For Robinhood cards: ALWAYS show CardBillingCycles component
-  // It will either show cycles (if configured) or the CycleDateEditor configuration UI
-  if (isRobinhoodCard) {
-    return true;
-  }
-  
-  // For non-Robinhood cards: only show if we have meaningful cycle data
-  if (!cycles || cycles.length === 0) return false;
-  
-  // Apply the same filtering logic as CardBillingCycles to check if cycles are meaningful
-  const sortedCycles = cycles.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-  const today = new Date();
-  
-  // Find current cycle (ends in the future) and most recent closed cycle
-  const currentCycle = sortedCycles.find(c => new Date(c.endDate) >= today);
-  const closedCycles = sortedCycles.filter(c => new Date(c.endDate) < today);
-  const mostRecentClosedCycle = closedCycles.length > 0 ? closedCycles[0] : null;
-  
-  // Build recent cycles array (current + most recent closed)
-  const recentCycles = [];
-  if (currentCycle) recentCycles.push(currentCycle);
-  if (mostRecentClosedCycle && (!currentCycle || mostRecentClosedCycle.id !== currentCycle.id)) {
-    recentCycles.push(mostRecentClosedCycle);
-  }
-  
-  // Build historical cycles (all others)
-  const shownCycleIds = new Set(recentCycles.map(c => c.id));
-  const historicalCycles = sortedCycles.filter(c => !shownCycleIds.has(c.id));
-  
-  // Return true if we have either recent cycles or historical cycles
-  return recentCycles.length > 0 || historicalCycles.length > 0;
+  // Always return true - CardBillingCycles handles all scenarios internally:
+  // 1. Shows actual cycle data if available
+  // 2. Shows CycleDateEditor configuration UI if no data
+  // 3. Shows "No billing cycles available" message with config prompt
+  return true;
 }
 
 interface SortableCardColumnProps {
