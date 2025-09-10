@@ -85,10 +85,11 @@ class PlaidServiceImpl implements PlaidService {
       },
     };
     
-    // For investment platforms, filter to only show institutions without liabilities product
+    // Note: Investment institutions are handled by product filtering above
+    // We use 'transactions' only for investment platforms, which limits available institutions
+    // to those that support transactions but may not support liabilities
     if (isInvestmentInstitution) {
-      console.log('🔒 Applying institution filters for investment platforms (institutions without liabilities support)');
-      (request as any).institution_ids = investmentInstitutions;
+      console.log('🔒 Investment institution filtering handled by product selection (transactions only)');
     }
     
     // Add statements as an optional product with required configuration

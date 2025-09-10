@@ -741,11 +741,19 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
     // Get the associated plaid item (used multiple times in this loop)
     const plaidItem = plaidItemMap.get(card.plaidItemId);
     
-    // Attempt statements-based periods when possible
+    // Attempt statements-based periods when possible (using cached support status)
     let statementPeriods: { startDate: Date | null; endDate: Date }[] | null = null;
     try {
       const isRobinhood = plaidItem?.institutionId === 'ins_54' || /robinhood/i.test(plaidItem?.institutionName || '');
-      if (!isRobinhood && plaidItem?.accessToken && card.accountId) {
+      
+      // Check cached statements support to avoid API calls
+      const hasStatementsSupport = plaidItem?.statements_enabled === true;
+      const statementsLastChecked = plaidItem?.statements_last_checked ? new Date(plaidItem.statements_last_checked) : null;
+      const isStale = !statementsLastChecked || (Date.now() - statementsLastChecked.getTime()) > (24 * 60 * 60 * 1000);
+      
+      if (!isRobinhood && hasStatementsSupport && plaidItem?.accessToken && card.accountId) {
+        console.log(`📄 Using cached statements support for ${card.name} (enabled: ${hasStatementsSupport})`);
+        
         // Dynamic import to avoid bundling server-only modules into client
         const { decrypt } = await import('@/lib/encryption');
         const { listStatementPeriods } = await import('@/services/plaidStatements');
@@ -758,6 +766,21 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
         if (usable.length > 0) {
           statementPeriods = usable;
         }
+      } else if (!isRobinhood && isStale && plaidItem?.accessToken) {
+        // If statements support hasn't been checked recently, refresh it in background
+        console.log(`🔄 Refreshing statements support cache for ${card.name} (stale by ${Math.round((Date.now() - (statementsLastChecked?.getTime() || 0)) / (60 * 60 * 1000))} hours)`);
+        (async () => {
+          try {
+            const { decrypt } = await import('@/lib/encryption');
+            const { checkAndCacheStatementsSupport } = await import('@/services/plaidStatements');
+            const accessToken = decrypt(plaidItem.accessToken);
+            await checkAndCacheStatementsSupport(accessToken, plaidItem.id, true);
+          } catch (e) {
+            console.warn('Background statements support refresh failed:', e);
+          }
+        })();
+      } else if (!hasStatementsSupport) {
+        console.log(`📄 Skipping statements for ${card.name}: ${isRobinhood ? 'Robinhood' : 'statements not enabled'}`);
       }
     } catch (e) {
       console.warn('Statements-based period listing failed; falling back to heuristic cycles:', e);

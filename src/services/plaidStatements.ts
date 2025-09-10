@@ -51,9 +51,8 @@ export async function getStatementDates(
     // Fetch statement list
     const request: StatementsListRequest = {
       access_token: accessToken,
-      // Get statements from the last 6 months
-      start_date: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      end_date: new Date().toISOString().split('T')[0]
+      // Note: start_date and end_date are not valid fields for statementsList
+      // The API returns all available statements and we filter on the client side
     };
     
     const response = await plaidClient.statementsList(request);
@@ -273,8 +272,8 @@ export async function listStatementPeriods(
   start.setMonth(start.getMonth() - Math.max(1, monthsBack));
   const request: StatementsListRequest = {
     access_token: accessToken,
-    start_date: start.toISOString().split('T')[0],
-    end_date: end.toISOString().split('T')[0],
+    // Note: Removed start_date and end_date as they're not recognized by this endpoint
+    // The API will return all available statements
   };
 
   const res = await plaidClient.statementsList(request);
@@ -408,7 +407,83 @@ export async function listStatementPeriods(
 }
 
 /**
- * Check if an item has statements support and try to enable it
+ * Check if an item has statements support and cache the result in database
+ * This prevents repeated API calls on every page load
+ */
+export async function checkAndCacheStatementsSupport(
+  accessToken: string, 
+  plaidItemId: string,
+  forceRefresh: boolean = false
+): Promise<{
+  supported: boolean;
+  available: boolean;
+  enabled: boolean;
+}> {
+  try {
+    // Check if we have cached data that's less than 24 hours old
+    if (!forceRefresh) {
+      const { data: cachedItem } = await supabaseAdmin
+        .from('plaid_items')
+        .select('statements_supported, statements_available, statements_enabled, statements_last_checked')
+        .eq('id', plaidItemId)
+        .single();
+      
+      if (cachedItem?.statements_last_checked) {
+        const lastChecked = new Date(cachedItem.statements_last_checked);
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        
+        if (lastChecked > twentyFourHoursAgo) {
+          console.log(`📋 Using cached statements support data for item ${plaidItemId}`);
+          return {
+            supported: cachedItem.statements_supported || false,
+            available: cachedItem.statements_available || false,
+            enabled: cachedItem.statements_enabled || false
+          };
+        }
+      }
+    }
+    
+    // Fetch fresh data from Plaid API
+    console.log(`🔄 Fetching fresh statements support data for item ${plaidItemId}`);
+    const itemResponse = await plaidClient.itemGet({
+      access_token: accessToken,
+    });
+    
+    const item = itemResponse.data.item;
+    
+    const result = {
+      supported: item.available_products?.includes('statements') || false,
+      available: item.consented_products?.includes('statements') || false,
+      enabled: item.products.includes('statements')
+    };
+    
+    // Cache the result in database
+    await supabaseAdmin
+      .from('plaid_items')
+      .update({
+        statements_supported: result.supported,
+        statements_available: result.available,
+        statements_enabled: result.enabled,
+        statements_last_checked: new Date().toISOString()
+      })
+      .eq('id', plaidItemId);
+    
+    console.log(`✅ Cached statements support: supported=${result.supported}, available=${result.available}, enabled=${result.enabled}`);
+    
+    return result;
+    
+  } catch (error) {
+    console.error('Error checking statements support:', error);
+    return {
+      supported: false,
+      available: false,
+      enabled: false
+    };
+  }
+}
+
+/**
+ * Legacy function for backwards compatibility
  */
 export async function checkStatementsSupport(accessToken: string): Promise<{
   supported: boolean;
