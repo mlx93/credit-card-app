@@ -860,10 +860,11 @@ export function DueDateCard({
             <p className="font-bold text-lg text-gray-900">
               {formatCurrency(Math.abs(card.balanceCurrent))}
             </p>
-            {isPaidOff && (
-              <p className="text-xs text-green-600 font-medium">All statements paid</p>
-            )}
-            {!isPaidOff && card.lastStatementBalance && (() => {
+            <div className="text-xs font-medium min-h-[16px]">
+              {isPaidOff && (
+                <p className="text-green-600">All statements paid</p>
+              )}
+              {!isPaidOff && card.lastStatementBalance && (() => {
               // Show "Statement paid ✓" if we have transaction data and found a matching payment,
               // or if we don't have transaction data but balance suggests payment (fallback)
               const statementBalance = Math.abs(card.lastStatementBalance || 0);
@@ -909,8 +910,9 @@ export function DueDateCard({
                 return balanceRatio < 0.5 || (currentBalance < 50 && currentBalance < statementBalance * 0.8);
               }
             })() && (
-              <p className="text-xs text-green-600 font-medium mt-0.5">Statement paid ✓</p>
+              <p className="text-green-600 mt-0.5">Statement paid ✓</p>
             )}
+            </div>
           </div>
           <div></div> {/* Empty second column for consistent grid spacing */}
         </div>
