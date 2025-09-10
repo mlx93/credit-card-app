@@ -173,9 +173,16 @@ export async function calculateBillingCycles(
     if (lastStatementDate) {
       const currentCycleStart = new Date(lastStatementDate);
       currentCycleStart.setDate(currentCycleStart.getDate() + 1);
-      const today = new Date();
-      const currentCycleEnd = today; // open cycle ends today for spend calc
-      const currentDue = baselineDay ? estimateHistoricalDue(new Date(currentCycleEnd)) : null;
+      // End = same day-of-month as anchor, one month into the future (clamped for month length)
+      const anchor = new Date(lastStatementDate);
+      const y = anchor.getFullYear();
+      const m = anchor.getMonth() + 1; // next month
+      const y2 = y + (m > 11 ? 1 : 0);
+      const m2 = (m % 12);
+      const targetDay = anchor.getDate();
+      const dim = new Date(y2, m2 + 1, 0).getDate();
+      const currentCycleEnd = new Date(y2, m2, Math.min(targetDay, dim));
+      const currentDue = null; // Do not guess due date for open cycle
       await createOrUpdateCycle(
         creditCardWithTransactions,
         cycles,
@@ -260,10 +267,16 @@ export async function calculateBillingCycles(
     );
   }
 
-  // Add current open cycle (from last anchor end + 1 to today)
+  // Add current open cycle (from last anchor end + 1 to next anchor day next month)
   const openStart = new Date(anchorEnd);
   openStart.setDate(openStart.getDate() + 1);
-  const openEnd = new Date();
+  const y = anchorEnd.getFullYear();
+  const m = anchorEnd.getMonth() + 1; // next month
+  const y2 = y + (m > 11 ? 1 : 0);
+  const m2 = (m % 12);
+  const targetDay = anchorEnd.getDate();
+  const dim = new Date(y2, m2 + 1, 0).getDate();
+  const openEnd = new Date(y2, m2, Math.min(targetDay, dim));
   await createOrUpdateCycle(
     creditCardWithTransactions,
     cycles,
