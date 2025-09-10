@@ -689,12 +689,13 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
     let statementPeriods: { startDate: Date | null; endDate: Date }[] | null = null;
     try {
       const plaidItem = plaidItemMap.get(card.plaidItemId);
-      if (plaidItem?.accessToken && card.accountId) {
+      const isRobinhood = plaidItem?.institutionId === 'ins_54' || /robinhood/i.test(plaidItem?.institutionName || '');
+      if (!isRobinhood && plaidItem?.accessToken && card.accountId) {
         // Dynamic import to avoid bundling server-only modules into client
         const { decrypt } = await import('@/lib/encryption');
         const { listStatementPeriods } = await import('@/services/plaidStatements');
         const accessToken = decrypt(plaidItem.accessToken);
-        const periods: any[] = await listStatementPeriods(accessToken, card.accountId, 13);
+        const periods: any[] = await listStatementPeriods(accessToken, card.accountId, 13, plaidItem?.institutionName);
         // Use only periods that have both start and end (skip newest if start is null)
         const usable = periods
           .filter(p => p.endDate && (p.startDate instanceof Date))
@@ -705,6 +706,15 @@ export async function getAllUserBillingCycles(userId: string): Promise<BillingCy
       }
     } catch (e) {
       console.warn('Statements-based period listing failed; falling back to heuristic cycles:', e);
+    }
+
+    // For Robinhood without manual configuration, do not generate/display cycles yet
+    const plaidItem = plaidItemMap.get(card.plaidItemId);
+    const isRobinhood = plaidItem?.institutionId === 'ins_54' || /robinhood/i.test(plaidItem?.institutionName || '');
+    const manualConfigured = !!(card as any).manual_dates_configured;
+    if (isRobinhood && !manualConfigured) {
+      // Skip cycle generation; transactions will still sync in background
+      continue;
     }
 
     const cycles = await calculateBillingCycles(card.id, {

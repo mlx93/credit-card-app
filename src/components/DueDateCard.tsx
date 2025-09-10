@@ -854,7 +854,7 @@ export function DueDateCard({
           </div>
         );
       })() || (
-        <div className="grid grid-cols-2 gap-2 mb-4 min-h-[48px] items-center -mt-1">
+        <div className="grid grid-cols-2 gap-2 mb-2 min-h-[48px] items-center -mt-1">
           <div>
             <p className="text-xs text-gray-600 mb-1">Balance</p>
             <p className="font-bold text-lg text-gray-900">
@@ -916,7 +916,7 @@ export function DueDateCard({
         </div>
       )}
 
-      <div className="mt-auto pt-3">
+      <div className="mt-auto pt-1">
         <div className="flex justify-between items-center text-sm text-gray-600 mb-1">
           <span>Credit Utilization</span>
           <div className="flex items-center gap-2">
