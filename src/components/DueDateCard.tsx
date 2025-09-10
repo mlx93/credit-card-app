@@ -327,6 +327,7 @@ export function DueDateCard({
   const connectionStatus = cardConnectionHealth?.status || 'unknown';
   const apiConnectivity = cardConnectionHealth?.apiConnectivity;
   const statementsInfo = cardConnectionHealth?.statements;
+  const needsStatementsConsent = !!(statementsInfo && statementsInfo.available && !statementsInfo.consented);
   
   // Use card's own lastSyncAt as primary source, fallback to connection health
   const primarySyncTime = card.plaidItem?.lastSyncAt || cardConnectionHealth?.lastSuccessfulSync;
@@ -676,10 +677,10 @@ export function DueDateCard({
           {card.plaidItem && (
             <div className="flex items-center gap-1">
               <button
-                onClick={handleSync}
+                onClick={hasConnectionIssue || needsStatementsConsent ? handleReconnect : handleSync}
                 disabled={syncing || reconnecting}
                 className={`p-1 rounded disabled:opacity-50 ${
-                  hasConnectionIssue 
+                  (hasConnectionIssue || needsStatementsConsent)
                     ? 'hover:bg-blue-100 text-blue-500 hover:text-blue-700' 
                     : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'
                 }`}
@@ -687,13 +688,13 @@ export function DueDateCard({
                   syncing ? "Syncing data..." :
                   reconnecting ? "Opening reconnection..." :
                   forceRefreshing ? "Loading full history..." :
-                  hasConnectionIssue ? "Reconnect account" :
+                  hasConnectionIssue || needsStatementsConsent ? "Reconnect account" :
                   "Refresh data"
                 }
               >
                 {syncing || reconnecting || forceRefreshing ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : hasConnectionIssue ? (
+                ) : (hasConnectionIssue || needsStatementsConsent) ? (
                   <ExternalLink className="h-4 w-4" />
                 ) : (
                   <RefreshCw className="h-4 w-4" />

@@ -546,16 +546,25 @@ class PlaidServiceImpl implements PlaidService {
             
             if (statementDates && statementDates.confidence >= 0.9) {
               console.log(`✅ Robinhood statement dates extracted from Statements API (${(statementDates.confidence * 100).toFixed(0)}% confidence)`);
+              
+              // Try to get statement balance from transaction analysis even when using Statements API for dates
+              const { getRobinhoodBillingInfo } = await import('@/services/robinhoodPlaidEnhanced');
+              const billingInfo = await getRobinhoodBillingInfo(accessToken, account.account_id);
+              
               liability = {
                 account_id: account.account_id,
                 balance_current: Math.abs(account.balances.current || 0),
                 limit: account.balances.limit || null,
-                minimum_payment_amount: null, // Would need PDF parsing for this
+                minimum_payment_amount: billingInfo.minimumPayment || null,
                 next_payment_due_date: statementDates.dueDate?.toISOString().split('T')[0] || null,
                 last_statement_issue_date: statementDates.statementDate?.toISOString().split('T')[0] || null,
-                last_statement_balance: null, // Would need PDF parsing for this
+                last_statement_balance: billingInfo.statementBalance || null, // Try to get from transaction analysis
                 aprs: []
               };
+              
+              if (billingInfo.statementBalance) {
+                console.log(`💰 Robinhood statement balance extracted: $${billingInfo.statementBalance.toFixed(2)}`);
+              }
             } else {
               // Method 2: Fall back to transaction analysis
               const { getRobinhoodBillingInfo } = await import('@/services/robinhoodPlaidEnhanced');
