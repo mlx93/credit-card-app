@@ -37,15 +37,13 @@ export default function CycleDateEditor({
   isRobinhood = false
 }: CycleDateEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [cycleDateType, setCycleDateType] = useState<'same_day' | 'days_before_end'>(
-    currentCycleDateType || 'same_day'
+  // Use a single date type for both statement and due dates to keep them in sync
+  const [dateType, setDateType] = useState<'same_day' | 'days_before_end'>(
+    currentCycleDateType || currentDueDateType || 'same_day'
   );
   const [cycleDayInput, setCycleDayInput] = useState((currentCycleDay || 1).toString());
   const [cycleDaysBeforeEndInput, setCycleDaysBeforeEndInput] = useState(
     (currentCycleDaysBeforeEnd || 3).toString()
-  );
-  const [dueDateType, setDueDateType] = useState<'same_day' | 'days_before_end'>(
-    currentDueDateType || 'same_day'
   );
   const [dueDayInput, setDueDayInput] = useState((currentDueDay || 1).toString());
   const [dueDaysBeforeEndInput, setDueDaysBeforeEndInput] = useState(
@@ -63,7 +61,7 @@ export default function CycleDateEditor({
     let dueDaysBeforeEndNum: number | undefined;
     
     // Validate cycle date settings
-    if (cycleDateType === 'same_day') {
+    if (dateType === 'same_day') {
       cycleDayNum = parseInt(cycleDayInput.trim());
       if (isNaN(cycleDayNum) || !Number.isInteger(cycleDayNum)) {
         setError('Statement close day must be a valid number');
@@ -86,7 +84,7 @@ export default function CycleDateEditor({
     }
     
     // Validate due date settings
-    if (dueDateType === 'same_day') {
+    if (dateType === 'same_day') {
       dueDayNum = parseInt(dueDayInput.trim());
       if (isNaN(dueDayNum) || !Number.isInteger(dueDayNum)) {
         setError('Payment due day must be a valid number');
@@ -115,9 +113,9 @@ export default function CycleDateEditor({
       await onSave({
         cycleDay: cycleDayNum,
         dueDay: dueDayNum,
-        cycleDateType,
+        cycleDateType: dateType,
         cycleDaysBeforeEnd: cycleDaysBeforeEndNum,
-        dueDateType,
+        dueDateType: dateType,
         dueDaysBeforeEnd: dueDaysBeforeEndNum
       });
       setIsEditing(false);
@@ -211,20 +209,19 @@ export default function CycleDateEditor({
         )}
 
         <div className="space-y-8">
+          {/* Date Type Selection - Applies to both statement and due dates */}
           <div>
             <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-              Statement Close Day
+              Billing Cycle Type
             </label>
-            
-            {/* Statement Date Type Selection */}
             <div className="mb-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
                     value="same_day"
-                    checked={cycleDateType === 'same_day'}
-                    onChange={(e) => setCycleDateType(e.target.value as 'same_day' | 'days_before_end')}
+                    checked={dateType === 'same_day'}
+                    onChange={(e) => setDateType(e.target.value as 'same_day' | 'days_before_end')}
                     className="text-blue-600"
                   />
                   <span className="text-sm">Same day each month</span>
@@ -233,17 +230,29 @@ export default function CycleDateEditor({
                   <input
                     type="radio"
                     value="days_before_end"
-                    checked={cycleDateType === 'days_before_end'}
-                    onChange={(e) => setCycleDateType(e.target.value as 'same_day' | 'days_before_end')}
+                    checked={dateType === 'days_before_end'}
+                    onChange={(e) => setDateType(e.target.value as 'same_day' | 'days_before_end')}
                     className="text-blue-600"
                   />
                   <span className="text-sm">X days before month end</span>
                 </label>
               </div>
             </div>
+            <p className="text-sm text-gray-500">
+              {dateType === 'same_day' 
+                ? 'Your card uses the same day each month for billing dates'
+                : 'Your card uses days relative to month end (e.g., Bilt closes 3 days before month end)'
+              }
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Statement Close Day
+            </label>
 
             {/* Conditional Input Based on Selection */}
-            {cycleDateType === 'same_day' ? (
+            {dateType === 'same_day' ? (
               <div className="flex items-center gap-3 mb-2">
                 <input
                   type="text"
@@ -274,9 +283,9 @@ export default function CycleDateEditor({
             )}
             
             <p className="text-sm text-gray-500">
-              {cycleDateType === 'same_day' 
+              {dateType === 'same_day' 
                 ? 'The day your statement period ends each month'
-                : 'Perfect for cards like Bilt that close 3 days before month end (e.g., 28th for 31-day months)'
+                : 'Number of days before the last day of the month when your statement closes'
               }
             </p>
           </div>
@@ -285,35 +294,9 @@ export default function CycleDateEditor({
             <label className="block text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Payment Due Day
             </label>
-            
-            {/* Due Date Type Selection */}
-            <div className="mb-4">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="same_day"
-                    checked={dueDateType === 'same_day'}
-                    onChange={(e) => setDueDateType(e.target.value as 'same_day' | 'days_before_end')}
-                    className="text-blue-600"
-                  />
-                  <span className="text-sm">Same day each month</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="days_before_end"
-                    checked={dueDateType === 'days_before_end'}
-                    onChange={(e) => setDueDateType(e.target.value as 'same_day' | 'days_before_end')}
-                    className="text-blue-600"
-                  />
-                  <span className="text-sm">X days before month end</span>
-                </label>
-              </div>
-            </div>
 
             {/* Conditional Input Based on Selection */}
-            {dueDateType === 'same_day' ? (
+            {dateType === 'same_day' ? (
               <div className="flex items-center gap-3 mb-2">
                 <input
                   type="text"
@@ -344,9 +327,9 @@ export default function CycleDateEditor({
             )}
             
             <p className="text-sm text-gray-500">
-              {dueDateType === 'same_day' 
+              {dateType === 'same_day' 
                 ? 'The day your payment is due each month'
-                : 'Useful for cards due on the last day of the month'
+                : 'Number of days before the last day of the month when payment is due'
               }
             </p>
           </div>
