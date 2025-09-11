@@ -748,14 +748,16 @@ function CardContent({
         });
       }
     } else {
-      // Fallback for cards without statement date: look for cycles with statement balance
-      const closedCyclesWithStatements = sortedCycles.filter(c => {
+      // Fallback for cards without statement date: look for cycles with statement balance OR totalSpend
+      // This ensures Bilt and other cards without statement dates still identify their most recent closed cycle
+      const closedCyclesWithData = sortedCycles.filter(c => {
         const end = new Date(c.endDate);
         const hasStatement = c.statementBalance && c.statementBalance > 0;
+        const hasSpend = c.totalSpend && c.totalSpend > 0;
         const endedBeforeToday = end < today;
-        return hasStatement && endedBeforeToday;
+        return (hasStatement || hasSpend) && endedBeforeToday;
       });
-      mostRecentClosedCycle = closedCyclesWithStatements[0];
+      mostRecentClosedCycle = closedCyclesWithData[0];
     }
     
     if (cardName.toLowerCase().includes('capital') && mostRecentClosedCycle) {

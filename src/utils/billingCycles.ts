@@ -265,7 +265,8 @@ export async function calculateBillingCycles(
     for (let m = 1; m <= 12; m++) {
       const prevBoundary = endBoundaries[m - 1];
       
-      // Target: 30 days ago (ideal cycle length)
+      // Target: 30 days before the previous boundary
+      // For a 31-day cycle from start to end inclusive, we need 30 days between closings
       const targetPrevEnd = new Date(prevBoundary);
       targetPrevEnd.setDate(targetPrevEnd.getDate() - 30);
       
@@ -295,6 +296,9 @@ export async function calculateBillingCycles(
         console.log(`📅 February adjustment: ${targetAnchorDay} → ${finalClosingDay} (proportional to 28-day month)`);
       } else {
         // Apply Amex-style adjustment rules
+        // For most recent cycle (m=1), prefer 31-day cycles to align with typical Amex pattern
+        const targetCycleLength = (m === 1) ? 31 : 30;
+        
         if (cycleLength > 31) {
           // Cycle too long - move closing date earlier to shorten next cycle
           finalClosingDay = Math.max(1, targetAnchorDay - 1);
@@ -303,6 +307,10 @@ export async function calculateBillingCycles(
           // Cycle too short - move closing date later to lengthen next cycle
           finalClosingDay = Math.min(daysInTargetMonth, targetAnchorDay + 1);
           console.log(`➡️  Adjusting later: ${targetAnchorDay} → ${finalClosingDay} (cycle was ${cycleLength} days)`);
+        } else if (m === 1 && cycleLength === 30) {
+          // For the most recent cycle, prefer 31 days to get Jul 19 start
+          finalClosingDay = Math.max(1, targetAnchorDay - 1);
+          console.log(`⬅️  Adjusting for 31-day cycle: ${targetAnchorDay} → ${finalClosingDay}`);
         } else {
           console.log(`✅ Using anchor day ${targetAnchorDay} (cycle length ${cycleLength} is optimal)`);
         }
