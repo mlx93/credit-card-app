@@ -1006,13 +1006,48 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       setRefreshProgress(20);
       
       setRefreshStep('Syncing account data...');
-      setRefreshProgress(50);
+      setRefreshProgress(30);
       
       const syncResult = await syncWithPlaidAPI(' Refresh All', true); // Force sync regardless of recent sync
       console.log('Sync API success result:', syncResult);
       
+      // Sync 30-day transactions for all unique Plaid items
+      setRefreshStep('Syncing recent transactions...');
+      setRefreshProgress(40);
+      
+      const uniqueItemIds = new Set(creditCards
+        .filter(card => card.plaidItem?.itemId)
+        .map(card => card.plaidItem.itemId));
+      
+      console.log(`🔄 Syncing transactions for ${uniqueItemIds.size} Plaid items`);
+      
+      let itemIndex = 0;
+      for (const itemId of uniqueItemIds) {
+        itemIndex++;
+        const progress = 40 + (itemIndex / uniqueItemIds.size) * 20; // Progress from 40 to 60
+        setRefreshProgress(progress);
+        
+        try {
+          console.log(`📊 Syncing 30-day transactions for item ${itemId}`);
+          const syncResponse = await fetch('/api/user/sync-card', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId })
+          });
+          
+          if (syncResponse.ok) {
+            const result = await syncResponse.json();
+            console.log(`✅ Synced ${result.transactionCount} transactions for item ${itemId}`);
+          } else {
+            console.error(`❌ Failed to sync transactions for item ${itemId}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error syncing transactions for item ${itemId}:`, error);
+        }
+      }
+      
       setRefreshStep('Processing connections...');
-      setRefreshProgress(70);
+      setRefreshProgress(60);
       
       // Check if any connections require reconnection
       const needsReconnection = syncResult.results?.some((result: any) => result.requiresReconnection);
@@ -1042,7 +1077,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       }
       
       setRefreshStep('Finalizing updates...');
-      setRefreshProgress(90);
+      setRefreshProgress(80);
       
       console.log('Fetching user data after sync...');
       await fetchAllUserData(' (refresh all)');
@@ -1089,57 +1124,24 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const handleCardSync = async (itemId: string) => {
     console.log(`🎯 handleCardSync called with itemId: ${itemId}`);
     try {
-      const response = await fetch('/api/sync', { 
+      // First, sync fresh transactions from Plaid
+      console.log('📡 Fetching fresh 30-day transactions from Plaid...');
+      const syncResponse = await fetch('/api/user/sync-card', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId, forceSync: true }) // Force sync to bypass any caching
+        body: JSON.stringify({ itemId })
       });
       
-      if (response.ok) {
-        const syncData = await response.json();
-        console.log('Sync response data:', syncData);
-        console.log('Sync results detailed:', syncData.results?.map((r: any) => ({
-          itemId: r.itemId,
-          status: r.status,
-          requiresReconnection: r.requiresReconnection,
-          error: r.error,
-          canAutoReconnect: r.canAutoReconnect
-        })));
-        
-        // Check if sync was actually successful
-        const hasErrors = syncData.results?.some((r: any) => r.status === 'error');
-        const successCount = syncData.results?.filter((r: any) => r.status === 'success').length || 0;
-        const reconnectionRequired = syncData.results?.some((r: any) => r.requiresReconnection);
-        
-        if (hasErrors) {
-          console.warn(`Sync completed with ${successCount} successes and some errors`);
-          
-          if (reconnectionRequired) {
-            // Find the specific itemId that requires reconnection
-            const errorResult = syncData.results?.find((r: any) => r.requiresReconnection);
-            if (errorResult?.itemId) {
-              console.log(`🔄 Auto-triggering reconnection for itemId: ${errorResult.itemId}`);
-              
-              // Show brief message then auto-trigger reconnection
-              if (successCount > 0) {
-                console.log(`✅ ${successCount} cards synced successfully. Opening reconnection for expired connection...`);
-                // Don't use alert here as it might interrupt the Plaid flow
-              } else {
-                console.log(`🔄 Opening reconnection for expired connection...`);
-              }
-              
-              // Auto-trigger reconnection flow
-              await handleCardReconnect(errorResult.itemId);
-              return; // Exit early, don't refresh data yet (reconnection will handle that)
-            } else {
-              alert(`Connection expired - please use the "Reconnect" button. ${successCount > 0 ? `${successCount} other cards synced successfully.` : ''}`);
-            }
-          } else {
-            alert(`Sync completed but some connections need attention. ${successCount} cards synced successfully.`);
-          }
-        } else {
-          console.log('Card sync fully successful');
-        }
+      if (syncResponse.ok) {
+        const syncData = await syncResponse.json();
+        console.log('✅ Transaction sync results:', syncData);
+        console.log(`📊 Synced ${syncData.transactionCount} new transactions, deleted ${syncData.deletedCount} old ones`);
+      } else {
+        const errorData = await syncResponse.json();
+        console.error('❌ Failed to sync transactions:', errorData);
+        alert(`Failed to sync transactions: ${errorData.error || 'Unknown error'}`);
+        return;
+      }
         
         // Add small delay to ensure database updates are complete before refreshing
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1941,7 +1943,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         }
         
         // Refresh card metadata (e.g., statement dates) lightly
-        const cardsRes = await fetch('/api/user/credit-cards?light=1', { cache: 'no-store' });
+        // Use full (non-light) credit-cards fetch here so payment detection runs
+        const cardsRes = await fetch('/api/user/credit-cards', { cache: 'no-store' });
         if (cardsRes.ok) {
           const { creditCards: cards } = await cardsRes.json();
           if (Array.isArray(cards) && cards.length > 0) {
