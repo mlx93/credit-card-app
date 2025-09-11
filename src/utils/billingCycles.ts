@@ -558,12 +558,12 @@ async function createOrUpdateCycle(
       console.log(`🔍 Payment detection debug for ${creditCard.name}:`, {
         currentBalance,
         originalStatementBalance,
-        conditionMet: originalStatementBalance > 0 && currentBalance < originalStatementBalance,
+        conditionMet: originalStatementBalance > 0,
         statementDate: lastStatementDate?.toDateString(),
         transactioncount: transactionsWithDates.filter(t => !isPaymentTransaction(t.name || '')).length
       });
 
-      if (originalStatementBalance > 0 && currentBalance < originalStatementBalance) {
+      if (originalStatementBalance > 0) {
         // Look for payment transactions since the last statement date
         const statementDate = lastStatementDate;
         

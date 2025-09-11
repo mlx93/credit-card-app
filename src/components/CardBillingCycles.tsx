@@ -666,6 +666,12 @@ function CardContent({
     const cycleStartDate = new Date(cycle.startDate);
     const daysSinceStart = Math.floor((today.getTime() - cycleStartDate.getTime()) / (1000 * 60 * 60 * 24));
     
+    // Exclude future cycles (cycles that start in the future)
+    if (daysSinceStart < 0) {
+      console.log(`🚫 Excluding future cycle starting ${cycleStartDate.toDateString()} (${Math.abs(daysSinceStart)} days in the future)`);
+      return false;
+    }
+    
     if (isCapitalOne) {
       // Capital One: exclude if start date is more than 90 days ago
       if (daysSinceStart > 90) {
@@ -853,19 +859,10 @@ function CardContent({
           </div>
           {(historical.length > 0 || olderLoading) && (
             olderLoading ? (
-              // iOS-style loading state - compact and responsive
+              // Simple non-animated loading label (no spinner)
               <div className="flex items-center justify-center py-2 mb-3 max-w-full">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100/80 backdrop-blur-sm max-w-full">
-                  {/* Compact iOS-style activity indicator */}
-                  <div className="relative w-4 h-4 flex-shrink-0">
-                    {/* Spinning gradient ring */}
-                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-gray-600 animate-spin"></div>
-                    {/* Inner dot pulse */}
-                    <div className="absolute inset-[4px] rounded-full bg-gray-400 animate-pulse"></div>
-                  </div>
-                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">
-                    Loading...
-                  </span>
+                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Loading...</span>
                 </div>
               </div>
             ) : (
