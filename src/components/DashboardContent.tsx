@@ -1136,12 +1136,6 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         const syncData = await syncResponse.json();
         console.log('✅ Transaction sync results:', syncData);
         console.log(`📊 Synced ${syncData.transactionCount} new transactions, deleted ${syncData.deletedCount} old ones`);
-      } else {
-        const errorData = await syncResponse.json();
-        console.error('❌ Failed to sync transactions:', errorData);
-        alert(`Failed to sync transactions: ${errorData.error || 'Unknown error'}`);
-        return;
-      }
         
         // Add small delay to ensure database updates are complete before refreshing
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1259,10 +1253,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         // If sync was successful, we know the connection is working
         console.log('✅ Individual card sync completed successfully - connection is healthy');
       } else {
-        console.error('Card sync failed:', response.status);
-        const errorText = await response.text();
-        console.error('Sync error details:', errorText);
-        alert('Failed to sync card data. Please try again.');
+        const errorData = await syncResponse.json();
+        console.error('❌ Failed to sync transactions:', errorData);
+        alert(`Failed to sync transactions: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error syncing card:', error);

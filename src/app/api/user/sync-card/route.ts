@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { supabaseAdmin } from '@/services/supabaseAdmin';
-import { PlaidService } from '@/services/plaid';
+import { authOptions } from '@/lib/auth';
+import { supabaseAdmin } from '@/lib/supabase';
+import { plaidService } from '@/services/plaid';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,8 +33,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Plaid item not found' }, { status: 404 });
     }
 
-    // Initialize Plaid service
-    const plaidService = PlaidService.getInstance();
+    // Plaid service is already imported and ready to use
     
     // Calculate date range (last 30 days)
     const endDate = new Date();
