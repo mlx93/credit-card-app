@@ -948,12 +948,12 @@ class PlaidServiceImpl implements PlaidService {
         });
         console.log('=== END DEBUG ===');
 
-        // For Capital One, use multiple sources for balance data
-        const currentBalance = (isCapitalOne && liability?.balances?.current !== undefined) 
+        // Always prefer liability data when available (most up-to-date from liabilities endpoint)
+        const currentBalance = liability?.balances?.current !== undefined
           ? liability.balances.current 
           : (balanceAccount?.balances?.current ?? accountsAccount?.balances?.current ?? account.balances.current);
           
-        const availableBalance = (isCapitalOne && liability?.balances?.available !== undefined)
+        const availableBalance = liability?.balances?.available !== undefined
           ? liability.balances.available
           : (balanceAccount?.balances?.available ?? accountsAccount?.balances?.available ?? account.balances.available);
 
