@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { plaidService } from '@/services/plaid';
+import { decrypt } from '@/lib/encryption';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +34,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Plaid item not found' }, { status: 404 });
     }
 
-    // Plaid service is already imported and ready to use
+    // Decrypt the access token before using it
+    const decryptedAccessToken = decrypt(plaidItem.accessToken);
     
     // Calculate date range (last 30 days)
     const endDate = new Date();
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch fresh transactions from Plaid for the last 30 days
     const freshTransactions = await plaidService.getTransactions(
-      plaidItem.accessToken,
+      decryptedAccessToken,
       startDate,
       endDate,
       false,

@@ -1121,15 +1121,15 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   };
 
 
-  const handleCardSync = async (itemId: string) => {
-    console.log(`🎯 handleCardSync called with itemId: ${itemId}`);
+  const handleCardSync = async (itemId: string, cardId?: string) => {
+    console.log(`🎯 handleCardSync called with itemId: ${itemId}, cardId: ${cardId || 'all'}`);
     try {
       // First, sync fresh transactions from Plaid
-      console.log('📡 Fetching fresh 30-day transactions from Plaid...');
+      console.log(`📡 Fetching fresh 30-day transactions from Plaid for ${cardId ? 'card ' + cardId : 'all cards in item'}...`);
       const syncResponse = await fetch('/api/user/sync-card', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId })
+        body: JSON.stringify({ itemId, cardId })
       });
       
       if (syncResponse.ok) {

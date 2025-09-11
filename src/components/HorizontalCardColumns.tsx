@@ -72,7 +72,7 @@ interface HorizontalCardColumnsProps {
   cards: CreditCardInfo[];
   cycles: BillingCycle[];
   connectionHealth?: ConnectionHealthData | null;
-  onSync?: (itemId: string) => void;
+  onSync?: (itemId: string, cardId?: string) => void;
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
   onRequestDelete?: (card: any) => void;
@@ -106,7 +106,7 @@ interface SortableCardColumnProps {
   connectionHealth?: ConnectionHealthData | null;
   isExpanded: boolean;
   onToggleExpand: () => void;
-  onSync?: (itemId: string) => void;
+  onSync?: (itemId: string, cardId?: string) => void;
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
   onRequestDelete?: (card: any) => void;

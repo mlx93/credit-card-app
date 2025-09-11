@@ -86,7 +86,7 @@ interface DueDateCardProps {
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
   onRequestDelete?: (card: CreditCardInfo) => void;
-  onSync?: (itemId: string) => void;
+  onSync?: (itemId: string, cardId?: string) => void;
   forceRefreshing?: boolean; // visual spinner without triggering sync
   onCreditLimitUpdated?: (data: {
     newLimit: number;
@@ -176,7 +176,7 @@ interface DueDateCardsProps {
   onReconnect?: (itemId: string) => void;
   onRemove?: (itemId: string) => void;
   onRequestDelete?: (card: CreditCardInfo) => void;
-  onSync?: (itemId: string) => void;
+  onSync?: (itemId: string, cardId?: string) => void;
   onOrderChange?: (cardOrder: string[]) => void;
   initialCardOrder?: string[];
   onCreditLimitUpdated?: (data: {
@@ -522,7 +522,7 @@ export function DueDateCard({
     if (!card.plaidItem || !onSync) return;
     setSyncing(true);
     try {
-      await onSync(card.plaidItem.itemId);
+      await onSync(card.plaidItem.itemId, card.id);
     } finally {
       setSyncing(false);
     }
