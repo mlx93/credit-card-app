@@ -207,8 +207,14 @@ export async function PATCH(
       );
     }
 
-    // Trigger billing cycle recalculation and background transaction refresh for this card's item
+    // Discard ALL existing billing cycles for this card and regenerate from scratch
     try {
+      // Remove all previously stored cycles for this card to avoid duplicates after manual change
+      await supabaseAdmin
+        .from('billing_cycles')
+        .delete()
+        .eq('creditCardId', params.id);
+
       const { calculateBillingCycles } = await import('@/utils/billingCycles');
       await calculateBillingCycles(params.id);
 
@@ -230,6 +236,12 @@ export async function PATCH(
               itemId: item.itemId,
               institutionName: item.institutionName,
             } as any, accessToken);
+            // After a full transactions sync, rebuild cycles again to ensure consistency
+            // First clear any cycles produced between PATCH and now to prevent drift
+            await supabaseAdmin
+              .from('billing_cycles')
+              .delete()
+              .eq('creditCardId', params.id);
             await calculateBillingCycles(params.id);
           }
         } catch (e) {
