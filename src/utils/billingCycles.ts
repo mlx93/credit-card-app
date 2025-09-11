@@ -277,7 +277,10 @@ export async function calculateBillingCycles(
       
       // Calculate what the cycle length would be with the anchor day
       const anchorDate = new Date(targetYear, targetMonth, targetAnchorDay);
-      const cycleLength = Math.floor((prevBoundary.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24));
+      // The cycle length is from the day after the previous close to the current close (inclusive)
+      const prevBoundaryPlusOne = new Date(prevBoundary);
+      prevBoundaryPlusOne.setDate(prevBoundaryPlusOne.getDate() + 1);
+      const cycleLength = Math.floor((prevBoundaryPlusOne.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       
       console.log(`🔄 Month -${m}: Anchor ${anchorDate.toDateString()}, cycle length would be ${cycleLength} days`);
       
@@ -285,13 +288,13 @@ export async function calculateBillingCycles(
       
       // Apply Amex-style adjustment rules
       if (cycleLength > 31) {
-        // Previous cycle too long - move earlier to shorten
-        finalClosingDay = Math.max(1, targetAnchorDay - 1);
-        console.log(`⬅️  Adjusting earlier: ${targetAnchorDay} → ${finalClosingDay} (cycle was ${cycleLength} days)`);
-      } else if (cycleLength < 28) {
-        // Previous cycle too short - move later to lengthen
+        // Previous cycle too long - move later to shorten (closer to prev boundary)
         finalClosingDay = Math.min(daysInTargetMonth, targetAnchorDay + 1);
         console.log(`➡️  Adjusting later: ${targetAnchorDay} → ${finalClosingDay} (cycle was ${cycleLength} days)`);
+      } else if (cycleLength < 28) {
+        // Previous cycle too short - move earlier to lengthen (further from prev boundary)
+        finalClosingDay = Math.max(1, targetAnchorDay - 1);
+        console.log(`⬅️  Adjusting earlier: ${targetAnchorDay} → ${finalClosingDay} (cycle was ${cycleLength} days)`);
       } else {
         console.log(`✅ Using anchor day ${targetAnchorDay} (cycle length ${cycleLength} is optimal)`);
       }
@@ -299,8 +302,10 @@ export async function calculateBillingCycles(
       const adjustedDate = new Date(targetYear, targetMonth, finalClosingDay);
       endBoundaries.push(adjustedDate);
       
-      // Recalculate actual cycle length after adjustment
-      const actualCycleLength = Math.floor((prevBoundary.getTime() - adjustedDate.getTime()) / (1000 * 60 * 60 * 24));
+      // Recalculate actual cycle length after adjustment (from day after this close to previous close)
+      const adjustedDatePlusOne = new Date(adjustedDate);
+      adjustedDatePlusOne.setDate(adjustedDatePlusOne.getDate() + 1);
+      const actualCycleLength = Math.floor((prevBoundary.getTime() - adjustedDatePlusOne.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       console.log(`📊 Final: ${adjustedDate.toDateString()}, actual cycle length: ${actualCycleLength} days`);
     }
     
