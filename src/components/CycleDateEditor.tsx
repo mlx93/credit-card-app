@@ -9,16 +9,16 @@ interface CycleDateEditorProps {
   cardName: string;
   currentCycleDay?: number | null;
   currentDueDay?: number | null;
-  currentCycleDateType?: 'same_day' | 'days_before_end' | null;
+  currentCycleDateType?: 'same_day' | 'days_before_end' | 'dynamic_anchor' | null;
   currentCycleDaysBeforeEnd?: number | null;
-  currentDueDateType?: 'same_day' | 'days_before_end' | null;
+  currentDueDateType?: 'same_day' | 'days_before_end' | 'dynamic_anchor' | null;
   currentDueDaysBeforeEnd?: number | null;
   onSave: (data: {
     cycleDay?: number;
     dueDay?: number;
-    cycleDateType: 'same_day' | 'days_before_end';
+    cycleDateType: 'same_day' | 'days_before_end' | 'dynamic_anchor';
     cycleDaysBeforeEnd?: number;
-    dueDateType: 'same_day' | 'days_before_end';
+    dueDateType: 'same_day' | 'days_before_end' | 'dynamic_anchor';
     dueDaysBeforeEnd?: number;
   }) => Promise<void>;
   isRobinhood?: boolean;
@@ -38,7 +38,7 @@ export default function CycleDateEditor({
 }: CycleDateEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   // Use a single date type for both statement and due dates to keep them in sync
-  const [dateType, setDateType] = useState<'same_day' | 'days_before_end'>(
+  const [dateType, setDateType] = useState<'same_day' | 'days_before_end' | 'dynamic_anchor'>(
     currentCycleDateType || currentDueDateType || 'same_day'
   );
   const [cycleDayInput, setCycleDayInput] = useState((currentCycleDay || 1).toString());
@@ -71,7 +71,7 @@ export default function CycleDateEditor({
         setError('Statement close day must be between 1 and 31');
         return;
       }
-    } else {
+    } else if (dateType === 'days_before_end') {
       cycleDaysBeforeEndNum = parseInt(cycleDaysBeforeEndInput.trim());
       if (isNaN(cycleDaysBeforeEndNum) || !Number.isInteger(cycleDaysBeforeEndNum)) {
         setError('Days before month end must be a valid number');
@@ -79,6 +79,17 @@ export default function CycleDateEditor({
       }
       if (cycleDaysBeforeEndNum < 1 || cycleDaysBeforeEndNum > 31) {
         setError('Days before month end must be between 1 and 31');
+        return;
+      }
+    } else if (dateType === 'dynamic_anchor') {
+      // For dynamic anchor, we use the cycleDayInput as the anchor day
+      cycleDayNum = parseInt(cycleDayInput.trim());
+      if (isNaN(cycleDayNum) || !Number.isInteger(cycleDayNum)) {
+        setError('Anchor day must be a valid number');
+        return;
+      }
+      if (cycleDayNum < 1 || cycleDayNum > 31) {
+        setError('Anchor day must be between 1 and 31');
         return;
       }
     }
@@ -94,7 +105,7 @@ export default function CycleDateEditor({
         setError('Payment due day must be between 1 and 31');
         return;
       }
-    } else {
+    } else if (dateType === 'days_before_end') {
       dueDaysBeforeEndNum = parseInt(dueDaysBeforeEndInput.trim());
       if (isNaN(dueDaysBeforeEndNum) || !Number.isInteger(dueDaysBeforeEndNum)) {
         setError('Days before month end must be a valid number');
@@ -102,6 +113,17 @@ export default function CycleDateEditor({
       }
       if (dueDaysBeforeEndNum < 1 || dueDaysBeforeEndNum > 31) {
         setError('Days before month end must be between 1 and 31');
+        return;
+      }
+    } else if (dateType === 'dynamic_anchor') {
+      // For dynamic anchor, due date is typically 21 days after statement
+      dueDayNum = parseInt(dueDayInput.trim());
+      if (isNaN(dueDayNum) || !Number.isInteger(dueDayNum)) {
+        setError('Due date anchor must be a valid number');
+        return;
+      }
+      if (dueDayNum < 1 || dueDayNum > 31) {
+        setError('Due date anchor must be between 1 and 31');
         return;
       }
     }
@@ -147,11 +169,15 @@ export default function CycleDateEditor({
                 // Format statement close display based on date type
                 const closeDisplay = currentCycleDateType === 'days_before_end' && currentCycleDaysBeforeEnd
                   ? `${currentCycleDaysBeforeEnd} days before last day of month`
+                  : currentCycleDateType === 'dynamic_anchor'
+                  ? `Dynamic anchor day ${currentCycleDay}`
                   : `Day ${currentCycleDay}`;
                 
                 // Format due date display based on date type
                 const dueDisplay = currentDueDateType === 'days_before_end' && currentDueDaysBeforeEnd
                   ? `${currentDueDaysBeforeEnd} days before last day of month`
+                  : currentDueDateType === 'dynamic_anchor'
+                  ? `Dynamic anchor day ${currentDueDay}`
                   : `Day ${currentDueDay}`;
                 
                 // Check if text is too long and needs wrapping
@@ -215,13 +241,13 @@ export default function CycleDateEditor({
               Billing Cycle Type
             </label>
             <div className="mb-4">
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
                     value="same_day"
                     checked={dateType === 'same_day'}
-                    onChange={(e) => setDateType(e.target.value as 'same_day' | 'days_before_end')}
+                    onChange={(e) => setDateType(e.target.value as 'same_day' | 'days_before_end' | 'dynamic_anchor')}
                     className="text-blue-600"
                   />
                   <span className="text-sm">Same day each month</span>
@@ -231,17 +257,32 @@ export default function CycleDateEditor({
                     type="radio"
                     value="days_before_end"
                     checked={dateType === 'days_before_end'}
-                    onChange={(e) => setDateType(e.target.value as 'same_day' | 'days_before_end')}
+                    onChange={(e) => setDateType(e.target.value as 'same_day' | 'days_before_end' | 'dynamic_anchor')}
                     className="text-blue-600"
                   />
                   <span className="text-sm">X days before month end</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="dynamic_anchor"
+                    checked={dateType === 'dynamic_anchor'}
+                    onChange={(e) => setDateType(e.target.value as 'same_day' | 'days_before_end' | 'dynamic_anchor')}
+                    className="text-blue-600"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm">Dynamic anchor (Amex-style)</span>
+                    <span className="text-xs text-gray-500">Cycles balance between 28-31 days using anchor date</span>
+                  </div>
                 </label>
               </div>
             </div>
             <p className="text-sm text-gray-500">
               {dateType === 'same_day' 
                 ? 'Your card uses the same day each month for billing dates'
-                : 'Your card uses days relative to month end (e.g., Bilt closes 3 days before month end)'
+                : dateType === 'days_before_end' 
+                ? 'Your card uses days relative to month end (e.g., Bilt closes 3 days before month end)'
+                : 'Your card uses dynamic anchor dates that balance cycle lengths (like Amex)'
               }
             </p>
           </div>
@@ -266,7 +307,7 @@ export default function CycleDateEditor({
                 />
                 <span className="text-gray-600 dark:text-gray-400">day of the month (1-31)</span>
               </div>
-            ) : (
+            ) : dateType === 'days_before_end' ? (
               <div className="flex items-center gap-3 mb-2">
                 <input
                   type="text"
@@ -280,12 +321,28 @@ export default function CycleDateEditor({
                 />
                 <span className="text-gray-600 dark:text-gray-400">days before month end (1-31)</span>
               </div>
+            ) : (
+              <div className="flex items-center gap-3 mb-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={cycleDayInput}
+                  onChange={(e) => setCycleDayInput(e.target.value)}
+                  className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
+                           bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                           transition-all duration-200"
+                  placeholder="19"
+                />
+                <span className="text-gray-600 dark:text-gray-400">anchor day (1-31)</span>
+              </div>
             )}
             
             <p className="text-sm text-gray-500">
               {dateType === 'same_day' 
                 ? 'The day your statement period ends each month'
-                : 'Number of days before the last day of the month when your statement closes'
+                : dateType === 'days_before_end' 
+                ? 'Number of days before the last day of the month when your statement closes'
+                : 'Target day that cycles aim for, but may adjust ±1-3 days to keep cycle length between 28-31 days'
               }
             </p>
           </div>
@@ -310,7 +367,7 @@ export default function CycleDateEditor({
                 />
                 <span className="text-gray-600 dark:text-gray-400">day of the month (1-31)</span>
               </div>
-            ) : (
+            ) : dateType === 'days_before_end' ? (
               <div className="flex items-center gap-3 mb-2">
                 <input
                   type="text"
@@ -324,12 +381,28 @@ export default function CycleDateEditor({
                 />
                 <span className="text-gray-600 dark:text-gray-400">days before month end (1-31)</span>
               </div>
+            ) : (
+              <div className="flex items-center gap-3 mb-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={dueDayInput}
+                  onChange={(e) => setDueDayInput(e.target.value)}
+                  className="w-20 px-3 py-2 text-lg text-center border border-gray-300 dark:border-gray-700 rounded-lg 
+                           bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500
+                           transition-all duration-200"
+                  placeholder="10"
+                />
+                <span className="text-gray-600 dark:text-gray-400">anchor day (1-31)</span>
+              </div>
             )}
             
             <p className="text-sm text-gray-500">
               {dateType === 'same_day' 
                 ? 'The day your payment is due each month'
-                : 'Number of days before the last day of the month when payment is due'
+                : dateType === 'days_before_end' 
+                ? 'Number of days before the last day of the month when payment is due'
+                : 'Target due day (typically ~21 days after statement close), adjusts with dynamic cycles'
               }
             </p>
           </div>

@@ -240,9 +240,13 @@ export async function calculateBillingCycles(
   const anchorEnd = new Date(lastStatementDate);
   // Get baseline closing day for same_day type (days_before_end is calculated per month)
   let baselineClosingDay = anchorEnd.getDate();
+  const cycleDateType = (creditCardWithTransactions as any).cycle_date_type;
+  
   if (creditCardWithTransactions.manual_dates_configured) {
-    const cycleDateType = (creditCardWithTransactions as any).cycle_date_type;
     if (cycleDateType === 'same_day' && creditCardWithTransactions.manual_cycle_day) {
+      baselineClosingDay = Number(creditCardWithTransactions.manual_cycle_day);
+    } else if (cycleDateType === 'dynamic_anchor' && creditCardWithTransactions.manual_cycle_day) {
+      // For dynamic anchor, use the manual_cycle_day as the anchor target
       baselineClosingDay = Number(creditCardWithTransactions.manual_cycle_day);
     }
   }
@@ -250,32 +254,114 @@ export async function calculateBillingCycles(
 
   // Generate 13 boundaries for 12 historical cycles
   const endBoundaries: Date[] = [];
-  for (let m = 0; m <= 12; m++) {
-    const d = new Date(anchorEnd);
-    d.setMonth(d.getMonth() - m);
-    const year = d.getFullYear();
-    const month = d.getMonth();
+  
+  if (cycleDateType === 'dynamic_anchor') {
+    // Dynamic anchor logic: balance cycle lengths between 28-31 days
+    console.log(`🎯 Using dynamic anchor logic with anchor day ${closingDay}`);
     
-    // Calculate closing day for this specific month (for days_before_end)
-    let monthClosingDay = closingDay;
-    if (creditCardWithTransactions.manual_dates_configured) {
-      const cycleDateType = (creditCardWithTransactions as any).cycle_date_type;
-      if (cycleDateType === 'days_before_end') {
-        const daysBeforeEnd = Number((creditCardWithTransactions as any).cycle_days_before_end);
-        if (daysBeforeEnd >= 1 && daysBeforeEnd <= 31) {
-          const lastDayOfThisMonth = new Date(year, month + 1, 0).getDate();
-          monthClosingDay = Math.max(1, lastDayOfThisMonth - daysBeforeEnd);
+    // Start with the anchor date and work backwards
+    endBoundaries.push(new Date(anchorEnd)); // Most recent (month 0)
+    
+    for (let m = 1; m <= 12; m++) {
+      const prevBoundary = endBoundaries[m - 1];
+      
+      // Target: 30 days ago (ideal cycle length)
+      const targetPrevEnd = new Date(prevBoundary);
+      targetPrevEnd.setDate(targetPrevEnd.getDate() - 30);
+      
+      // Get the target month's anchor day
+      const targetMonth = targetPrevEnd.getMonth();
+      const targetYear = targetPrevEnd.getFullYear();
+      const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const targetAnchorDay = Math.min(closingDay, daysInTargetMonth);
+      
+      // Calculate what the cycle length would be with the anchor day
+      const anchorDate = new Date(targetYear, targetMonth, targetAnchorDay);
+      const cycleLength = Math.floor((prevBoundary.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      console.log(`🔄 Month -${m}: Anchor ${anchorDate.toDateString()}, cycle length would be ${cycleLength} days`);
+      
+      let finalClosingDay = targetAnchorDay;
+      
+      // Apply Amex-style adjustment rules
+      if (cycleLength > 31) {
+        // Previous cycle too long - move earlier to shorten
+        finalClosingDay = Math.max(1, targetAnchorDay - 1);
+        console.log(`⬅️  Adjusting earlier: ${targetAnchorDay} → ${finalClosingDay} (cycle was ${cycleLength} days)`);
+      } else if (cycleLength < 28) {
+        // Previous cycle too short - move later to lengthen
+        finalClosingDay = Math.min(daysInTargetMonth, targetAnchorDay + 1);
+        console.log(`➡️  Adjusting later: ${targetAnchorDay} → ${finalClosingDay} (cycle was ${cycleLength} days)`);
+      } else {
+        console.log(`✅ Using anchor day ${targetAnchorDay} (cycle length ${cycleLength} is optimal)`);
+      }
+      
+      const adjustedDate = new Date(targetYear, targetMonth, finalClosingDay);
+      endBoundaries.push(adjustedDate);
+      
+      // Recalculate actual cycle length after adjustment
+      const actualCycleLength = Math.floor((prevBoundary.getTime() - adjustedDate.getTime()) / (1000 * 60 * 60 * 24));
+      console.log(`📊 Final: ${adjustedDate.toDateString()}, actual cycle length: ${actualCycleLength} days`);
+    }
+    
+    console.log(`🎯 Generated ${endBoundaries.length} dynamic anchor boundaries`);
+  } else {
+    // Existing logic for same_day and days_before_end
+    for (let m = 0; m <= 12; m++) {
+      const d = new Date(anchorEnd);
+      d.setMonth(d.getMonth() - m);
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      
+      // Calculate closing day for this specific month (for days_before_end)
+      let monthClosingDay = closingDay;
+      if (creditCardWithTransactions.manual_dates_configured) {
+        if (cycleDateType === 'days_before_end') {
+          const daysBeforeEnd = Number((creditCardWithTransactions as any).cycle_days_before_end);
+          if (daysBeforeEnd >= 1 && daysBeforeEnd <= 31) {
+            const lastDayOfThisMonth = new Date(year, month + 1, 0).getDate();
+            monthClosingDay = Math.max(1, lastDayOfThisMonth - daysBeforeEnd);
+          }
         }
       }
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const day = Math.min(monthClosingDay, daysInMonth);
+      endBoundaries.push(new Date(year, month, day));
     }
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const day = Math.min(monthClosingDay, daysInMonth);
-    endBoundaries.push(new Date(year, month, day));
   }
 
   // helper for due date estimation (same day-of-month as current due date)
   const estimateHistoricalDue = (cycleEnd: Date): Date | null => {
     if (!baselineDay) return null;
+    
+    // For dynamic anchor, calculate due date based on the adjusted closing date + typical grace period
+    const dueDateType = (creditCardWithTransactions as any).due_date_type;
+    if (dueDateType === 'dynamic_anchor') {
+      // Typically 21 days after statement close for dynamic anchor cards
+      const dueDate = new Date(cycleEnd);
+      dueDate.setDate(dueDate.getDate() + 21);
+      
+      // If manual due day is configured, try to hit that target day (but adjust if needed)
+      if (creditCardWithTransactions.manual_due_day) {
+        const targetDueDay = Number(creditCardWithTransactions.manual_due_day);
+        const targetMonth = dueDate.getMonth();
+        const targetYear = dueDate.getFullYear();
+        const daysInDueMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+        const adjustedDueDay = Math.min(targetDueDay, daysInDueMonth);
+        
+        // Use the target due day if it's within a reasonable range (±5 days) of calculated due
+        const targetDueDate = new Date(targetYear, targetMonth, adjustedDueDay);
+        const daysDiff = Math.abs((targetDueDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff <= 5) {
+          return targetDueDate;
+        }
+      }
+      
+      return dueDate;
+    }
+    
+    // Existing logic for same_day and days_before_end
     const y = cycleEnd.getFullYear();
     const m = cycleEnd.getMonth() + 1; // next month
     const y2 = y + (m > 11 ? 1 : 0);

@@ -37,6 +37,13 @@ export async function PATCH(
           { status: 400 }
         );
       }
+    } else if (cycleDateType === 'dynamic_anchor') {
+      if (!cycleDay || cycleDay < 1 || cycleDay > 31) {
+        return NextResponse.json(
+          { error: 'Anchor day must be between 1 and 31' },
+          { status: 400 }
+        );
+      }
     }
 
     if (dueDateType === 'same_day') {
@@ -50,6 +57,13 @@ export async function PATCH(
       if (dueDaysBeforeEnd === undefined || dueDaysBeforeEnd < 1 || dueDaysBeforeEnd > 31) {
         return NextResponse.json(
           { error: 'Due days before end must be between 1 and 31' },
+          { status: 400 }
+        );
+      }
+    } else if (dueDateType === 'dynamic_anchor') {
+      if (!dueDay || dueDay < 1 || dueDay > 31) {
+        return NextResponse.json(
+          { error: 'Due date anchor must be between 1 and 31' },
           { status: 400 }
         );
       }
@@ -81,7 +95,7 @@ export async function PATCH(
     const calculateDate = (
       year: number, 
       month: number, 
-      dateType: 'same_day' | 'days_before_end', 
+      dateType: 'same_day' | 'days_before_end' | 'dynamic_anchor', 
       dayOfMonth?: number, 
       daysBeforeEnd?: number
     ): Date => {
@@ -92,6 +106,12 @@ export async function PATCH(
         const lastDay = new Date(year, month + 1, 0).getDate();
         const calculatedDay = lastDay - daysBeforeEnd;
         return new Date(year, month, Math.max(1, calculatedDay));
+      } else if (dateType === 'dynamic_anchor' && dayOfMonth) {
+        // For dynamic anchor, use the day of month as the target anchor
+        // This is a simplified version - the actual dynamic logic happens in billingCycles.ts
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const anchorDay = Math.min(dayOfMonth, daysInMonth);
+        return new Date(year, month, anchorDay);
       }
       throw new Error('Invalid date calculation parameters');
     };
@@ -164,8 +184,8 @@ export async function PATCH(
     const { data: updatedCard, error: updateError } = await supabaseAdmin
       .from('credit_cards')
       .update({
-        manual_cycle_day: cycleDateType === 'same_day' ? cycleDay : null,
-        manual_due_day: dueDateType === 'same_day' ? dueDay : null,
+        manual_cycle_day: (cycleDateType === 'same_day' || cycleDateType === 'dynamic_anchor') ? cycleDay : null,
+        manual_due_day: (dueDateType === 'same_day' || dueDateType === 'dynamic_anchor') ? dueDay : null,
         cycle_date_type: cycleDateType,
         cycle_days_before_end: cycleDateType === 'days_before_end' ? cycleDaysBeforeEnd : null,
         due_date_type: dueDateType,
