@@ -428,7 +428,7 @@ export function DueDateCard({
     }
     
     // CRITICAL: Check for payment transactions that match statement balances
-    // Look for payments in the past 30 days that occurred after a cycle end date
+    // Simplified: Look for any matching payment in the last 30 days (don't require after cycle end)
     if (card.recentTransactions) {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -444,24 +444,31 @@ export function DueDateCard({
         return transactionDate >= thirtyDaysAgo && isPaymentTransaction(t.name);
       });
       
-      // Check if any payment matches a statement balance from a closed cycle
+      // Check if any payment matches a statement balance from any recent cycle
       for (const cycle of closedCycles) {
-        const cycleEnd = new Date(cycle.endDate);
         const statementAmount = Math.abs(cycle.statementBalance || cycle.totalSpend || 0);
         
         if (statementAmount <= 0) continue; // Skip cycles with no balance
         
-        // Find payment that matches this statement amount and occurred after cycle end
+        // Find payment that matches this statement amount (no date restriction)
         const matchingPayment = recentPayments.find(t => {
-          const transactionDate = new Date(t.date);
           const paymentAmount = Math.abs(t.amount);
           const amountDiff = Math.abs(paymentAmount - statementAmount);
-          
-          return transactionDate > cycleEnd && amountDiff <= 5; // Payment after cycle end, within $5
+          return amountDiff <= 5; // Payment matches amount within $5
         });
         
         if (matchingPayment) {
-          // Found a payment that matches a statement balance and occurred after the cycle
+          // Found a payment that matches a statement balance
+          return true;
+        }
+      }
+      
+      // Also check current balance against most recent closed cycle totalSpend
+      if (closedCycles.length > 0) {
+        const mostRecentClosedCycle = closedCycles[0];
+        const mostRecentSpend = Math.abs(mostRecentClosedCycle.totalSpend || 0);
+        if (mostRecentSpend > 0 && Math.abs(currentBalance - mostRecentSpend) <= 5) {
+          // Current balance matches most recent closed cycle spending = statement paid
           return true;
         }
       }
