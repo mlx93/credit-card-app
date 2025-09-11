@@ -926,8 +926,10 @@ function CardContent({
                             throw new Error('Failed to update cycle dates');
                           }
                           
-                          // Refresh the page to show updated billing cycles
-                          window.location.reload();
+                          // Notify app to refresh ONLY this card's cycles and data
+                          try {
+                            window.dispatchEvent(new CustomEvent('cardCycleDatesUpdated', { detail: { cardId: card.id } }));
+                          } catch {}
                         } catch (error) {
                           console.error('Error updating cycle dates:', error);
                           throw error;

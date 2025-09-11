@@ -1921,8 +1921,45 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
 
     window.addEventListener('creditLimitUpdated', handleCreditLimitUpdate);
     
+    const handleCardCycleDatesUpdated = async (event: any) => {
+      const cardId: string | undefined = event?.detail?.cardId;
+      if (!cardId) return;
+      try {
+        // Mark only this card as loading older cycles
+        setHistoryRefreshingIds(prev => Array.from(new Set([...prev, cardId])));
+        
+        // Fetch fresh cycles for this card only (prefer full history for correctness)
+        const fullRes = await fetch(`/api/user/billing-cycles?cardId=${encodeURIComponent(cardId)}`, { cache: 'no-store' });
+        if (fullRes.ok) {
+          const { billingCycles: all } = await fullRes.json();
+          const newCycles = Array.isArray(all) ? all : [];
+          setBillingCycles(prev => {
+            // Remove old cycles for this card and replace with new ones
+            const kept = Array.isArray(prev) ? prev.filter(c => c.creditCardId !== cardId) : [];
+            return dedupeCycles([...kept, ...newCycles]);
+          });
+        }
+        
+        // Refresh card metadata (e.g., statement dates) lightly
+        const cardsRes = await fetch('/api/user/credit-cards?light=1', { cache: 'no-store' });
+        if (cardsRes.ok) {
+          const { creditCards: cards } = await cardsRes.json();
+          if (Array.isArray(cards) && cards.length > 0) {
+            setCreditCards(cards);
+          }
+        }
+      } catch (e) {
+        console.warn('Per-card cycles refresh failed:', e);
+      } finally {
+        setHistoryRefreshingIds(prev => prev.filter(id => id !== cardId));
+      }
+    };
+
+    window.addEventListener('cardCycleDatesUpdated', handleCardCycleDatesUpdated);
+    
     return () => {
       window.removeEventListener('creditLimitUpdated', handleCreditLimitUpdate);
+      window.removeEventListener('cardCycleDatesUpdated', handleCardCycleDatesUpdated);
     };
   }, []);
 
