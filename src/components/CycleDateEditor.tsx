@@ -64,7 +64,7 @@ export default function CycleDateEditor({
     let dueDaysBeforeEndNum: number | undefined;
     
     // Validate cycle date settings
-    if (dateType === 'same_day') {
+    if (cycleDateType === 'same_day') {
       cycleDayNum = parseInt(cycleDayInput.trim());
       if (isNaN(cycleDayNum) || !Number.isInteger(cycleDayNum)) {
         setError('Statement close day must be a valid number');
@@ -74,7 +74,7 @@ export default function CycleDateEditor({
         setError('Statement close day must be between 1 and 31');
         return;
       }
-    } else if (dateType === 'days_before_end') {
+    } else if (cycleDateType === 'days_before_end') {
       cycleDaysBeforeEndNum = parseInt(cycleDaysBeforeEndInput.trim());
       if (isNaN(cycleDaysBeforeEndNum) || !Number.isInteger(cycleDaysBeforeEndNum)) {
         setError('Days before month end must be a valid number');
@@ -84,7 +84,7 @@ export default function CycleDateEditor({
         setError('Days before month end must be between 1 and 31');
         return;
       }
-    } else if (dateType === 'dynamic_anchor') {
+    } else if (cycleDateType === 'dynamic_anchor') {
       // For dynamic anchor, we use the cycleDayInput as the anchor day
       cycleDayNum = parseInt(cycleDayInput.trim());
       if (isNaN(cycleDayNum) || !Number.isInteger(cycleDayNum)) {

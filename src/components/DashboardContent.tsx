@@ -77,7 +77,16 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   const [lastBackgroundSync, setLastBackgroundSync] = useState<Date | null>(null);
   const [recentCardAddition, setRecentCardAddition] = useState(false);
   const [cardDeletionInProgress, setCardDeletionInProgress] = useState(false);
-  const [sharedCardOrder, setSharedCardOrder] = useState<string[]>([]);
+  // Initialize shared card order from local cache immediately to avoid race
+  const [sharedCardOrder, setSharedCardOrder] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('cached_card_order');
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return [];
+  });
   // Pinned new cards: always placed at the front until the user reorders
   const [pinnedNewCardIds, setPinnedNewCardIds] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
