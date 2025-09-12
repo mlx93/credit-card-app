@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
   try {
     console.log('👥 Fetching all users...');
     
-    // Get all users (including potentially deleted ones)
+    // Get all users
     const { data: users, error: usersError } = await supabaseAdmin
       .from('users')
-      .select('id, email, name, createdAt, updatedAt, deletedAt')
+      .select('id, email, name, createdAt, updatedAt')
       .order('createdAt', { ascending: true });
 
     if (usersError) {
@@ -62,13 +62,10 @@ export async function GET(request: NextRequest) {
         authType = 'Email Code';
       }
       
-      const isDeleted = !!user.deletedAt;
-      
       console.log(`👥 User ${user.email}:`, {
         authType,
         plaidConnections: userPlaidItems.length,
         creditCards: userCreditCards.length,
-        isDeleted,
         accounts: userAccounts
       });
       
@@ -78,8 +75,6 @@ export async function GET(request: NextRequest) {
         name: user.name || 'No name',
         createdAt: user.createdAt,
         authType,
-        isDeleted,
-        deletedAt: user.deletedAt,
         plaidConnections: userPlaidItems.length,
         plaidConnectionDetails: userPlaidItems.map(item => ({
           institutionName: item.institutionName,
@@ -93,19 +88,14 @@ export async function GET(request: NextRequest) {
 
     console.log(`👥 Found ${users?.length || 0} total users`);
 
-    const activeUsers = usersWithDetails.filter(u => !u.isDeleted);
-    const deletedUsers = usersWithDetails.filter(u => u.isDeleted);
-
     return NextResponse.json({
       totalUsers: users?.length || 0,
-      activeUsers: activeUsers.length,
-      deletedUsers: deletedUsers.length,
       users: usersWithDetails,
       summary: {
-        emailAuthUsers: activeUsers.filter(u => u.authType === 'Email Code').length,
-        oauthUsers: activeUsers.filter(u => u.authType === 'Google OAuth').length,
-        totalPlaidConnections: activeUsers.reduce((sum, u) => sum + u.plaidConnections, 0),
-        totalCreditCards: activeUsers.reduce((sum, u) => sum + u.creditCards, 0)
+        emailAuthUsers: usersWithDetails.filter(u => u.authType === 'Email Code').length,
+        oauthUsers: usersWithDetails.filter(u => u.authType === 'Google OAuth').length,
+        totalPlaidConnections: usersWithDetails.reduce((sum, u) => sum + u.plaidConnections, 0),
+        totalCreditCards: usersWithDetails.reduce((sum, u) => sum + u.creditCards, 0)
       }
     });
 
