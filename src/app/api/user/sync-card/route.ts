@@ -45,10 +45,38 @@ export async function POST(request: NextRequest) {
       const accountSyncResult = await plaidService.syncAccounts(decryptedAccessToken, plaidItem.itemId);
       console.log('Step 1: Account sync completed');
       
-      console.log('Step 2: Syncing transactions (12 months)...');
+      console.log('Step 2a: Quick sync - Recent transactions (3 months) for instant display...');
+      try {
+        await plaidService.syncRecentTransactions(plaidItem, decryptedAccessToken);
+        console.log('✅ Recent transactions synced (3 months)');
+        
+        // Calculate current and recent closed cycles for immediate display
+        const { calculateCurrentBillingCycle, calculateRecentClosedCycle } = await import('@/utils/billingCycles');
+        const { data: cards } = await supabaseAdmin
+          .from('credit_cards')
+          .select('id, name')
+          .eq('plaidItemId', plaidItem.id);
+          
+        let quickCyclesCalculated = 0;
+        for (const card of cards || []) {
+          try {
+            const currentCycle = await calculateCurrentBillingCycle(card.id);
+            const recentClosed = await calculateRecentClosedCycle(card.id);
+            if (currentCycle) quickCyclesCalculated++;
+            if (recentClosed) quickCyclesCalculated++;
+          } catch (cycleError) {
+            console.warn(`Quick cycle calc failed for ${card.name}:`, cycleError);
+          }
+        }
+        console.log(`✅ Quick billing cycles calculated: ${quickCyclesCalculated} cycles`);
+      } catch (quickSyncError) {
+        console.warn('⚠️ Quick sync failed, proceeding with full sync:', quickSyncError);
+      }
+      
+      console.log('Step 2b: Full transaction sync (12 months)...');
       // Use syncTransactions for full 12-month sync (or institution limits)
       await plaidService.syncTransactions(plaidItem, decryptedAccessToken);
-      console.log('Step 2: Transaction sync completed (up to 12 months)');
+      console.log('Step 2b: Full transaction sync completed (up to 12 months)');
 
       // Update connection status to active on successful sync
       const { error: updateError } = await supabaseAdmin
