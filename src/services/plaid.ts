@@ -216,6 +216,20 @@ class PlaidServiceImpl implements PlaidService {
       try {
         return await operation();
       } catch (error: any) {
+        // Handle PRODUCT_NOT_READY (Plaid needs more time to prepare the product after link)
+        const plaidCode = error?.response?.data?.error_code;
+        if (plaidCode === 'PRODUCT_NOT_READY') {
+          if (attempt >= maxRetries) {
+            console.warn('⏳ Plaid product not ready after retries; giving up');
+            throw error;
+          }
+          const jitter = Math.random() * 500; // small jitter
+          const delay = (baseDelay * (attempt + 1)) + jitter; // gentle linear backoff
+          console.log(`⏳ PRODUCT_NOT_READY; waiting ${Math.round(delay)}ms before retry ${attempt}/${maxRetries}`);
+          await this.delay(delay);
+          continue;
+        }
+
         // Check if it's a rate limit error (429)
         if (error.response?.status === 429) {
           if (attempt >= maxRetries) {
@@ -1349,13 +1363,23 @@ class PlaidServiceImpl implements PlaidService {
       console.log(`⚡ RECENT SYNC DATE RANGE: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
       
       // Get transactions for the shorter date range
-      const transactions = await this.getTransactions(
+      let transactions: any[] = [];
+      try {
+        transactions = await this.getTransactions(
         accessToken,
         startDate,
         endDate,
         isCapitalOneItem,
         isRobinhoodItem
-      );
+        );
+      } catch (e: any) {
+        if (e?.response?.data?.error_code === 'PRODUCT_NOT_READY') {
+          console.warn('⏳ Plaid PRODUCT_NOT_READY during instant setup; proceeding without transactions');
+          transactions = [];
+        } else {
+          throw e;
+        }
+      }
 
       console.log(`⚡ Got ${transactions.length} recent transactions for instant setup`);
       
