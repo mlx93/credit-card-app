@@ -377,7 +377,8 @@ export function DueDateCard({
   // Otherwise, use manual limit if available
   const effectiveLimit = hasValidPlaidLimit ? card.balanceLimit : (isManualLimit ? card.manualcreditlimit : null);
   const hasValidEffectiveLimit = effectiveLimit && effectiveLimit > 0 && isFinite(effectiveLimit) && !isNaN(effectiveLimit);
-  const utilization = hasValidEffectiveLimit ? Math.abs(card.balanceCurrent) / effectiveLimit * 100 : 0;
+  // Note: utilization will be recalculated after currentBalance is determined
+  let utilization = 0;
   
   // Editing is ONLY allowed when there's NO valid Plaid limit (regardless of manual limit status)
   const allowEditing = !hasValidPlaidLimit;
@@ -404,8 +405,52 @@ export function DueDateCard({
     });
   }
 
-  // Check if card is paid off - should only be true if there are genuinely no outstanding balances
-  const currentBalance = Math.abs(card.balanceCurrent || 0);
+  // Determine current balance with fallback calculation
+  let currentBalance = Math.abs(card.balanceCurrent || 0);
+  let currentBalanceSource = 'plaid_account';
+  
+  // If no Plaid balance is available, calculate from transaction data (last resort)
+  if (!card.balanceCurrent || card.balanceCurrent === 0) {
+    // Try to calculate from recent cycles and transactions
+    const today = new Date();
+    const closedCycles = (card.recentCycles || [])
+      .filter(cycle => new Date(cycle.endDate) < today)
+      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+    
+    if (closedCycles.length > 0) {
+      const mostRecentClosed = closedCycles[0];
+      const statementBalance = Math.abs(mostRecentClosed.statementBalance || mostRecentClosed.totalSpend || 0);
+      
+      // Find current/open cycle
+      const openCycle = (card.recentCycles || []).find(cycle => {
+        const cycleEnd = new Date(cycle.endDate);
+        return cycleEnd >= today;
+      });
+      
+      const currentCycleSpending = openCycle ? Math.abs(openCycle.totalSpend || 0) : 0;
+      
+      // Calculate: statement balance + current cycle spending
+      if (statementBalance > 0 || currentCycleSpending > 0) {
+        currentBalance = statementBalance + currentCycleSpending;
+        currentBalanceSource = 'calculated_from_transactions';
+        console.log(`📊 ${card.name}: Calculated current balance from transactions:`, {
+          statementBalance,
+          currentCycleSpending,
+          calculatedBalance: currentBalance
+        });
+      }
+    }
+  }
+  
+  // Log the balance source for debugging
+  console.log(`💳 ${card.name} - Current Balance:`, {
+    balance: currentBalance,
+    source: currentBalanceSource,
+    plaidBalance: card.balanceCurrent
+  });
+  
+  // Now calculate utilization with the determined currentBalance
+  utilization = hasValidEffectiveLimit ? currentBalance / effectiveLimit * 100 : 0;
   
   // Calculate if there are any unpaid statement balances
   const calculateIsPaidOff = (): boolean => {
@@ -574,7 +619,7 @@ export function DueDateCard({
         // Calculate previous limit and new utilization for popup
         const previousLimit = isManualLimit ? card.manualcreditlimit : null;
         const plaidLimit = hasValidPlaidLimit ? card.balanceLimit : null;
-        const newUtilization = limit ? (Math.abs(card.balanceCurrent) / limit) * 100 : 0;
+        const newUtilization = limit ? (currentBalance / limit) * 100 : 0;
         
         // Update the card data locally to avoid page reload
         if (data.card) {
@@ -702,7 +747,7 @@ export function DueDateCard({
                   </div>
                   <p className="text-[11px] font-semibold text-gray-700">All Paid</p>
                   {/* Show upcoming date (no "Next" label to save vertical space) */}
-                  {card.balanceCurrent > 0 && card.nextPaymentDueDate && (
+                  {currentBalance > 0 && card.nextPaymentDueDate && (
                     <div className="mt-0.5 text-center text-gray-600 whitespace-normal break-words">
                       {(() => {
                         const currentDueDate = new Date(card.nextPaymentDueDate);
@@ -882,7 +927,7 @@ export function DueDateCard({
             <div className="text-center pl-4">
               <p className="text-xs text-gray-600">Current Balance</p>
               <p className="font-bold text-lg text-gray-900">
-                {formatCurrency(Math.abs(card.balanceCurrent))}
+                {formatCurrency(currentBalance)}
               </p>
             </div>
           </div>
@@ -892,7 +937,7 @@ export function DueDateCard({
           <div>
             <p className="text-xs text-gray-600">Balance</p>
             <p className="font-bold text-lg text-gray-900">
-              {formatCurrency(Math.abs(card.balanceCurrent))}
+              {formatCurrency(currentBalance)}
             </p>
             <div className="text-xs font-medium min-h-[16px]">
               {isPaidOff && (
@@ -902,7 +947,7 @@ export function DueDateCard({
               // Show "Statement paid ✓" if we have transaction data and found a matching payment,
               // or if we don't have transaction data but balance suggests payment (fallback)
               const statementBalance = Math.abs(card.lastStatementBalance || 0);
-              const currentBalance = Math.abs(card.balanceCurrent || 0);
+              // Note: currentBalance is already calculated above
               
               // Use same logic as statement balance hiding: check for recent paid cycles first
               const hasRecentPaidCycle = (card.recentCycles || []).some(cycle => {

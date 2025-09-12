@@ -948,10 +948,11 @@ class PlaidServiceImpl implements PlaidService {
         });
         console.log('=== END DEBUG ===');
 
-        // Always prefer liability data when available (most up-to-date from liabilities endpoint)
-        const currentBalance = liability?.balances?.current !== undefined
-          ? liability.balances.current 
-          : (balanceAccount?.balances?.current ?? accountsAccount?.balances?.current ?? account.balances.current);
+        // Prefer account balance (cleared transactions only) over liability balance (includes pending)
+        // This provides a more stable view without uncleared transactions
+        const currentBalance = account.balances.current !== undefined
+          ? account.balances.current
+          : (balanceAccount?.balances?.current ?? accountsAccount?.balances?.current ?? liability?.balances?.current);
           
         const availableBalance = liability?.balances?.available !== undefined
           ? liability.balances.available
