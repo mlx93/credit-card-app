@@ -1011,8 +1011,8 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       const syncResult = await syncWithPlaidAPI(' Refresh All', true); // Force sync regardless of recent sync
       console.log('Sync API success result:', syncResult);
       
-      // Sync 30-day transactions for all unique Plaid items
-      setRefreshStep('Syncing recent transactions...');
+      // Sync 12 months of transactions for all unique Plaid items
+      setRefreshStep('Syncing transaction history...');
       setRefreshProgress(40);
       
       const uniqueItemIds = new Set(creditCards
@@ -1028,7 +1028,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         setRefreshProgress(progress);
         
         try {
-          console.log(`📊 Syncing 30-day transactions for item ${itemId}`);
+          console.log(`📊 Syncing 12 months of transactions for item ${itemId}`);
           const syncResponse = await fetch('/api/user/sync-card', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1125,7 +1125,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
     console.log(`🎯 handleCardSync called with itemId: ${itemId}, cardId: ${cardId || 'all'}`);
     try {
       // First, sync fresh transactions from Plaid
-      console.log(`📡 Fetching fresh 30-day transactions from Plaid for ${cardId ? 'card ' + cardId : 'all cards in item'}...`);
+      console.log(`📡 Fetching 12 months of transactions from Plaid for ${cardId ? 'card ' + cardId : 'all cards in item'}...`);
       const syncResponse = await fetch('/api/user/sync-card', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

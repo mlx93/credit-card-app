@@ -92,18 +92,17 @@ export async function POST(request: NextRequest) {
         const accountsProcessed = accountSyncResult?.accountsProcessed || 0;
         const creditCardsFound = accountSyncResult?.creditCardsFound || 0;
         
-        console.log('Step 2: Syncing transactions...');
+        console.log('Step 2: Syncing transactions (12 months)...');
         console.log('About to call plaidService.syncTransactions with:', { itemId: item.itemId, hasAccessToken: !!decryptedAccessToken });
         console.log('PlaidService method exists?', typeof plaidService.syncTransactions);
         
         try {
-          // Use 30-day sync for regular refreshes to reduce API costs
-          // Historical transactions are preserved from initial card setup
+          // Use full syncTransactions for 12-month sync (or institution limits)
           if (forceSync) {
-            console.log('⚡ Force sync: Using 30-day transaction sync');
+            console.log('⚡ Force sync: Using full 12-month transaction sync');
           }
-          await plaidService.sync30DayTransactions(item, decryptedAccessToken);
-          console.log('Step 2: 30-day transaction sync completed successfully');
+          await plaidService.syncTransactions(item, decryptedAccessToken);
+          console.log('Step 2: Transaction sync completed successfully (up to 12 months)');
         } catch (syncError) {
           console.error('🚨 TRANSACTION SYNC ERROR:', syncError);
           console.error('Error details:', {
