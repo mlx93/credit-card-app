@@ -45,9 +45,10 @@ export async function POST(request: NextRequest) {
       const accountSyncResult = await plaidService.syncAccounts(decryptedAccessToken, plaidItem.itemId);
       console.log('Step 1: Account sync completed');
       
-      console.log('Step 2: Syncing recent transactions...');
-      await plaidService.sync30DayTransactions(plaidItem, decryptedAccessToken, cardId);
-      console.log('Step 2: 30-day transaction sync completed');
+      console.log('Step 2: Syncing transactions (12 months)...');
+      // Use syncTransactions for full 12-month sync (or institution limits)
+      await plaidService.syncTransactions(plaidItem, decryptedAccessToken);
+      console.log('Step 2: Transaction sync completed (up to 12 months)');
 
       // Update connection status to active on successful sync
       const { error: updateError } = await supabaseAdmin
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: `Successfully synced account data, 30-day transactions, and regenerated billing cycles`,
+      message: `Successfully synced account data, 12 months of transactions, and regenerated billing cycles`,
       cardsSynced: creditCardIds.length
     });
 

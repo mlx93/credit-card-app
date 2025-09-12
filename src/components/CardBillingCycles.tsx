@@ -727,28 +727,90 @@ function CardContent({
       return includesHEOday;
     });
     
-    // Find most recently closed cycle based on card's lastStatementIssueDate
-    // The cycle ending on or just before the statement date is the most recent closed cycle
-    const lastStatementDate = card?.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
-    
+    // Find most recently closed cycle using improved logic for manual dates
+    // For manual cycle configuration: determine if current month's cycle has closed based on user settings
     let mostRecentClosedCycle = null;
-    if (lastStatementDate) {
-      // Find the cycle that ends on the statement date (most accurate method)
+    
+    if (card?.manual_dates_configured) {
+      console.log('🔧 Using manual date logic to identify most recent closed cycle');
+      
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const todayDate = today.getDate();
+      
+      // Calculate the cycle end day for current month based on user's manual settings
+      let cycleEndDay: number;
+      
+      if (card.cycle_date_type === 'same_day' && card.manual_cycle_day) {
+        cycleEndDay = card.manual_cycle_day;
+      } else if (card.cycle_date_type === 'days_before_end' && card.cycle_days_before_end) {
+        const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        cycleEndDay = daysInCurrentMonth - card.cycle_days_before_end;
+      } else if (card.cycle_date_type === 'dynamic_anchor' && card.manual_cycle_day) {
+        const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        cycleEndDay = Math.min(card.manual_cycle_day, daysInCurrentMonth);
+      } else {
+        // Fallback to statement date method
+        cycleEndDay = card.lastStatementIssueDate ? new Date(card.lastStatementIssueDate).getDate() : 1;
+      }
+      
+      // If today >= cycle end day, then current month's cycle has closed
+      // Otherwise, last month's cycle is the most recent closed
+      let targetMonth: number, targetYear: number;
+      if (todayDate >= cycleEndDay) {
+        // Current month's cycle has closed
+        targetMonth = currentMonth;
+        targetYear = currentYear;
+      } else {
+        // Last month's cycle is most recent closed
+        targetMonth = currentMonth - 1;
+        targetYear = currentMonth === 0 ? currentYear - 1 : currentYear; // Handle January -> December
+      }
+      
+      // Find the cycle that ends in the target month
       mostRecentClosedCycle = sortedCycles.find(c => {
         const cycleEnd = new Date(c.endDate);
-        const diffDays = Math.abs((cycleEnd.getTime() - lastStatementDate.getTime()) / (1000 * 60 * 60 * 24));
-        return diffDays <= 1; // Allow 1-day difference for timezone/date precision
+        return cycleEnd.getMonth() === targetMonth && cycleEnd.getFullYear() === targetYear;
       });
       
-      // Fallback: if no exact match, find the most recent cycle that ended before today
-      if (!mostRecentClosedCycle) {
+      console.log('🔍 Manual cycle identification:', {
+        todayDate,
+        cycleEndDay,
+        targetMonth: targetMonth + 1, // Display as 1-12
+        targetYear,
+        foundCycle: mostRecentClosedCycle ? {
+          id: mostRecentClosedCycle.id,
+          endDate: mostRecentClosedCycle.endDate
+        } : null
+      });
+    } 
+    
+    // Fallback to statement date method for non-manual configurations
+    if (!mostRecentClosedCycle) {
+      const lastStatementDate = card?.lastStatementIssueDate ? new Date(card.lastStatementIssueDate) : null;
+      
+      if (lastStatementDate) {
+        // Find the cycle that ends on the statement date (most accurate method)
         mostRecentClosedCycle = sortedCycles.find(c => {
-          const end = new Date(c.endDate);
-          return end < today;
+          const cycleEnd = new Date(c.endDate);
+          const diffDays = Math.abs((cycleEnd.getTime() - lastStatementDate.getTime()) / (1000 * 60 * 60 * 24));
+          return diffDays <= 1; // Allow 1-day difference for timezone/date precision
         });
+        
+        // Fallback: if no exact match, find the most recent cycle that ended before today
+        if (!mostRecentClosedCycle) {
+          mostRecentClosedCycle = sortedCycles.find(c => {
+            const end = new Date(c.endDate);
+            return end < today;
+          });
+        }
       }
-    } else {
-      // Fallback for cards without statement date: look for cycles with statement balance OR totalSpend
+    }
+    
+    // Final fallback for cards without statement date or manual config
+    if (!mostRecentClosedCycle) {
+      // Fallback for cards without statement date or manual config: look for cycles with statement balance OR totalSpend
       // This ensures Bilt and other cards without statement dates still identify their most recent closed cycle
       const closedCyclesWithData = sortedCycles.filter(c => {
         const end = new Date(c.endDate);
