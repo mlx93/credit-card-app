@@ -1950,7 +1950,7 @@ class PlaidServiceImpl implements PlaidService {
       }
 
       const creditCardIds = (creditCards || []).map(card => card.id);
-      console.log(`Found ${creditCardIds.length} credit cards for 30-day sync ${cardId ? '(filtered by cardId)' : '(all cards)'}`);}
+      console.log(`Found ${creditCardIds.length} credit cards for 30-day sync ${cardId ? '(filtered by cardId)' : '(all cards)'}`);
 
       // Step 2: Delete existing transactions in the 30-day window
       if (creditCardIds.length > 0) {
