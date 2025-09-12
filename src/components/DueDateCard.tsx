@@ -808,33 +808,60 @@ export function DueDateCard({
           .filter(cycle => new Date(cycle.endDate) < today)
           .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
         
-        // Determine which statement balance to show (payment detection already handled by isPaidOff)
-        let statementBalance = 0;
-        
-        // First preference: Use Plaid's statement balance if available
-        if (plaidStatementBalance > 0) {
-          statementBalance = plaidStatementBalance;
-        } else {
-          // Fallback: Use most recent cycle data
-          const mostRecentCycle = closedCycles.find(cycle => 
-            cycle.totalSpend > 0 || cycle.statementBalance > 0
-          );
-          
-          if (mostRecentCycle) {
-            statementBalance = Math.abs(mostRecentCycle.totalSpend || mostRecentCycle.statementBalance || 0);
-          }
+        // New logic: Never manually override, check paid status first
+        // Rule 1: If statement is paid off, hide the field entirely
+        if (isPaidOff) {
+          console.log(`✅ ${card.name}: Statement is paid off, hiding field`);
+          return null;
         }
-        // Otherwise, no statement to show (all paid or no data)
         
-        console.log(`🔍 Statement balance for ${card.name}:`, {
-          plaidStatementBalance,
-          statementBalance,
-          source: plaidStatementBalance > 0 ? 'plaid' : 'cycle_data'
+        // Rule 2: Prefer most recent closed cycle with statement balance
+        let statementBalance = 0;
+        let statementSource = 'none';
+        
+        // Find the most recent closed cycle with a statement balance
+        const mostRecentClosedCycle = closedCycles.find(cycle => {
+          const hasStatementBalance = cycle.statementBalance && cycle.statementBalance > 0;
+          return hasStatementBalance;
         });
         
-        // Don't show statement section if there's no statement balance
+        if (mostRecentClosedCycle && mostRecentClosedCycle.statementBalance) {
+          statementBalance = Math.abs(mostRecentClosedCycle.statementBalance);
+          statementSource = 'cycle_statement';
+        }
+        // Also check Plaid's statement balance as a secondary source
+        else if (plaidStatementBalance > 0) {
+          statementBalance = plaidStatementBalance;
+          statementSource = 'plaid_statement';
+        }
+        // Rule 3: Rare fallback - only if we have a recent closed cycle with transactions but no statement data
+        else {
+          const mostRecentClosedWithTransactions = closedCycles.find(cycle => 
+            cycle.totalSpend && cycle.totalSpend > 0
+          );
+          
+          // Only use this if it's truly the most recent closed cycle and we have no statement data
+          if (mostRecentClosedWithTransactions && closedCycles.indexOf(mostRecentClosedWithTransactions) === 0) {
+            statementBalance = Math.abs(mostRecentClosedWithTransactions.totalSpend);
+            statementSource = 'calculated_from_transactions';
+            console.log(`⚠️ ${card.name}: Using transaction-calculated balance as rare fallback`);
+          }
+        }
+        
+        console.log(`🔍 Statement balance logic for ${card.name}:`, {
+          isPaidOff,
+          statementBalance,
+          source: statementSource,
+          mostRecentClosedCycle: mostRecentClosedCycle ? {
+            endDate: mostRecentClosedCycle.endDate,
+            statementBalance: mostRecentClosedCycle.statementBalance,
+            totalSpend: mostRecentClosedCycle.totalSpend
+          } : null
+        });
+        
+        // Rule 4: Never show $0 - hide the field instead
         if (!statementBalance || statementBalance <= 0) {
-          return null; // Return null instead of false
+          return null;
         }
         
         // Payment detection is now handled by isPaidOff - no need for duplicate logic here
