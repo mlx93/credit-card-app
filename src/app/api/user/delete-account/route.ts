@@ -156,7 +156,33 @@ export async function DELETE(request: NextRequest) {
       console.log('No user_preferences table found (this is fine)');
     }
 
-    // Step 6: Log comprehensive deletion summary
+    // Step 6: Delete OAuth accounts (NextAuth accounts table)
+    const { error: accountsError, count: accountsCount } = await supabaseAdmin
+      .from('accounts')
+      .delete({ count: 'exact' })
+      .eq('userId', userId);
+    
+    if (accountsError) {
+      console.error('Error deleting OAuth accounts:', accountsError);
+      return NextResponse.json({ error: 'Failed to delete authentication data' }, { status: 500 });
+    }
+    
+    const accountsDeleted = accountsCount || 0;
+
+    // Step 7: Finally delete the user record itself
+    const { error: userDeleteError, count: userCount } = await supabaseAdmin
+      .from('users')
+      .delete({ count: 'exact' })
+      .eq('id', userId);
+    
+    if (userDeleteError) {
+      console.error('Error deleting user record:', userDeleteError);
+      return NextResponse.json({ error: 'Failed to delete user record' }, { status: 500 });
+    }
+
+    const userDeleted = userCount || 0;
+
+    // Step 8: Log comprehensive deletion summary
     console.log(`🎯 ACCOUNT DELETION COMPLETED for user ${userId}:`);
     console.log(`   • APR records: ${deletionSummary.aprs}`);
     console.log(`   • Billing cycles: ${deletionSummary.billingCycles}`);  
@@ -164,12 +190,18 @@ export async function DELETE(request: NextRequest) {
     console.log(`   • Credit cards: ${deletionSummary.creditCards}`);
     console.log(`   • Plaid connections: ${deletionSummary.plaidItems}`);
     console.log(`   • User preferences: ${deletionSummary.userPreferences}`);
-    console.log(`🗑️ Total data points deleted: ${Object.values(deletionSummary).reduce((a, b) => a + b, 0)}`);
+    console.log(`   • OAuth accounts: ${accountsDeleted}`);
+    console.log(`   • User record: ${userDeleted}`);
+    console.log(`🗑️ Total data points deleted: ${Object.values(deletionSummary).reduce((a, b) => a + b, 0) + accountsDeleted + userDeleted}`);
 
     return NextResponse.json({ 
       success: true, 
       message: 'Account and all associated data successfully deleted',
-      deletionSummary
+      deletionSummary: {
+        ...deletionSummary,
+        accounts: accountsDeleted,
+        user: userDeleted
+      }
     });
 
   } catch (error) {
