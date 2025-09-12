@@ -104,42 +104,31 @@ export async function POST(request: NextRequest) {
         accountToCardMap.set(card.accountId, card.id);
       }
 
-      // Prepare fresh transactions for insertion
-      const transactionsToInsert = [];
+      // Prepare fresh transactions for insertion (match DB schema)
+      const transactionsToInsert: any[] = [];
       for (const transaction of freshTransactions) {
         const creditCardId = accountToCardMap.get(transaction.account_id);
         
         // Only insert if we have a matching credit card
         if (creditCardId && (!cardId || creditCardId === cardId)) {
           transactionsToInsert.push({
+            plaidItemId: plaidItem.id,
+            creditCardId,
             transactionId: transaction.transaction_id,
-            creditCardId: creditCardId,
-            accountId: transaction.account_id,
+            accountid: transaction.account_id,
+            plaidtransactionid: transaction.pending_transaction_id || null,
             amount: transaction.amount,
+            isoCurrencyCode: transaction.iso_currency_code || null,
             date: transaction.date,
-            authorizedDate: transaction.authorized_date,
+            authorizedDate: transaction.authorized_date || null,
             name: transaction.name,
-            merchantName: transaction.merchant_name,
-            paymentChannel: transaction.payment_channel,
-            primary: transaction.personal_finance_category?.primary,
-            detailed: transaction.personal_finance_category?.detailed,
-            confidenceLevel: transaction.personal_finance_category?.confidence_level,
-            pending: transaction.pending,
-            pendingTransactionId: transaction.pending_transaction_id,
-            accountOwner: transaction.account_owner,
-            category: transaction.category?.join(', '),
-            locationAddress: transaction.location?.address,
-            locationCity: transaction.location?.city,
-            locationRegion: transaction.location?.region,
-            locationPostalCode: transaction.location?.postal_code,
-            locationCountry: transaction.location?.country,
-            locationLat: transaction.location?.lat,
-            locationLon: transaction.location?.lon,
-            locationStoreNumber: transaction.location?.store_number,
-            isoCurrencyCode: transaction.iso_currency_code,
-            unofficialCurrencyCode: transaction.unofficial_currency_code,
-            logoUrl: transaction.logo_url,
-            website: transaction.website
+            merchantName: transaction.merchant_name || null,
+            category: transaction.personal_finance_category?.primary || (transaction.category ? transaction.category.join(', ') : null),
+            categoryId: transaction.category_id || null,
+            subcategory: transaction.personal_finance_category?.detailed || null,
+            accountOwner: transaction.account_owner || null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           });
         }
       }
