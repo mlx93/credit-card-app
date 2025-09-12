@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { plaidClient } from '@/lib/plaid';
+import { decrypt } from '@/lib/encryption';
 
 function getWebhookUrl(): string {
   // Prefer explicit APP_URL for server-to-server callbacks, fall back to NEXT_PUBLIC_APP_URL

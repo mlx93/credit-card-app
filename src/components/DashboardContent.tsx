@@ -2381,7 +2381,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         
         {/* Header Metrics - utilizing more horizontal space */}
         <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4" suppressHydrationWarning={true}>
           <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center">
               <TrendingUp className="h-7 w-7 text-green-600 mr-3" />
@@ -2454,7 +2454,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
               <p className="text-gray-600">Loading your credit cards...</p>
             </div>
           ) : displayCards.length > 0 ? (
-            <div className="relative -mx-7">
+            <div className="relative -mx-7" suppressHydrationWarning={true}>
               <HorizontalCardColumns
                 cards={displayCards}
                 cycles={displayCycles}
