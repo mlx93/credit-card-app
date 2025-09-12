@@ -655,6 +655,14 @@ function CardContent({
       return false;
     }
     
+    // Exclude cycles that end before the card's true open date if provided
+    if (card?.openDate) {
+      const open = new Date(card.openDate as any);
+      if (new Date(cycle.endDate) < open) {
+        return false;
+      }
+    }
+
     if (isCapitalOne) {
       // Capital One: exclude if start date is more than 90 days ago
       if (daysSinceStart > 90) {

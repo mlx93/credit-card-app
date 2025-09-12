@@ -275,6 +275,20 @@ export async function calculateBillingCycles(
       );
     }
 
+    // Filter out cycles prior to adjusted open date (Capital One = earliest transaction; others = true open date)
+    try {
+      const isCapOneByName = isCapitalOneCard(undefined, creditCardWithTransactions.name);
+      const earliestTxn = (transactionsWithDates && transactionsWithDates.length > 0)
+        ? new Date(Math.min(...transactionsWithDates.map(t => t.date.getTime())))
+        : null;
+      const trueOpen = creditCardWithTransactions.openDate ? new Date(creditCardWithTransactions.openDate) : null;
+      const adjustedOpen = isCapOneByName && earliestTxn
+        ? (trueOpen ? (earliestTxn > trueOpen ? earliestTxn : trueOpen) : earliestTxn)
+        : trueOpen;
+      if (adjustedOpen) {
+        cycles = cycles.filter(c => new Date(c.endDate) >= adjustedOpen);
+      }
+    } catch {}
     return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
   }
 
@@ -293,6 +307,19 @@ export async function calculateBillingCycles(
       false,
       transactionsWithDates
     );
+    try {
+      const isCapOneByName = isCapitalOneCard(undefined, creditCardWithTransactions.name);
+      const earliestTxn = (transactionsWithDates && transactionsWithDates.length > 0)
+        ? new Date(Math.min(...transactionsWithDates.map(t => t.date.getTime())))
+        : null;
+      const trueOpen = creditCardWithTransactions.openDate ? new Date(creditCardWithTransactions.openDate) : null;
+      const adjustedOpen = isCapOneByName && earliestTxn
+        ? (trueOpen ? (earliestTxn > trueOpen ? earliestTxn : trueOpen) : earliestTxn)
+        : trueOpen;
+      if (adjustedOpen) {
+        cycles = cycles.filter(c => new Date(c.endDate) >= adjustedOpen);
+      }
+    } catch {}
     return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
   }
 
@@ -519,6 +546,19 @@ export async function calculateBillingCycles(
     transactionsWithDates
   );
 
+  try {
+    const isCapOneByName = isCapitalOneCard(undefined, creditCardWithTransactions.name);
+    const earliestTxn = (transactionsWithDates && transactionsWithDates.length > 0)
+      ? new Date(Math.min(...transactionsWithDates.map(t => t.date.getTime())))
+      : null;
+    const trueOpen = creditCardWithTransactions.openDate ? new Date(creditCardWithTransactions.openDate) : null;
+    const adjustedOpen = isCapOneByName && earliestTxn
+      ? (trueOpen ? (earliestTxn > trueOpen ? earliestTxn : trueOpen) : earliestTxn)
+      : trueOpen;
+    if (adjustedOpen) {
+      cycles = cycles.filter(c => new Date(c.endDate) >= adjustedOpen);
+    }
+  } catch {}
   return cycles.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
 }
 
