@@ -223,33 +223,26 @@ function SortableCardColumn({
             isExpanded ? 'max-h-[2000px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-4'
           }`}
         >
-          {shouldShowCardBillingCycles(cycles, card) && !(olderCyclesLoadingIds && olderCyclesLoadingIds.includes(card.id)) ? (
-            <div className="glass-morphism rounded-xl ios-shadow">
-              <div className="p-4">
-                {/* Section Header */}
-                <div className="flex items-center mb-4">
-                  <div className={`w-1 h-4 bg-gradient-to-b ${billingCycleGradient} rounded-full mr-3`}></div>
-                  <h3 className="text-sm font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                    Recent Billing Cycles
-                  </h3>
-                </div>
-                
-                <CardBillingCycles 
-                  cycles={cycles}
-                  cards={[card]}
-                  cardOrder={[card.id]}
-                  olderCyclesLoadingIds={olderCyclesLoadingIds}
-                  fullCyclesLoading={Boolean(fullCyclesLoading)}
-                  compactMode={true}
-                />
+          <div className="glass-morphism rounded-xl ios-shadow">
+            <div className="p-4">
+              {/* Section Header */}
+              <div className="flex items-center mb-4">
+                <div className={`w-1 h-4 bg-gradient-to-b ${billingCycleGradient} rounded-full mr-3`}></div>
+                <h3 className="text-sm font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                  Recent Billing Cycles
+                </h3>
               </div>
+              
+              <CardBillingCycles 
+                cycles={cycles}
+                cards={[card]}
+                cardOrder={[card.id]}
+                olderCyclesLoadingIds={olderCyclesLoadingIds}
+                fullCyclesLoading={Boolean(fullCyclesLoading)}
+                compactMode={true}
+              />
             </div>
-          ) : (
-            <div className="glass-morphism-dark rounded-xl p-6 text-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full mx-auto mb-2 opacity-40"></div>
-              <p className="text-gray-600 text-sm font-medium">Loading billing cycles…</p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

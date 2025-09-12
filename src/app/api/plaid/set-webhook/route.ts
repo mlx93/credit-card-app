@@ -37,22 +37,14 @@ export async function POST(req: NextRequest) {
 
     const webhook = getWebhookUrl();
     // Configure webhook on the Plaid item
-    await plaidClient.itemWebhookUpdate({
-      access_token: (await (async () => {
-        const { data: rec } = await supabaseAdmin
-          .from('plaid_items')
-          .select('accessToken')
-          .eq('itemId', itemId)
-          .single();
-        if (!rec?.accessToken) throw new Error('Missing access token');
-        // Encrypted at rest; decrypt in lib if necessary — lib/plaid uses env secrets
-        // Here we pass encrypted token to plaid client wrapper which decrypts internally (if implemented)
-        // If not, consider adding decryption here.
-        // For current codebase, plaidClient expects plaintext token; decrypt in services where used.
-        return rec.accessToken as unknown as string;
-      })()),
-      webhook,
-    } as any);
+    const { data: rec } = await supabaseAdmin
+      .from('plaid_items')
+      .select('accessToken')
+      .eq('itemId', itemId)
+      .single();
+    if (!rec?.accessToken) throw new Error('Missing access token');
+    const accessToken = decrypt(rec.accessToken);
+    await plaidClient.itemWebhookUpdate({ access_token: accessToken, webhook });
 
     return NextResponse.json({ success: true, webhook });
   } catch (e: any) {
@@ -60,4 +52,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e?.message || 'Failed to set webhook' }, { status: 500 });
   }
 }
-
