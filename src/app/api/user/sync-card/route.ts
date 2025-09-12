@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing itemId' }, { status: 400 });
     }
 
-    console.log(`🔄 Starting 30-day transaction sync for item ${itemId}, card ${cardId || 'all'}`);
+    console.log(`🔄 Starting sync for item ${itemId}, card ${cardId || 'specific card'}`);
 
     // Get the Plaid item and access token
     const { data: plaidItem, error: plaidItemError } = await supabaseAdmin
@@ -40,147 +40,160 @@ export async function POST(request: NextRequest) {
     }
     const decryptedAccessToken = decrypt(plaidItem.accessToken);
     
-    // Calculate date range (last 30 days)
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
-    
-    console.log(`📅 Fetching transactions from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
-
-    // Fetch fresh transactions from Plaid for the last 30 days
-    // Determine institution flags
-    const instName = (plaidItem.institutionName || '').toLowerCase();
-    const instId = plaidItem.institutionId || '';
-    const isCapitalOne = instName.includes('capital one');
-    const isRobinhood = instId === 'ins_54' || instName.includes('robinhood');
-    
-    let freshTransactions: any[] = [];
     try {
-      freshTransactions = await plaidService.getTransactions(
-        decryptedAccessToken,
-        startDate,
-        endDate,
-        isCapitalOne,
-        isRobinhood
-      );
-    } catch (err: any) {
-      const code = err?.response?.data?.error_code || err?.code || 'UNKNOWN_ERROR';
-      const message = err?.response?.data?.error_message || err?.message || 'Failed to fetch transactions from Plaid';
-      console.error('Plaid transactionsGet error:', { code, message });
-      return NextResponse.json({ error: message, code }, { status: 502 });
-    }
+      console.log('Step 1: Syncing account data...');
+      const accountSyncResult = await plaidService.syncAccounts(decryptedAccessToken, plaidItem.itemId);
+      console.log('Step 1: Account sync completed');
+      
+      console.log('Step 2: Syncing recent transactions...');
+      await plaidService.sync30DayTransactions(plaidItem, decryptedAccessToken, cardId);
+      console.log('Step 2: 30-day transaction sync completed');
 
-    console.log(`✅ Fetched ${freshTransactions.length} transactions from Plaid`);
-
-    if (freshTransactions.length > 0) {
-      // Get credit card IDs for this Plaid item
-      let creditCardIds: string[] = [];
-      if (cardId) {
-        // Sync specific card only
-        creditCardIds = [cardId];
-      } else {
-        // Sync all cards for this Plaid item
-        creditCardIds = plaidItem.credit_cards.map((card: any) => card.id);
-      }
-
-      // Delete existing transactions in the 30-day window for these cards
-      const { error: deleteError } = await supabaseAdmin
-        .from('transactions')
-        .delete()
-        .in('creditCardId', creditCardIds)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0]);
-
-      if (deleteError) {
-        console.error('Error deleting old transactions:', deleteError);
-        throw deleteError;
-      }
-
-      console.log('🗑️ Deleted existing transactions in the 30-day window for selected cards');
-
-      // Create a map of account IDs to credit card IDs
-      const accountToCardMap = new Map();
-      for (const card of plaidItem.credit_cards) {
-        accountToCardMap.set(card.accountId, card.id);
-      }
-
-      // Prepare fresh transactions for insertion (match DB schema)
-      const transactionsToInsert: any[] = [];
-      for (const transaction of freshTransactions) {
-        const creditCardId = accountToCardMap.get(transaction.account_id);
-        
-        // Only insert if we have a matching credit card
-        if (creditCardId && (!cardId || creditCardId === cardId)) {
-          transactionsToInsert.push({
-            id: crypto.randomUUID(),
-            plaidItemId: plaidItem.id,
-            creditCardId,
-            transactionId: transaction.transaction_id,
-            accountid: transaction.account_id,
-            plaidtransactionid: transaction.pending_transaction_id || null,
-            amount: transaction.amount,
-            isoCurrencyCode: transaction.iso_currency_code || null,
-            date: transaction.date,
-            authorizedDate: transaction.authorized_date || null,
-            name: transaction.name,
-            merchantName: transaction.merchant_name || null,
-            category: transaction.personal_finance_category?.primary || (transaction.category ? transaction.category.join(', ') : null),
-            categoryId: transaction.category_id || null,
-            subcategory: transaction.personal_finance_category?.detailed || null,
-            accountOwner: transaction.account_owner || null,
-            pending: transaction.pending || false,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-        }
-      }
-
-      // Insert fresh transactions
-      if (transactionsToInsert.length > 0) {
-        const { error: insertError } = await supabaseAdmin
-          .from('transactions')
-          .insert(transactionsToInsert);
-
-        if (insertError) {
-          console.error('Error inserting fresh transactions:', insertError);
-          throw insertError;
-        }
-
-        console.log(`✅ Inserted ${transactionsToInsert.length} fresh transactions`);
-      }
-
-      // Update the last sync timestamp for the Plaid item
+      // Update connection status to active on successful sync
       const { error: updateError } = await supabaseAdmin
         .from('plaid_items')
-        .update({ lastSyncAt: new Date().toISOString() })
-        .eq('id', plaidItem.id);
+        .update({
+          status: 'active',
+          lastSyncAt: new Date().toISOString(),
+          errorCode: null,
+          errorMessage: null
+        })
+        .eq('itemId', plaidItem.itemId);
 
       if (updateError) {
-        console.error('Error updating last sync time:', updateError);
+        console.error('Failed to update plaid item status:', updateError);
       }
-
-      // Now regenerate billing cycles with the fresh data
-      const { calculateBillingCycles } = await import('@/utils/billingCycles');
+    } catch (error: any) {
+      console.error(`Sync error for ${plaidItem.institutionName} (${plaidItem.itemId}):`, error);
       
-      for (const creditCardId of creditCardIds) {
-        console.log(`🔄 Regenerating billing cycles for card ${creditCardId}`);
-        await calculateBillingCycles(creditCardId);
-      }
+      // Check for specific Plaid connection errors
+      const errorCode = error.error_code || error?.response?.data?.error_code || 'SYNC_ERROR';
+      const errorType = error.error_type || error?.response?.data?.error_type;
+      const statusCode = error?.response?.status || 0;
+      
+      // Enhanced error detection - include 400 status codes and more error types
+      const isConnectionError = (
+        ['ITEM_LOGIN_REQUIRED', 'ACCESS_NOT_GRANTED', 'INVALID_ACCESS_TOKEN', 'ITEM_NOT_FOUND'].includes(errorCode) ||
+        statusCode === 400 ||
+        error.message?.includes('400') ||
+        error.message?.toLowerCase().includes('invalid') ||
+        error.message?.toLowerCase().includes('expired')
+      );
+      
+      console.log('Enhanced error analysis:', {
+        errorCode,
+        errorType,
+        statusCode,
+        isConnectionError,
+        errorMessage: error.message,
+        shouldReconnect: isConnectionError
+      });
+      
+      // If it's a connection error, try auto-reconnection ONCE
+      if (isConnectionError && !plaidItem.errorCode) { // Only try if this isn't a repeated failure
+        console.log(`🔄 Auto-reconnecting ${plaidItem.institutionName} due to connection error...`);
+        
+        try {
+          // Create update link token and mark for manual reconnection
+          await plaidService.createUpdateLinkToken(plaidItem.userId, plaidItem.itemId);
+          
+          console.log(`✅ Update link token created for ${plaidItem.institutionName}`);
+          
+          // Mark as requiring reconnection but provide the means to do it
+          const { error: reconnectUpdateError } = await supabaseAdmin
+            .from('plaid_items')
+            .update({
+              status: 'expired',
+              errorCode: errorCode,
+              errorMessage: 'Connection expired - reconnection required'
+            })
+            .eq('itemId', plaidItem.itemId);
 
+          if (reconnectUpdateError) {
+            console.error('Failed to update plaid item for reconnection:', reconnectUpdateError);
+          }
+          
+          return NextResponse.json({ 
+            itemId: plaidItem.itemId, 
+            status: 'error', 
+            error: 'Connection expired',
+            requiresReconnection: true,
+            canAutoReconnect: true
+          }, { status: 502 });
+          
+        } catch (reconnectError) {
+          console.error(`Failed to prepare reconnection for ${plaidItem.institutionName}:`, reconnectError);
+          // Fall through to regular error handling
+        }
+      }
+      
+      // Update connection status based on error type
+      const newStatus = isConnectionError ? 'expired' : 'error';
+      
+      const { error: statusUpdateError } = await supabaseAdmin
+        .from('plaid_items')
+        .update({
+          status: newStatus,
+          errorCode: errorCode,
+          errorMessage: error.message || error?.response?.data?.error_message || 'Unknown sync error'
+        })
+        .eq('itemId', plaidItem.itemId);
+
+      if (statusUpdateError) {
+        console.error('Failed to update plaid item error status:', statusUpdateError);
+      }
+      
       return NextResponse.json({ 
-        success: true, 
-        message: `Synced ${transactionsToInsert.length} transactions and regenerated billing cycles`,
-        transactionCount: transactionsToInsert.length
-      });
-    } else {
-      console.log('⚠️ No transactions found in the last 30 days');
-      return NextResponse.json({ 
-        success: true, 
-        message: 'No transactions found in the last 30 days',
-        transactionCount: 0,
-        deletedCount: 0
-      });
+        itemId: plaidItem.itemId, 
+        status: 'error', 
+        error: error.message,
+        requiresReconnection: isConnectionError
+      }, { status: 502 });
     }
+
+    // Step 4: Delete existing billing cycles for the specific card(s) being synced
+    console.log('Step 4: Deleting existing billing cycles for target card(s)...');
+    
+    // Get credit card IDs based on whether we're syncing a specific card or all cards
+    let creditCardIds: string[] = [];
+    if (cardId) {
+      creditCardIds = [cardId];
+    } else {
+      creditCardIds = plaidItem.credit_cards.map((card: any) => card.id);
+    }
+    
+    // Delete existing billing cycles for only the target card(s)
+    const { error: deleteError, count: deletedCount } = await supabaseAdmin
+      .from('billing_cycles')
+      .delete()
+      .in('creditCardId', creditCardIds);
+
+    if (deleteError) {
+      console.error('Failed to delete existing billing cycles for target card(s):', deleteError);
+    } else {
+      console.log(`🗑️ Deleted ${deletedCount || 0} existing billing cycles for target card(s)`);
+    }
+    
+    // Step 5: Regenerate billing cycles using all available data (not just 30-day window)
+    console.log('Step 5: Regenerating billing cycles with complete transaction history...');
+    const { calculateBillingCycles } = await import('@/utils/billingCycles');
+    
+    for (const creditCardId of creditCardIds) {
+      console.log(`🔄 Regenerating billing cycles for card ${creditCardId}`);
+      try {
+        await calculateBillingCycles(creditCardId);
+        console.log(`✅ Billing cycles regenerated for card ${creditCardId}`);
+      } catch (cycleError) {
+        console.error(`❌ Failed to regenerate billing cycles for card ${creditCardId}:`, cycleError);
+        // Continue with other cards
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: `Successfully synced account data, 30-day transactions, and regenerated billing cycles`,
+      cardsSynced: creditCardIds.length
+    });
 
   } catch (error) {
     console.error('Error syncing card transactions:', error);

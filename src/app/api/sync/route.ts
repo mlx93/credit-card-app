@@ -97,13 +97,13 @@ export async function POST(request: NextRequest) {
         console.log('PlaidService method exists?', typeof plaidService.syncTransactions);
         
         try {
-          // syncTransactions method doesn't have daily sync protections built-in
-          // It always syncs when called, which is what we want for both regular and force sync
+          // Use 30-day sync for regular refreshes to reduce API costs
+          // Historical transactions are preserved from initial card setup
           if (forceSync) {
-            console.log('⚡ Force sync: Bypassing any daily sync protections');
+            console.log('⚡ Force sync: Using 30-day transaction sync');
           }
-          await plaidService.syncTransactions(item, decryptedAccessToken);
-          console.log('Step 2: Transaction sync completed successfully');
+          await plaidService.sync30DayTransactions(item, decryptedAccessToken);
+          console.log('Step 2: 30-day transaction sync completed successfully');
         } catch (syncError) {
           console.error('🚨 TRANSACTION SYNC ERROR:', syncError);
           console.error('Error details:', {

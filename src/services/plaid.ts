@@ -25,7 +25,8 @@ export interface PlaidService {
   getBalances(accessToken: string): Promise<any>;
   getStatements(accessToken: string, accountId: string): Promise<any[]>;
   syncAccounts(accessToken: string, itemId: string): Promise<void>;
-  syncTransactions(plaidItemRecord: any, accessToken: string): Promise<void>;
+  syncTransactions(plaidItemRecord: any, accessToken: string, cardId?: string): Promise<void>;
+  sync30DayTransactions(plaidItemRecord: any, accessToken: string, cardId?: string): Promise<void>;
   syncHistoricalTransactions(plaidItemRecord: any, accessToken: string, cutoffDate: Date): Promise<void>;
   forceReconnectionSync(accessToken: string, itemId: string, userId: string): Promise<{success: boolean, details: any}>;
 }
@@ -1541,8 +1542,8 @@ class PlaidServiceImpl implements PlaidService {
     }
   }
 
-  async syncTransactions(plaidItemRecord: any, accessToken: string): Promise<void> {
-    console.log('🚀 TRANSACTION SYNC METHOD CALLED!', { itemId: plaidItemRecord.itemId, hasAccessToken: !!accessToken });
+  async syncTransactions(plaidItemRecord: any, accessToken: string, cardId?: string): Promise<void> {
+    console.log('🚀 TRANSACTION SYNC METHOD CALLED!', { itemId: plaidItemRecord.itemId, hasAccessToken: !!accessToken, cardId: cardId || 'all cards' });
     
     // Validate access token format
     if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) {
@@ -1634,12 +1635,19 @@ class PlaidServiceImpl implements PlaidService {
       let processedCount = 0;
       let creditCardFoundCount = 0;
       
-      // Batch fetch all credit cards for this plaid item to avoid N queries
+      // Batch fetch credit cards for this plaid item (optionally filtered by cardId)
       const uniqueAccountIds = [...new Set(transactions.map(t => t.account_id))];
-      const { data: creditCards, error: creditCardsError } = await supabaseAdmin
+      let query = supabaseAdmin
         .from('credit_cards')
         .select('*')
         .in('accountId', uniqueAccountIds);
+      
+      if (cardId) {
+        query = query.eq('id', cardId);
+        console.log(`🎯 Filtering transactions for specific card: ${cardId}`);
+      }
+      
+      const { data: creditCards, error: creditCardsError } = await query;
       
       if (creditCardsError) {
         console.error('Error fetching credit cards:', creditCardsError);
@@ -1891,6 +1899,199 @@ class PlaidServiceImpl implements PlaidService {
       console.error('Stack trace:', error.stack);
       console.error('=== END TRANSACTION SYNC ERROR ===');
       throw error; // Re-throw to propagate error up
+    }
+  }
+
+  /**
+   * 30-DAY TRANSACTION SYNC for regular refreshes
+   * 
+   * This method implements a "refresh" strategy where we:
+   * 1. Delete existing transactions in the 30-day window
+   * 2. Fetch fresh transactions from Plaid API (last 30 days only)
+   * 3. Insert fresh transactions
+   * 4. Preserve historical transactions outside the 30-day window
+   * 
+   * Benefits:
+   * - Reduced API costs by limiting to 30 days
+   * - Fresh, accurate data for recent transactions
+   * - Preserves historical data beyond API limitations
+   * - Consistent with individual card sync behavior
+   */
+  async sync30DayTransactions(plaidItemRecord: any, accessToken: string, cardId?: string): Promise<void> {
+    console.log('🔄 30-DAY TRANSACTION SYNC for regular refresh', { itemId: plaidItemRecord.itemId, cardId: cardId || 'all cards' });
+    
+    try {
+      // Determine institution type
+      const isCapitalOneItem = this.isCapitalOne(plaidItemRecord.institutionName);
+      const isRobinhoodItem = this.isRobinhood(plaidItemRecord.institutionName);
+      console.log(`Institution type: ${isCapitalOneItem ? 'Capital One' : isRobinhoodItem ? 'Robinhood' : 'Standard'}`);
+
+      // Calculate 30-day window
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+      
+      console.log(`📅 30-day sync window: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+
+      // Step 1: Get credit cards for this Plaid item (optionally filtered by cardId)
+      let query = supabaseAdmin
+        .from('credit_cards')
+        .select('*')
+        .eq('plaidItemId', plaidItemRecord.id);
+      
+      if (cardId) {
+        query = query.eq('id', cardId);
+      }
+      
+      const { data: creditCards, error: creditCardsError } = await query;
+
+      if (creditCardsError) {
+        throw new Error(`Failed to fetch credit cards: ${creditCardsError.message}`);
+      }
+
+      const creditCardIds = (creditCards || []).map(card => card.id);
+      console.log(`Found ${creditCardIds.length} credit cards for 30-day sync ${cardId ? '(filtered by cardId)' : '(all cards)'}`);}
+
+      // Step 2: Delete existing transactions in the 30-day window
+      if (creditCardIds.length > 0) {
+        console.log(`🗑️ Deleting existing transactions in 30-day window...`);
+        
+        const { error: deleteError, count: deletedCount } = await supabaseAdmin
+          .from('transactions')
+          .delete()
+          .in('creditCardId', creditCardIds)
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0]);
+
+        if (deleteError) {
+          console.error('Error deleting transactions in 30-day window:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log(`🗑️ Deleted ${deletedCount || 0} existing transactions in 30-day window`);
+      }
+
+      // Step 3: Fetch fresh transactions from Plaid
+      console.log(`📶 Fetching fresh 30-day transactions from Plaid...`);
+      const transactions = await this.getTransactions(
+        accessToken,
+        startDate,
+        endDate,
+        isCapitalOneItem,
+        isRobinhoodItem
+      );
+
+      console.log(`✅ Fetched ${transactions.length} fresh transactions from Plaid`);
+
+      if (transactions.length === 0) {
+        console.log(`🚫 No transactions found in 30-day window`);
+        return;
+      }
+
+      // Step 4: Prepare transactions for insertion
+      const creditCardMap = new Map();
+      (creditCards || []).forEach(card => {
+        creditCardMap.set(card.accountId, card);
+      });
+
+      const transactionsToInsert: any[] = [];
+      let creditCardFoundCount = 0;
+
+      for (const transaction of transactions) {
+        const creditCard = creditCardMap.get(transaction.account_id);
+        
+        if (!creditCard) {
+          console.log('No credit card found for transaction:', {
+            transactionId: transaction.transaction_id,
+            accountId: transaction.account_id,
+            amount: transaction.amount,
+            date: transaction.date,
+            name: transaction.name
+          });
+          continue;
+        }
+        
+        creditCardFoundCount++;
+
+        // Validate transaction amount
+        if (!this.validateTransactionAmount(transaction.amount, transaction.name)) {
+          console.error(`Skipping invalid transaction: ${transaction.name} with amount: ${transaction.amount}`);
+          continue;
+        }
+
+        // Process category information
+        let categoryName = null;
+        let categoryId = null;
+        let subcategory = null;
+        
+        if (transaction.personal_finance_category) {
+          categoryName = transaction.personal_finance_category.primary;
+          categoryId = transaction.personal_finance_category.detailed;
+          subcategory = transaction.personal_finance_category.detailed;
+        } else if (transaction.category && transaction.category.length > 0) {
+          categoryName = transaction.category[0];
+          categoryId = transaction.category_id;
+          if (transaction.category.length > 1) {
+            subcategory = transaction.category[1];
+          }
+        }
+
+        const transactionRecord = {
+          id: crypto.randomUUID(),
+          plaidItemId: plaidItemRecord.id,
+          creditCardId: creditCard.id,
+          transactionId: transaction.transaction_id,
+          accountid: transaction.account_id,
+          plaidtransactionid: transaction.pending_transaction_id || null,
+          amount: transaction.amount,
+          isoCurrencyCode: transaction.iso_currency_code || null,
+          date: transaction.date,
+          authorizedDate: transaction.authorized_date || null,
+          name: transaction.name,
+          merchantName: transaction.merchant_name || null,
+          category: categoryName,
+          categoryId: categoryId,
+          subcategory: subcategory,
+          accountOwner: transaction.account_owner || null,
+          pending: transaction.pending || false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        transactionsToInsert.push(transactionRecord);
+      }
+
+      // Step 5: Insert fresh transactions
+      if (transactionsToInsert.length > 0) {
+        console.log(`💾 Inserting ${transactionsToInsert.length} fresh transactions...`);
+        
+        const { error: insertError } = await supabaseAdmin
+          .from('transactions')
+          .insert(transactionsToInsert);
+
+        if (insertError) {
+          console.error('Error inserting fresh transactions:', insertError);
+          throw insertError;
+        }
+
+        console.log(`✅ Successfully inserted ${transactionsToInsert.length} fresh transactions`);
+      }
+
+      // Summary
+      console.log(`=== 30-DAY SYNC SUMMARY ===`);
+      console.log(`📅 Sync Window: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+      console.log(`📋 Credit Cards: ${creditCardIds.length}`);
+      console.log(`📶 API Transactions: ${transactions.length}`);
+      console.log(`✅ Matched Transactions: ${creditCardFoundCount}`);
+      console.log(`💾 Inserted Transactions: ${transactionsToInsert.length}`);
+      console.log(`=== END 30-DAY SYNC ===`);
+      
+    } catch (error) {
+      console.error('=== 30-DAY TRANSACTION SYNC ERROR ===');
+      console.error('Error in sync30DayTransactions:', error);
+      console.error('Stack trace:', error.stack);
+      console.error('=== END 30-DAY SYNC ERROR ===');
+      throw error;
     }
   }
 
