@@ -1253,9 +1253,18 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
         // If sync was successful, we know the connection is working
         console.log('✅ Individual card sync completed successfully - connection is healthy');
       } else {
-        const errorData = await syncResponse.json();
-        console.error('❌ Failed to sync transactions:', errorData);
-        alert(`Failed to sync transactions: ${errorData.error || 'Unknown error'}`);
+        let errorText = 'Unknown error';
+        try {
+          const ct = syncResponse.headers.get('Content-Type') || '';
+          if (ct.includes('application/json')) {
+            const json = await syncResponse.json();
+            errorText = json.error || json.message || JSON.stringify(json);
+          } else {
+            errorText = await syncResponse.text();
+          }
+        } catch (e) {}
+        console.error('❌ Failed to sync transactions:', errorText);
+        alert(`Failed to sync transactions: ${errorText}`);
       }
     } catch (error) {
       console.error('Error syncing card:', error);

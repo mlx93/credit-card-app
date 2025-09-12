@@ -256,143 +256,83 @@ export async function calculateBillingCycles(
   const endBoundaries: Date[] = [];
   
   if (cycleDateType === 'dynamic_anchor') {
-    // Dynamic anchor logic: Reverse-engineer cycles considering weekend/holiday avoidance
+    // Dynamic anchor logic: Mathematical recurrence with anchor constraints
     console.log(`🎯 Using dynamic anchor logic with anchor day ${closingDay}`);
     
     // Start with the anchor date and work backwards
     endBoundaries.push(new Date(anchorEnd)); // Most recent (month 0)
     
-    // Credit cards adjust closing dates to:
-    // 1. Avoid weekends/holidays for due dates (typically 21-25 days after close)
-    // 2. Maintain cycle lengths between 27-31 days (ideally ~30)
-    // 3. Keep month-end consistency as the primary goal
-    
-    // Helper to check if a date falls on weekend
-    const isWeekend = (date: Date) => {
-      const day = date.getDay();
-      return day === 0 || day === 6; // Sunday or Saturday
-    };
-    
-    // Helper to adjust date to avoid weekend (move to Friday if weekend)
-    const avoidWeekend = (date: Date, direction: 'backward' | 'forward' = 'backward') => {
-      const day = date.getDay();
-      if (day === 0) { // Sunday
-        return direction === 'backward' ? -2 : 1; // Move to Friday or Monday
-      } else if (day === 6) { // Saturday
-        return direction === 'backward' ? -1 : 2; // Move to Friday or Monday
-      }
-      return 0; // No adjustment needed
-    };
-    
-    // Track the pattern to maintain consistency
-    let lastAdjustment = 0;
+    // Use mathematical recurrence: d_{k-1} = d_k + L_{k-1} - T_{k-1}
+    // But constrain the result to stay within reasonable range of anchor
     
     for (let m = 1; m <= 12; m++) {
-      const prevBoundary = endBoundaries[m - 1];
-      const prevMonth = prevBoundary.getMonth();
-      const prevYear = prevBoundary.getFullYear();
-      const prevDay = prevBoundary.getDate();
+      const E_k = endBoundaries[m - 1]; // Current end date
+      const d_k = E_k.getDate(); // Day of current end
+      const currentMonth = E_k.getMonth();
+      const currentYear = E_k.getFullYear();
       
-      // Calculate the target month (1 month before)
-      let targetMonth = prevMonth - 1;
-      let targetYear = prevYear;
-      if (targetMonth < 0) {
-        targetMonth = 11;
-        targetYear--;
+      // Calculate previous month
+      let prevMonth = currentMonth - 1;
+      let prevYear = currentYear;
+      if (prevMonth < 0) {
+        prevMonth = 11;
+        prevYear--;
       }
       
-      const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-      const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+      // L_{k-1} = number of days in the previous month
+      const L_prev = new Date(prevYear, prevMonth + 1, 0).getDate();
       
-      // Start with the anchor day
-      let targetDay = closingDay;
+      // Determine target cycle length T_{k-1} based on constraints
+      let targetCycleLength = 30; // Default to 30 days
       
-      // Calculate what the due date would be (typically 21-25 days after close)
-      const potentialClose = new Date(targetYear, targetMonth, Math.min(targetDay, daysInTargetMonth));
-      const potentialDue = new Date(potentialClose);
-      potentialDue.setDate(potentialDue.getDate() + 23); // Typical grace period
-      
-      // Check if due date would fall on weekend
-      const dueWeekendAdjust = avoidWeekend(potentialDue);
-      
-      // If due date needs adjustment, we might shift the closing date
-      if (dueWeekendAdjust !== 0) {
-        // Adjust closing date in opposite direction to maintain cycle length
-        targetDay += dueWeekendAdjust;
-        console.log(`📅 Adjusting ${targetMonth + 1}/${targetDay - dueWeekendAdjust} → ${targetDay} to avoid weekend due date`);
-      }
-      
-      // Now check cycle length with this closing date
-      const testDate = new Date(targetYear, targetMonth, Math.min(targetDay, daysInTargetMonth));
-      const testStart = new Date(testDate);
-      testStart.setDate(testStart.getDate() + 1);
-      const cycleLength = Math.floor((prevBoundary.getTime() - testStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      
-      // Apply month-end consistency rules
-      if (targetMonth === 1) { // February special case
-        // February needs aggressive adjustment for its short length
-        // Proportionally scale: 19/31 * 28 ≈ 17 for non-leap, 18 for leap
-        const februaryRatio = daysInTargetMonth / 31;
-        targetDay = Math.round(closingDay * februaryRatio);
-        // Further adjust if this creates too short/long cycle
-        if (cycleLength > 31) targetDay--;
-        if (cycleLength < 27) targetDay++;
+      // Special handling for February transitions
+      if (prevMonth === 1) { // February
+        targetCycleLength = 27; // Shorter cycle from Feb to accommodate short month
+      } else if (currentMonth === 2) { // March (coming from Feb)
+        targetCycleLength = 30; // Longer cycle to rebalance after February
       } else {
-        // For non-February months, maintain consistency while keeping cycles 27-31 days
-        
-        // Primary rule: Keep cycles between 27-31 days
-        if (cycleLength > 31) {
-          targetDay--; // Move earlier to shorten
-          lastAdjustment = -1;
-        } else if (cycleLength < 27) {
-          targetDay++; // Move later to lengthen
-          lastAdjustment = 1;
-        } else if (cycleLength === 31) {
-          // 31 days is acceptable, but consider alternating for balance
-          // If previous month has 30 days and we didn't adjust, do a small adjustment
-          if (daysInTargetMonth === 30 && lastAdjustment === 0) {
-            targetDay--; // Create variation
-            lastAdjustment = -1;
-          }
-        } else if (cycleLength === 28 && daysInPrevMonth === 31) {
-          // If coming from a 31-day month with a 28-day cycle, we likely adjusted down
-          // Consider returning to anchor for next cycle
-          if (prevDay < closingDay) {
-            targetDay = closingDay; // Return to anchor
-            lastAdjustment = 0;
-          }
+        // For other months, aim for 29-31 days based on month lengths
+        if (L_prev === 31 && new Date(currentYear, currentMonth + 1, 0).getDate() === 30) {
+          targetCycleLength = 31; // 31-day to 30-day month
+        } else if (L_prev === 30 && new Date(currentYear, currentMonth + 1, 0).getDate() === 31) {
+          targetCycleLength = 29; // 30-day to 31-day month
         }
-        
-        // Secondary rule: Account for month-end variations
-        // If target month has fewer days than anchor, we must cap
-        if (targetDay > daysInTargetMonth) {
-          targetDay = daysInTargetMonth;
-        }
-        
-        // Tertiary rule: Maintain pattern consistency
-        // After a -1 adjustment in a 31-day month, often return to anchor
-        if (lastAdjustment === -1 && daysInPrevMonth === 31 && daysInTargetMonth === 30) {
-          targetDay = Math.min(closingDay, daysInTargetMonth);
-          lastAdjustment = 0;
-        }
+      }
+      
+      // Apply the recurrence: d_{k-1} = d_k + L_{k-1} - T_{k-1}
+      let d_prev = d_k + L_prev - targetCycleLength;
+      
+      // Constrain to reasonable range around anchor (±3 days typically)
+      const anchorRange = 3;
+      const minDay = Math.max(1, closingDay - anchorRange);
+      const maxDay = Math.min(L_prev, closingDay + anchorRange);
+      
+      // Special case for February - allow more deviation
+      if (prevMonth === 1) {
+        const februaryRatio = L_prev / 31;
+        const idealFebruaryDay = Math.round(closingDay * februaryRatio);
+        d_prev = Math.max(idealFebruaryDay - 2, Math.min(idealFebruaryDay + 2, d_prev));
+      } else {
+        // For other months, keep within anchor range
+        d_prev = Math.max(minDay, Math.min(maxDay, d_prev));
       }
       
       // Final bounds check
-      targetDay = Math.min(targetDay, daysInTargetMonth);
-      targetDay = Math.max(1, targetDay);
+      d_prev = Math.max(1, Math.min(d_prev, L_prev));
       
-      const adjustedDate = new Date(targetYear, targetMonth, targetDay);
+      // Create the previous end date E_{k-1}
+      const E_prev = new Date(prevYear, prevMonth, d_prev);
+      endBoundaries.push(E_prev);
       
-      // Calculate actual cycle length for logging
-      const adjustedStart = new Date(adjustedDate);
-      adjustedStart.setDate(adjustedStart.getDate() + 1);
-      const actualCycleLength = Math.floor((prevBoundary.getTime() - adjustedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      // Calculate actual cycle length for verification
+      const cycleStart = new Date(E_prev);
+      cycleStart.setDate(cycleStart.getDate() + 1);
+      const actualCycleLength = Math.floor((E_k.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      console.log(`📊 ${monthNames[targetMonth]} ${targetDay}: Creates ${actualCycleLength}-day cycle ` +
-                  `(${monthNames[targetMonth]} ${targetDay + 1} - ${monthNames[prevMonth]} ${prevDay})`);
-      
-      endBoundaries.push(adjustedDate);
+      console.log(`📊 ${monthNames[prevMonth]} ${d_prev}: Creates ${actualCycleLength}-day cycle ` +
+                  `(${monthNames[prevMonth]} ${d_prev + 1} - ${monthNames[currentMonth]} ${d_k}) ` +
+                  `[recurrence: ${d_k} + ${L_prev} - ${targetCycleLength} = ${d_k + L_prev - targetCycleLength}→${d_prev}]`);
     }
     
     console.log(`🎯 Generated ${endBoundaries.length} dynamic anchor boundaries`);
