@@ -151,7 +151,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
       }
       // else keep existing
     }
-    return Array.from(byKey.values()).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    return Array.from(byKey.values()).sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
   }
 
   // Merge helper: combine recent cycles with any existing historical cycles in state
@@ -1940,7 +1940,9 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
           setBillingCycles(prev => {
             // Remove old cycles for this card and replace with new ones
             const kept = Array.isArray(prev) ? prev.filter(c => c.creditCardId !== cardId) : [];
-            return dedupeCycles([...kept, ...newCycles]);
+            const merged = dedupeCycles([...kept, ...newCycles]);
+            // Sort cycles by end date (newest first) to ensure correct display order
+            return merged.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
           });
         }
         
