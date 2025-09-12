@@ -256,20 +256,65 @@ export async function calculateBillingCycles(
   const endBoundaries: Date[] = [];
   
   if (cycleDateType === 'dynamic_anchor') {
-    // Dynamic anchor logic: Mathematical recurrence with anchor constraints
+    // Dynamic anchor logic: Based on Amex pattern analysis
     console.log(`🎯 Using dynamic anchor logic with anchor day ${closingDay}`);
+    
+    // Helper function to choose cycle length based on month transitions
+    const chooseCycleLength = (
+      prevMonthDays: number,
+      currentMonth: number,
+      currentYear: number,
+      currentEndDay: number,
+      recentLengths: number[]
+    ): number => {
+      // Dec -> Jan: keep 31 to avoid over-correcting around Feb
+      if (currentMonth === 0) { // January (0-indexed)
+        return 31;
+      }
+      // Jan -> Feb (short) and Feb -> Mar (give-back)
+      if (currentMonth === 1) { // February
+        return new Date(currentYear, 2, 0).getDate(); // Days in Feb (28 or 29)
+      }
+      if (currentMonth === 2) { // March
+        return 31;
+      }
+      
+      // Previous month had 30 days
+      if (prevMonthDays === 30) {
+        return currentEndDay === closingDay ? 31 : 30;
+      }
+      
+      // Previous month had 31 days
+      if (prevMonthDays === 31) {
+        if (currentEndDay === closingDay) {
+          return 32; // Will be clamped to 31 in practice
+        } else {
+          // Prefer 31 specifically when current end is in November
+          if (currentMonth === 10) { // November (0-indexed)
+            return 31;
+          }
+          // Stability: break long runs of 30-day cycles
+          if (recentLengths.length >= 2 && 
+              recentLengths[recentLengths.length - 1] === 30 && 
+              recentLengths[recentLengths.length - 2] === 30) {
+            return 31;
+          }
+          return 30;
+        }
+      }
+      
+      return 30; // Default safeguard
+    };
     
     // Start with the anchor date and work backwards
     endBoundaries.push(new Date(anchorEnd)); // Most recent (month 0)
-    
-    // Use mathematical recurrence: d_{k-1} = d_k + L_{k-1} - T_{k-1}
-    // But constrain the result to stay within reasonable range of anchor
+    const recentLengths: number[] = [];
     
     for (let m = 1; m <= 12; m++) {
-      const E_k = endBoundaries[m - 1]; // Current end date
-      const d_k = E_k.getDate(); // Day of current end
-      const currentMonth = E_k.getMonth();
-      const currentYear = E_k.getFullYear();
+      const currentEnd = endBoundaries[m - 1];
+      const currentEndDay = currentEnd.getDate();
+      const currentMonth = currentEnd.getMonth();
+      const currentYear = currentEnd.getFullYear();
       
       // Calculate previous month
       let prevMonth = currentMonth - 1;
@@ -279,60 +324,32 @@ export async function calculateBillingCycles(
         prevYear--;
       }
       
-      // L_{k-1} = number of days in the previous month
-      const L_prev = new Date(prevYear, prevMonth + 1, 0).getDate();
+      // Days in previous month
+      const prevMonthDays = new Date(prevYear, prevMonth + 1, 0).getDate();
       
-      // Determine target cycle length T_{k-1} based on constraints
-      let targetCycleLength = 30; // Default to 30 days
+      // Choose cycle length based on pattern
+      const T = chooseCycleLength(prevMonthDays, currentMonth, currentYear, currentEndDay, recentLengths);
+      recentLengths.push(T);
       
-      // Special handling for February transitions
-      if (prevMonth === 1) { // February
-        targetCycleLength = 27; // Shorter cycle from Feb to accommodate short month
-      } else if (currentMonth === 2) { // March (coming from Feb)
-        targetCycleLength = 30; // Longer cycle to rebalance after February
-      } else {
-        // For other months, aim for 29-31 days based on month lengths
-        if (L_prev === 31 && new Date(currentYear, currentMonth + 1, 0).getDate() === 30) {
-          targetCycleLength = 31; // 31-day to 30-day month
-        } else if (L_prev === 30 && new Date(currentYear, currentMonth + 1, 0).getDate() === 31) {
-          targetCycleLength = 29; // 30-day to 31-day month
-        }
-      }
+      // Apply recurrence: d_prev = d_curr + days_in_prev_month - T
+      let d_prev = currentEndDay + prevMonthDays - T;
       
-      // Apply the recurrence: d_{k-1} = d_k + L_{k-1} - T_{k-1}
-      let d_prev = d_k + L_prev - targetCycleLength;
+      // Clamp to valid range
+      d_prev = Math.max(1, Math.min(prevMonthDays, d_prev));
       
-      // Constrain to reasonable range around anchor (±3 days typically)
-      const anchorRange = 3;
-      const minDay = Math.max(1, closingDay - anchorRange);
-      const maxDay = Math.min(L_prev, closingDay + anchorRange);
+      // Create the previous end date
+      const prevEnd = new Date(prevYear, prevMonth, d_prev);
+      endBoundaries.push(prevEnd);
       
-      // Special case for February - allow more deviation
-      if (prevMonth === 1) {
-        const februaryRatio = L_prev / 31;
-        const idealFebruaryDay = Math.round(closingDay * februaryRatio);
-        d_prev = Math.max(idealFebruaryDay - 2, Math.min(idealFebruaryDay + 2, d_prev));
-      } else {
-        // For other months, keep within anchor range
-        d_prev = Math.max(minDay, Math.min(maxDay, d_prev));
-      }
-      
-      // Final bounds check
-      d_prev = Math.max(1, Math.min(d_prev, L_prev));
-      
-      // Create the previous end date E_{k-1}
-      const E_prev = new Date(prevYear, prevMonth, d_prev);
-      endBoundaries.push(E_prev);
-      
-      // Calculate actual cycle length for verification
-      const cycleStart = new Date(E_prev);
+      // Calculate actual cycle length for logging
+      const cycleStart = new Date(prevEnd);
       cycleStart.setDate(cycleStart.getDate() + 1);
-      const actualCycleLength = Math.floor((E_k.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const actualCycleLength = Math.floor((currentEnd.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       console.log(`📊 ${monthNames[prevMonth]} ${d_prev}: Creates ${actualCycleLength}-day cycle ` +
-                  `(${monthNames[prevMonth]} ${d_prev + 1} - ${monthNames[currentMonth]} ${d_k}) ` +
-                  `[recurrence: ${d_k} + ${L_prev} - ${targetCycleLength} = ${d_k + L_prev - targetCycleLength}→${d_prev}]`);
+                  `(${monthNames[prevMonth]} ${d_prev + 1} - ${monthNames[currentMonth]} ${currentEndDay}) ` +
+                  `[T=${T}, recurrence: ${currentEndDay} + ${prevMonthDays} - ${T} = ${d_prev}]`);
     }
     
     console.log(`🎯 Generated ${endBoundaries.length} dynamic anchor boundaries`);
