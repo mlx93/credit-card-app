@@ -2074,7 +2074,7 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   })();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" suppressHydrationWarning={true}>
       <div className="max-w-none mx-auto px-9 py-4">
         {/* Header with title and Quick Actions */}
         <div className="mb-3 max-w-5xl mx-auto">
