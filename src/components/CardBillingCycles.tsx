@@ -717,15 +717,18 @@ function CardContent({
       });
     }
     
-    // Show current open cycle first (if it exists)
+    // Add current open cycle (if it exists)
     if (currentCycle) {
       recentCycles.push(currentCycle);
     }
     
-    // Show most recently closed cycle second (if it exists and is different from current)
+    // Add most recently closed cycle (if it exists and is different from current)
     if (mostRecentClosedCycle && (!currentCycle || mostRecentClosedCycle.id !== currentCycle.id)) {
       recentCycles.push(mostRecentClosedCycle);
     }
+    
+    // Sort recent cycles by end date (newest first) to ensure proper chronological order
+    recentCycles.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
     
     // All other cycles are historical - ensure we exclude BOTH current and most recent closed
     const shownCycleIds = new Set(recentCycles.map(c => c.id));
@@ -780,10 +783,6 @@ function CardContent({
   
   const allRecentCycles = recentCycles;
   const historical = historicalCycles;
-  
-  // For backward compatibility with existing code references
-  const recentClosedCycle = recentCycles.filter(c => c.statementBalance && c.statementBalance > 0);
-  const recentCurrentCycle = recentCycles.filter(c => !c.statementBalance || c.statementBalance <= 0);
 
   return (
     <div className={`rounded-lg border-2 ${cardColors[colorIndex]} ${cardBorderColors[colorIndex]} border-l-4`}>
@@ -902,20 +901,8 @@ function CardContent({
                   </div>
                 )}
                 
-                {/* Show recent current cycle first */}
-                {recentCurrentCycle.map(cycle => (
-                  <BillingCycleItem 
-                    key={cycle.id} 
-                    cycle={cycle}
-                    card={card}
-                    isHistorical={false}
-                    allCycles={allCycles}
-                    compactMode={compactMode}
-                  />
-                ))}
-                
-                {/* Show recent closed cycle with statement balance second */}
-                {recentClosedCycle.map(cycle => (
+                {/* Show all recent cycles in chronological order (newest first) */}
+                {allRecentCycles.map(cycle => (
                   <BillingCycleItem 
                     key={cycle.id} 
                     cycle={cycle}

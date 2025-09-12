@@ -144,7 +144,69 @@ export async function calculateBillingCycles(
 
   const cycles: BillingCycleData[] = [];
   
-  const lastStatementDate = creditCardWithTransactions.lastStatementIssueDate;
+  // For manual dates, calculate the anchor based on user configuration instead of Plaid data
+  let lastStatementDate = creditCardWithTransactions.lastStatementIssueDate;
+  const cycleDateType = (creditCardWithTransactions as any).cycle_date_type;
+  
+  if (creditCardWithTransactions.manual_dates_configured) {
+    // Use the same logic as the manual endpoint to calculate the most recent closed cycle date
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const todayDate = today.getDate();
+    
+    // Calculate the cycle end day for current month based on user's manual settings
+    let cycleEndDay: number;
+    
+    if (cycleDateType === 'same_day' && creditCardWithTransactions.manual_cycle_day) {
+      cycleEndDay = creditCardWithTransactions.manual_cycle_day;
+    } else if (cycleDateType === 'days_before_end' && creditCardWithTransactions.cycle_days_before_end) {
+      const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      cycleEndDay = daysInCurrentMonth - creditCardWithTransactions.cycle_days_before_end;
+    } else if (cycleDateType === 'dynamic_anchor' && creditCardWithTransactions.manual_cycle_day) {
+      const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      cycleEndDay = Math.min(creditCardWithTransactions.manual_cycle_day, daysInCurrentMonth);
+    } else {
+      // Fallback to Plaid data if manual configuration is incomplete
+      cycleEndDay = lastStatementDate ? lastStatementDate.getDate() : 1;
+    }
+    
+    // If today >= cycle end day, then current month's cycle has closed
+    // Otherwise, last month's cycle is the most recent closed
+    let targetMonth: number, targetYear: number;
+    if (todayDate >= cycleEndDay) {
+      // Current month's cycle has closed
+      targetMonth = currentMonth;
+      targetYear = currentYear;
+    } else {
+      // Last month's cycle is most recent closed
+      targetMonth = currentMonth - 1;
+      targetYear = currentMonth === 0 ? currentYear - 1 : currentYear; // Handle January -> December
+    }
+    
+    // Calculate the actual end date for the target month using manual settings
+    let manualCycleEndDay = cycleEndDay;
+    if (cycleDateType === 'days_before_end' && creditCardWithTransactions.cycle_days_before_end) {
+      const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      manualCycleEndDay = daysInTargetMonth - creditCardWithTransactions.cycle_days_before_end;
+    } else if (cycleDateType === 'dynamic_anchor' && creditCardWithTransactions.manual_cycle_day) {
+      const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      manualCycleEndDay = Math.min(creditCardWithTransactions.manual_cycle_day, daysInTargetMonth);
+    }
+    
+    // Override lastStatementDate with the calculated manual date
+    lastStatementDate = new Date(targetYear, targetMonth, manualCycleEndDay);
+    
+    console.log('🔧 Using manual date as anchor for billing cycles:', {
+      cycleDateType,
+      cycleEndDay,
+      targetMonth: targetMonth + 1, // Display as 1-12
+      targetYear,
+      manualCycleEndDay,
+      calculatedAnchor: lastStatementDate.toDateString(),
+      originalPlaidDate: creditCardWithTransactions.lastStatementIssueDate?.toDateString()
+    });
+  }
   const nextDueDate = creditCardWithTransactions.nextPaymentDueDate;
 
   // If explicit statement periods are provided, build cycles strictly from them
@@ -240,7 +302,6 @@ export async function calculateBillingCycles(
   const anchorEnd = new Date(lastStatementDate);
   // Get baseline closing day for same_day type (days_before_end is calculated per month)
   let baselineClosingDay = anchorEnd.getDate();
-  const cycleDateType = (creditCardWithTransactions as any).cycle_date_type;
   
   if (creditCardWithTransactions.manual_dates_configured) {
     if (cycleDateType === 'same_day' && creditCardWithTransactions.manual_cycle_day) {
