@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
   try {
     console.log('👥 Fetching all users...');
     
-    // Get all users
+    // Get all users (including potentially deleted ones)
     const { data: users, error: usersError } = await supabaseAdmin
       .from('users')
-      .select('id, email, name, createdAt, updatedAt')
+      .select('id, email, name, createdAt, updatedAt, deletedAt')
       .order('createdAt', { ascending: true });
 
     if (usersError) {
@@ -30,15 +30,45 @@ export async function GET(request: NextRequest) {
       .select('userId, provider, type')
       .order('userId');
 
-    console.log('👥 Accounts data:', accounts);
-    console.log('👥 Accounts error:', accountsError);
+    // Get Plaid items count per user
+    const { data: plaidItems, error: plaidItemsError } = await supabaseAdmin
+      .from('plaid_items')
+      .select('userId, institutionName, status')
+      .order('userId');
 
-    const usersWithAuthType = users?.map(user => {
+    // Get credit cards count per user
+    const { data: creditCards, error: creditCardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('userId, name, plaidItemId')
+      .order('userId');
+
+    console.log('👥 Accounts data:', accounts);
+    console.log('👥 Plaid items:', plaidItems?.length || 0);
+    console.log('👥 Credit cards:', creditCards?.length || 0);
+
+    const usersWithDetails = users?.map(user => {
       const userAccounts = accounts?.filter(acc => acc.userId === user.id) || [];
-      const hasOAuth = userAccounts.length > 0;
+      const userPlaidItems = plaidItems?.filter(item => item.userId === user.id) || [];
+      const userCreditCards = creditCards?.filter(card => card.userId === user.id) || [];
+      
+      // Fix auth type logic - check provider type, not just existence
+      const hasGoogleOAuth = userAccounts.some(acc => acc.provider === 'google' && acc.type === 'oauth');
+      const hasEmailCode = userAccounts.some(acc => acc.provider === 'email-code' && acc.type === 'credentials');
+      
+      let authType = 'Unknown';
+      if (hasGoogleOAuth) {
+        authType = 'Google OAuth';
+      } else if (hasEmailCode) {
+        authType = 'Email Code';
+      }
+      
+      const isDeleted = !!user.deletedAt;
       
       console.log(`👥 User ${user.email}:`, {
-        hasOAuth,
+        authType,
+        plaidConnections: userPlaidItems.length,
+        creditCards: userCreditCards.length,
+        isDeleted,
         accounts: userAccounts
       });
       
@@ -47,19 +77,35 @@ export async function GET(request: NextRequest) {
         email: user.email,
         name: user.name || 'No name',
         createdAt: user.createdAt,
-        authType: hasOAuth ? 'Google OAuth' : 'Email Code',
+        authType,
+        isDeleted,
+        deletedAt: user.deletedAt,
+        plaidConnections: userPlaidItems.length,
+        plaidConnectionDetails: userPlaidItems.map(item => ({
+          institutionName: item.institutionName,
+          status: item.status
+        })),
+        creditCards: userCreditCards.length,
+        creditCardNames: userCreditCards.map(card => card.name),
         accountsFound: userAccounts
       };
     }) || [];
 
     console.log(`👥 Found ${users?.length || 0} total users`);
 
+    const activeUsers = usersWithDetails.filter(u => !u.isDeleted);
+    const deletedUsers = usersWithDetails.filter(u => u.isDeleted);
+
     return NextResponse.json({
       totalUsers: users?.length || 0,
-      users: usersWithAuthType,
+      activeUsers: activeUsers.length,
+      deletedUsers: deletedUsers.length,
+      users: usersWithDetails,
       summary: {
-        emailAuthUsers: usersWithAuthType.filter(u => u.authType === 'Email Code').length,
-        oauthUsers: usersWithAuthType.filter(u => u.authType === 'Google OAuth').length
+        emailAuthUsers: activeUsers.filter(u => u.authType === 'Email Code').length,
+        oauthUsers: activeUsers.filter(u => u.authType === 'Google OAuth').length,
+        totalPlaidConnections: activeUsers.reduce((sum, u) => sum + u.plaidConnections, 0),
+        totalCreditCards: activeUsers.reduce((sum, u) => sum + u.creditCards, 0)
       }
     });
 
