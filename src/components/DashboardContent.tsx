@@ -1973,12 +1973,29 @@ export function DashboardContent({ isLoggedIn, userEmail }: DashboardContentProp
   }, [isLoggedIn]);
 
   const displayCardsRaw = isLoggedIn ? (Array.isArray(creditCards) ? creditCards : []) : mockCards;
-  // Deduplicate cards visually by a stable identity key: normalized name + mask
+  // Deduplicate visually by normalized name+mask, preferring fresher/more accurate records
   const displayCards = (() => {
     const byKey = new Map<string, any>();
+    const pickBetter = (a: any, b: any) => {
+      // Prefer smaller absolute remaining statement balance (closer to paid)
+      const aStmt = Math.abs(a?.lastStatementBalance || 0);
+      const bStmt = Math.abs(b?.lastStatementBalance || 0);
+      if (aStmt !== bStmt) return aStmt < bStmt ? a : b;
+      // Prefer newer plaidItem.lastSyncAt
+      const aSync = a?.plaidItem?.lastSyncAt ? new Date(a.plaidItem.lastSyncAt).getTime() : 0;
+      const bSync = b?.plaidItem?.lastSyncAt ? new Date(b.plaidItem.lastSyncAt).getTime() : 0;
+      if (aSync !== bSync) return aSync > bSync ? a : b;
+      // Prefer newer updatedAt
+      const aUpd = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const bUpd = b?.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      if (aUpd !== bUpd) return aUpd > bUpd ? a : b;
+      return a; // stable fallback
+    };
     for (const c of displayCardsRaw) {
       const key = `${normalizeCardDisplayName(c.name || '', c.mask || '')}|${c.mask || ''}`.toLowerCase();
-      if (!byKey.has(key)) byKey.set(key, c);
+      const existing = byKey.get(key);
+      if (!existing) byKey.set(key, c);
+      else byKey.set(key, pickBetter(existing, c));
     }
     return Array.from(byKey.values());
   })();

@@ -191,27 +191,27 @@ const BillingCycleItem = ({ cycle, card, isHistorical = false, allCycles = [], c
     const accountedFor = mostRecentClosedBalance + openCycleSpend;
     const remainingFromOlderCycles = currentBalance - accountedFor;
     
-    // Check if this cycle IS the most recent closed cycle (should show "Due By" or "Outstanding")
-    
+    // Check if this cycle IS the most recent closed cycle
     if (mostRecentClosedCycle && cycle.id === mostRecentClosedCycle.id) {
-      // For the most recent closed cycle, check payment status
-      const cycleAmount = cycle.statementBalance || cycle.totalSpend || 0;
-      
-      // If current balance >= cycle amount, it hasn't been paid
-      if (currentBalance >= cycleAmount && cycleAmount > 0) {
-        // Check if the due date has passed (overdue)
+      const cycleAmount = Math.abs(cycle.statementBalance || cycle.totalSpend || 0);
+      const epsilon = 0.01;
+      // Remove open-cycle spend when assessing whether last statement is paid
+      const currentMinusOpen = Math.max(0, currentBalance - openCycleSpend);
+
+      // Treat as paid when only open-cycle spend remains (statement fully paid)
+      if (currentMinusOpen <= epsilon) {
+        paymentStatus = 'paid';
+        paymentAnalysis = 'Most recent closed cycle - Paid (only open-cycle spend remains)';
+      } else if (cycleAmount > 0) {
+        // Otherwise, unpaid or overdue
         if (cycle.dueDate && new Date(cycle.dueDate) < new Date()) {
           paymentStatus = 'outstanding';
-          const daysOverdue = Math.floor((new Date().getTime() - new Date(cycle.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-          paymentAnalysis = `Most recent closed cycle - OVERDUE by ${daysOverdue} days (balance: ${formatCurrency(currentBalance)}, statement: ${formatCurrency(cycleAmount)})`;
+          const daysOverdue = Math.floor((Date.now() - new Date(cycle.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+          paymentAnalysis = `Most recent closed cycle - OVERDUE by ${daysOverdue} days (unpaid: ${formatCurrency(cycleAmount)})`;
         } else {
           paymentStatus = 'due';
           paymentAnalysis = `Most recent closed cycle - Due By ${cycle.dueDate ? formatDate(cycle.dueDate) : 'NO DUE DATE'} (unpaid: ${formatCurrency(cycleAmount)})`;
         }
-      } else {
-        // Current balance < cycle amount means it's been at least partially paid
-        paymentStatus = 'paid';
-        paymentAnalysis = `Most recent closed cycle - Paid (current: ${formatCurrency(currentBalance)} < statement: ${formatCurrency(cycleAmount)})`;
       }
     }
     // Step 3: Check if older cycles are paid
