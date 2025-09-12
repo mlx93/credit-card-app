@@ -211,6 +211,7 @@ async function handleTransactionWebhook(webhookCode: string, itemId: string) {
     case 'INITIAL_UPDATE':
     case 'HISTORICAL_UPDATE':
     case 'DEFAULT_UPDATE':
+    case 'SYNC_UPDATES_AVAILABLE':
       console.log(`Processing transaction update for item: ${itemId}`);
       
       // Get the plaid item and access token from database

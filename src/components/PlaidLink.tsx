@@ -109,6 +109,17 @@ export function PlaidLink({ onSuccess }: PlaidLinkProps) {
           setLoadingMessage('Loading balance info');
           setLoadingSubMessage('Preparing recent billing cycles...');
           
+          // Ensure webhook is configured so Plaid can notify when products are ready
+          try {
+            await fetch('/api/plaid/set-webhook', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ itemId: data.itemId })
+            });
+          } catch (e) {
+            console.warn('Failed to configure webhook (will rely on default):', e);
+          }
+          
           try {
             // Add timeout to instant-card-setup request (60 seconds)
             const controller = new AbortController();
