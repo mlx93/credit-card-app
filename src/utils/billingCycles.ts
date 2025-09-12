@@ -481,6 +481,11 @@ async function createOrUpdateCycle(
      /robinhood/i.test(creditCard.plaidItem?.institutionName || ''));
   
   const cycleTransactions = creditCard.transactions.filter((t: any) => {
+    // Exclude pending transactions from all calculations
+    if (t.pending === true) {
+      return false;
+    }
+    
     if (isRobinhoodWithManualDates && t.authorizedDate) {
       // For Robinhood with manual dates: use authorized date (posted date)
       return t.authorizedDate >= cycleStart && t.authorizedDate <= effectiveEndDate;
@@ -490,8 +495,13 @@ async function createOrUpdateCycle(
     }
   });
   
+  // Count pending transactions that were excluded
+  const pendingCount = creditCard.transactions.filter((t: any) => t.pending === true).length;
+  
   if (isRobinhoodWithManualDates) {
-    console.log(`🏦 Robinhood manual cycle: Using authorized dates for ${cycleTransactions.length} transactions between ${cycleStart.toDateString()} - ${effectiveEndDate.toDateString()}`);
+    console.log(`🏦 Robinhood manual cycle: Using authorized dates for ${cycleTransactions.length} posted transactions between ${cycleStart.toDateString()} - ${effectiveEndDate.toDateString()} (${pendingCount} pending excluded)`);
+  } else if (pendingCount > 0) {
+    console.log(`📊 Cycle includes ${cycleTransactions.length} posted transactions (${pendingCount} pending excluded)`);
   }
 
   // Properly calculate spend: include charges and refunds, but exclude payments
@@ -1089,6 +1099,11 @@ export async function calculateCurrentBillingCycle(creditCardId: string): Promis
         .data?.institutionName || ''));
     
     const cycleTransactions = transactionsWithDates.filter(t => {
+      // Exclude pending transactions from all calculations
+      if (t.pending === true) {
+        return false;
+      }
+      
       if (isRobinhoodWithManualDates && t.authorizedDate) {
         // For Robinhood with manual dates: use authorized date (posted date)
         return t.authorizedDate >= currentCycleStart && t.authorizedDate <= currentCycleEnd;
@@ -1295,6 +1310,11 @@ export async function calculateRecentClosedCycle(creditCardId: string): Promise<
         .data?.institutionName || ''));
     
     const cycleTransactions = transactionsWithDates.filter(t => {
+      // Exclude pending transactions from all calculations
+      if (t.pending === true) {
+        return false;
+      }
+      
       if (isRobinhoodWithManualDates && t.authorizedDate) {
         // For Robinhood with manual dates: use authorized date (posted date)
         return t.authorizedDate >= closedCycleStart && t.authorizedDate <= closedCycleEnd;

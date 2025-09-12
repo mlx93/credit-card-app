@@ -1408,6 +1408,7 @@ class PlaidServiceImpl implements PlaidService {
             categoryId: categoryId,
             subcategory: subcategory,
             accountOwner: transaction.account_owner,
+            pending: transaction.pending || false,
             updatedAt: new Date().toISOString(),
           };
         }).filter(Boolean); // Remove null entries
@@ -1779,6 +1780,7 @@ class PlaidServiceImpl implements PlaidService {
           categoryId: categoryId,
           subcategory: subcategory,
           accountOwner: transaction.account_owner,
+          pending: transaction.pending || false,
         };
 
         // Debug: Log category info for sample transactions

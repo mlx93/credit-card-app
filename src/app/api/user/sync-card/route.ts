@@ -128,6 +128,7 @@ export async function POST(request: NextRequest) {
             categoryId: transaction.category_id || null,
             subcategory: transaction.personal_finance_category?.detailed || null,
             accountOwner: transaction.account_owner || null,
+            pending: transaction.pending || false,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           });
