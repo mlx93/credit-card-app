@@ -37,9 +37,12 @@ export default function CycleDateEditor({
   isRobinhood = false
 }: CycleDateEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
-  // Use a single date type for both statement and due dates to keep them in sync
-  const [dateType, setDateType] = useState<'same_day' | 'days_before_end' | 'dynamic_anchor'>(
-    currentCycleDateType || currentDueDateType || 'same_day'
+  // Independent date types for cycle and due dates
+  const [cycleDateType, setCycleDateType] = useState<'same_day' | 'days_before_end' | 'dynamic_anchor'>(
+    currentCycleDateType || 'same_day'
+  );
+  const [dueDateType, setDueDateType] = useState<'same_day' | 'days_before_end' | 'dynamic_anchor'>(
+    currentDueDateType || 'same_day'
   );
   const [cycleDayInput, setCycleDayInput] = useState((currentCycleDay || 1).toString());
   const [cycleDaysBeforeEndInput, setCycleDaysBeforeEndInput] = useState(
