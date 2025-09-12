@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
         // Only insert if we have a matching credit card
         if (creditCardId && (!cardId || creditCardId === cardId)) {
           transactionsToInsert.push({
+            id: crypto.randomUUID(),
             plaidItemId: plaidItem.id,
             creditCardId,
             transactionId: transaction.transaction_id,
