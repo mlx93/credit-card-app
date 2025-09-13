@@ -50,8 +50,11 @@ export async function PUT(request: NextRequest) {
       .from('users')
       .upsert({ 
         id: session.user.id, 
-        email: session.user.email || '',
-        updatedAt: new Date().toISOString()
+        email: session.user.email || null,
+        name: session.user.name || null,
+        image: session.user.image || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }, { onConflict: 'id' })
       .select();
 
@@ -62,8 +65,13 @@ export async function PUT(request: NextRequest) {
 
     console.log('User upsert result:', userData);
 
+    if (!userData || userData.length === 0) {
+      console.error('User was not created/found after upsert');
+      return NextResponse.json({ success: false, error: 'Failed to create user record' }, { status: 500 });
+    }
+
     // Brief pause to ensure user record is committed before foreign key reference
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Direct upsert (user should exist now)
     const { data: orderData, error: upsertErr } = await supabaseAdmin
