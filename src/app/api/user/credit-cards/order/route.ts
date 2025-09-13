@@ -50,8 +50,8 @@ export async function PUT(request: NextRequest) {
       .from('users')
       .upsert({ 
         id: session.user.id, 
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        email: session.user.email || '',
+        updatedAt: new Date().toISOString()
       }, { onConflict: 'id' })
       .select();
 
