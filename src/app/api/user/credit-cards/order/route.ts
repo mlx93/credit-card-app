@@ -10,18 +10,25 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    console.log('GET card order for user:', session.user.id);
+
     // Direct table read (no RPC dependency)
     const { data: row, error: tblErr } = await supabaseAdmin
       .from('user_card_orders')
-      .select('order_ids')
+      .select('*')
       .eq('user_id', session.user.id)
       .maybeSingle();
+      
     if (tblErr) {
       console.warn('get_card_order table read failed:', tblErr.message);
       return NextResponse.json({ error: 'Failed to load order' }, { status: 500 });
     }
-    return NextResponse.json({ order: Array.isArray(row?.order_ids) ? row!.order_ids : [] });
+    
+    console.log('Retrieved card order from database:', row);
+    
+    return NextResponse.json({ order: Array.isArray(row?.order_ids) ? row.order_ids : [] });
   } catch (error) {
+    console.error('GET card order error:', error);
     return NextResponse.json({ order: [] });
   }
 }
