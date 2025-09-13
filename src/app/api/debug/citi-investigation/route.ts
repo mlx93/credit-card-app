@@ -12,16 +12,32 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Find Citi cards and their Plaid items
-    const { data: citiCards, error: cardsError } = await supabaseAdmin
+    // Find Citi cards by name
+    const { data: citiCardsByName, error: cardsError } = await supabaseAdmin
       .from('credit_cards')
       .select('*, plaidItem:plaid_items(*)')
       .eq('userId', session.user.id)
-      .or('name.ilike.%citi%,plaidItem.institutionName.ilike.%citi%');
+      .ilike('name', '%citi%');
 
     if (cardsError) {
       return NextResponse.json({ error: cardsError.message }, { status: 500 });
     }
+
+    // Also find cards where the plaid item institution name contains Citi
+    const { data: allCards, error: allCardsError } = await supabaseAdmin
+      .from('credit_cards')
+      .select('*, plaidItem:plaid_items(*)')
+      .eq('userId', session.user.id);
+
+    if (allCardsError) {
+      return NextResponse.json({ error: allCardsError.message }, { status: 500 });
+    }
+
+    // Filter for Citi cards (by name or institution)
+    const citiCards = allCards?.filter(card => 
+      card.name?.toLowerCase().includes('citi') ||
+      card.plaidItem?.institutionName?.toLowerCase().includes('citi')
+    ) || [];
 
     const results = [];
 

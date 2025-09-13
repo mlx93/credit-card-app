@@ -53,8 +53,8 @@ export async function PUT(request: NextRequest) {
         email: session.user.email || null,
         name: session.user.name || null,
         image: session.user.image || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }, { onConflict: 'id' })
       .select();
 
